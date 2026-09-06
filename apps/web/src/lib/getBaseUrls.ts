@@ -39,6 +39,9 @@ export const baseUrls: Record<string, string> = {
   pollinations: "https://text.pollinations.ai/openai",
   "google-gemini": "https://generativelanguage.googleapis.com/v1beta",
   gemini: "https://generativelanguage.googleapis.com/v1beta",
+  orcarouter: "https://api.orcarouter.ai/v1",
+  freeai: "https://api.free.ai/v1",
+  cline: "https://api.cline.bot/api/v1",
 };
 
 export function getBaseUrl(slug: string): string {

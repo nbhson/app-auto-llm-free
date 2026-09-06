@@ -9,7 +9,7 @@ function parseTiers(): string[][] {
         ["nvidia-nim", "groq", "cerebras", "google-gemini"],
         ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
         ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
-        ["openrouter", "kilo-code", "pollinations"],
+        ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
       ];
     return JSON.parse(raw);
   } catch {
@@ -17,7 +17,7 @@ function parseTiers(): string[][] {
       ["nvidia-nim", "groq", "cerebras", "google-gemini"],
       ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
       ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
-      ["openrouter", "kilo-code", "pollinations"],
+      ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
     ];
   }
 }
@@ -77,6 +77,10 @@ export const config = {
     nscale: parseKeys(process.env.NSCALE_API_KEYS),
     nebius: parseKeys(process.env.NEBIUS_API_KEYS),
     "ai21-labs": parseKeys(process.env.AI21_API_KEYS),
+    // custom from opencode.json (user)
+    orcarouter: parseKeys(process.env.ORCAROUTER_API_KEYS),
+    freeai: parseKeys(process.env.FREEAI_API_KEYS),
+    cline: parseKeys(process.env.CLINE_API_KEYS),
     // legacy / scraped
     nvidia: parseKeys(process.env.NVIDIA_API_KEYS),
     together: parseKeys(process.env.TOGETHER_API_KEYS),

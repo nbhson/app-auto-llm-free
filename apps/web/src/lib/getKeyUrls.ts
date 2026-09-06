@@ -1,4 +1,4 @@
-// Direct console URLs for obtaining API keys (from freellms.org Get API Key buttons)
+// Direct console URLs for obtaining API keys (from freellms.org Get API Key buttons + opencode config)
 export const getKeyUrls: Record<string, string> = {
   "nvidia-nim": "https://build.nvidia.com/settings/api-keys",
   groq: "https://console.groq.com/keys",
@@ -39,6 +39,9 @@ export const getKeyUrls: Record<string, string> = {
   novita: "https://novita.ai/settings/key",
   pollinations: "https://enter.pollinations.ai",
   "ollama-cloud": "https://ollama.com/settings/keys",
+  orcarouter: "https://api.orcarouter.ai",
+  freeai: "https://api.free.ai",
+  cline: "https://api.cline.bot",
 };
 
 export function getKeyUrl(slug: string): string {

@@ -47,6 +47,11 @@ export const providers: Record<string, Provider> = {
   nebius: OPENAI({ id: "nebius", baseUrl: "https://api.studio.nebius.com/v1" }),
   "ai21-labs": OPENAI({ id: "ai21-labs", baseUrl: "https://api.ai21.com/studio/v1" }),
 
+  // Custom from opencode.json (ORCAROUTER/FREEAI/CLINE)
+  orcarouter: OPENAI({ id: "orcarouter", baseUrl: "https://api.orcarouter.ai/v1" }),
+  freeai: OPENAI({ id: "freeai", baseUrl: "https://api.free.ai/v1" }),
+  cline: OPENAI({ id: "cline", baseUrl: "https://api.cline.bot/api/v1" }),
+
   // Legacy / extra
   together: OPENAI({ id: "together", baseUrl: "https://api.together.xyz/v1" }),
   fireworks: OPENAI({ id: "fireworks", baseUrl: "https://api.fireworks.ai/inference/v1" }),
@@ -88,9 +93,12 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   "grok-xai": { name: "Grok (xAI)", tier: "Permanent Free", tier_type: "permanent", caps: ["text"], noCard: false },
   siliconflow: { name: "SiliconFlow", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   deepseek: { name: "DeepSeek", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
+  orcarouter: { name: "OrcaRouter", tier: "Custom", tier_type: "custom", caps: ["text","reasoning"], noCard: true },
+  freeai: { name: "FreeAI", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
+  cline: { name: "Cline", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
 };
 
-// Alias map for smart routing (freellms-aware) — auto includes full 4-tier + public fallback
+// Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback
 export const modelAliases: Record<string, string[]> = {
   auto: [
     "nvidia-nim",
@@ -108,6 +116,9 @@ export const modelAliases: Record<string, string[]> = {
     "openrouter",
     "kilo-code",
     "pollinations",
+    "orcarouter",
+    "freeai",
+    "cline",
   ],
   "gpt-4": ["groq", "cerebras", "google-gemini", "openrouter", "nvidia-nim"],
   "gpt-3.5": ["groq", "pollinations", "ovhcloud-ai-endpoints", "modelscope"],
