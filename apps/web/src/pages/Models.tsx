@@ -10,12 +10,20 @@ function badge(status?: string) {
   return <span style={{ background: "#f1f5f9", color: "#64748b", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>{status || "unverified"}</span>;
 }
 
+function parseLimit(limit?: string): string {
+  if (!limit) return "-";
+  // Shorten: "Up to 40 RPM" -> "40 RPM", "15 RPM, 1,500 RPD" -> "15 RPM"
+  return limit;
+}
+
 export default function Models() {
   const [models, setModels] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [verified, setVerified] = useState<string>("all");
   const [live, setLive] = useState<Record<string, any>>({});
   const [checking, setChecking] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [usage, setUsage] = useState<Record<string, number>>({});
 
   const fetchModels = () => {
     const params = new URLSearchParams();
@@ -26,16 +34,45 @@ export default function Models() {
       .catch(() => setModels([]));
   };
 
-  useEffect(() => { fetchModels(); }, [verified]);
+  const fetchUsage = () => {
+    fetch(`/api/logs?limit=200`, { headers: { Authorization: `Bearer ${mk()}` } })
+      .then((r) => r.json()).then((d) => {
+        const map: Record<string, number> = {};
+        for (const l of d.data || []) {
+          const id = l.model || "";
+          map[id] = (map[id] || 0) + 1;
+        }
+        setUsage(map);
+      }).catch(() => {});
+  };
+
+  useEffect(() => { fetchModels(); fetchUsage(); }, [verified]);
+  useEffect(() => { setSelected(new Set()); setLive({}); }, [verified, q]);
 
   const filtered = models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase()) || (m.provider || "").toLowerCase().includes(q.toLowerCase()) || (m.owned_by || "").toLowerCase().includes(q.toLowerCase()));
+  const visible = filtered.slice(0, 200);
+  const allVisibleSelected = visible.length > 0 && visible.every((m) => selected.has(m.id));
 
-  const checkLive = async (ids: string[]) => {
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    if (allVisibleSelected) setSelected(new Set());
+    else setSelected(new Set(visible.map((m) => m.id)));
+  };
+
+  const checkSelected = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) { alert("Chọn ít nhất 1 model (tick checkbox)"); return; }
+    if (ids.length > 20) { if (!confirm(`Check ${ids.length} models sẽ mất ~${ids.length * 2}s và có thể hit rate limit. Tiếp tục?`)) return; }
     setChecking(true);
     try {
-      // Bulk: use provider filter if set, else check visible filtered
-      const toCheck = ids.length ? ids : filtered.slice(0, 10).map((m) => m.id);
-      for (const id of toCheck) {
+      for (const id of ids) {
         const res = await fetch(`/api/models/health?model=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${mk()}` } });
         const data = await res.json().catch(() => null);
         if (data) setLive((prev) => ({ ...prev, [id]: data }));
@@ -46,8 +83,8 @@ export default function Models() {
   return (
     <div>
       <h2>Models ({filtered.length})</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <input placeholder="Filter id/provider... (vd: nvidia-nim, gemini...)" value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: 8, width: 320, border: "1px solid #ddd", borderRadius: 6 }} />
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <input placeholder="Filter id/provider... (vd: nvidia, gemini...)" value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: 8, width: 300, border: "1px solid #ddd", borderRadius: 6 }} />
         <select value={verified} onChange={(e) => setVerified(e.target.value)} style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}>
           <option value="all">All (316)</option>
           <option value="free">Verified free</option>
@@ -55,22 +92,35 @@ export default function Models() {
           <option value="unverified">Unverified</option>
         </select>
         <button onClick={fetchModels}>Refresh</button>
-        <button onClick={() => checkLive([])} disabled={checking} style={{ background: checking ? "#f1f5f9" : "white" }}>{checking ? "Checking..." : "Check Live (10)"}</button>
-        <button onClick={() => { const ids = filtered.slice(0, 5).map((m) => m.id); if (ids.length) checkLive(ids); }} disabled={checking}>Check 5 visible</button>
+        <button onClick={checkSelected} disabled={checking || selected.size === 0} style={{ background: selected.size > 0 ? "#2563eb" : "#f1f5f9", color: selected.size > 0 ? "white" : "#64748b", border: selected.size > 0 ? "1px solid #2563eb" : "1px solid #ddd", opacity: checking ? 0.6 : 1 }}>
+          {checking ? "Checking..." : `Check Live (${selected.size})`}
+        </button>
+        <span style={{ fontSize: 12, color: "#666" }}>{selected.size} selected • tick checkbox để chọn</span>
       </div>
-      <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Verified: probe `/models` mỗi 24h (xanh verified, đỏ deprecated, vàng no-key). <b>Live</b>: bấm <code>Check Live</code> để gọi thử <code>POST /v1/chat/completions</code> với <code>Hi</code> (8s timeout) — biết model nào thực sự <b>usable</b>.</div>
+      <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Verified: probe 24h (xanh verified, đỏ deprecated, vàng no-key). <b>Live</b>: tick checkbox rồi bấm <code>Check Live</code> để gọi thử <code>POST /v1/chat/completions</code> (8s timeout) — biết model nào thực sự <b>usable</b>.</div>
       <table>
-        <thead><tr><th>ID</th><th>Provider</th><th>Context</th><th>Score</th><th>Status</th><th>Live</th><th>Limit</th></tr></thead>
+        <thead><tr><th><input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} title="Chọn tất cả visible" /></th><th>ID</th><th>Provider</th><th>Context</th><th>Score</th><th>Status</th><th>Live</th><th>Used / Limit</th></tr></thead>
         <tbody>
-          {filtered.slice(0, 200).map((m) => {
+          {visible.map((m) => {
             const h = live[m.id];
+            const used = usage[m.id] || 0;
             return (
-              <tr key={m.id}><td><code style={{ fontSize: 12 }}>{m.id}</code></td><td style={{ fontSize: 12 }}>{m.owned_by || m.provider}</td><td>{m.context_length ? (m.context_length >= 1000000 ? (m.context_length/1000000)+"M" : m.context_length >= 1000 ? Math.round(m.context_length/1000)+"K" : m.context_length) : "-"}</td><td>{m.score ?? "-"}</td><td>{badge(m.live_status)}</td><td style={{ fontSize: 11 }}>{h ? (h.status === "usable" ? <span style={{ color: "#16a34a" }}>✅ usable {h.latency_ms}ms</span> : h.status === "no-key" ? <span style={{ color: "#854d0e" }}>no-key</span> : <span style={{ color: "#dc2626" }}>{h.status} {h.http_status || ""}</span>) : <button onClick={() => checkLive([m.id])} style={{ fontSize: 11, padding: "2px 6px" }}>Check</button>}</td><td style={{ fontSize: 11 }}>{m.limit || "-"}</td></tr>
+              <tr key={m.id} style={{ background: selected.has(m.id) ? "#f0f9ff" : "transparent" }}>
+                <td><input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} /></td>
+                <td><code style={{ fontSize: 12 }}>{m.id}</code></td>
+                <td style={{ fontSize: 12 }}>{m.owned_by || m.provider}</td>
+                <td>{m.context_length ? (m.context_length >= 1000000 ? (m.context_length/1000000)+"M" : m.context_length >= 1000 ? Math.round(m.context_length/1000)+"K" : m.context_length) : "-"}</td>
+                <td>{m.score ?? "-"}</td>
+                <td>{badge(m.live_status)}</td>
+                <td style={{ fontSize: 11 }}>{h ? (h.status === "usable" ? <span style={{ color: "#16a34a" }}>✅ usable {h.latency_ms}ms</span> : h.status === "no-key" ? <span style={{ color: "#854d0e" }}>no-key</span> : <span style={{ color: "#dc2626" }}>{h.status} {h.http_status || ""}</span>) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                <td style={{ fontSize: 11 }}><span style={{ fontWeight: used > 0 ? 600 : 400 }}>{used}</span> / {parseLimit(m.limit)}</td>
+              </tr>
             );
           })}
         </tbody>
       </table>
       {filtered.length > 200 && <p style={{ fontSize: 12, color: "#888" }}>Hiển thị 200/{filtered.length} — dùng filter để thu hẹp.</p>}
+      {filtered.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>Không có model nào khớp filter.</p>}
     </div>
   );
 }
