@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
+import { useLang } from "../lib/i18n.tsx";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
 export default function Logs() {
+  const { t } = useLang();
   const [logs, setLogs] = useState<any[]>([]);
   const [live, setLive] = useState(false);
   const [stats, setStats] = useState<any>(null);
@@ -53,17 +55,17 @@ export default function Logs() {
 
   return (
     <div>
-      <h2>Logs & Stats</h2>
+      <h2>{t("logs.title")}</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={load}>↻ Refresh</button>
-        <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white", border: `1px solid ${live ? "#86efac" : "#e2e8f0"}`, display: "flex", gap: 6, alignItems: "center" }}>{live ? "● Live ON" : "○ Live OFF"}</button>
+        <button onClick={load}>{t("logs.refresh")}</button>
+        <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white", border: `1px solid ${live ? "#86efac" : "#e2e8f0"}`, display: "flex", gap: 6, alignItems: "center" }}>{live ? t("logs.live_on") : t("logs.live_off")}</button>
         <span style={{ fontSize: 12, color: "#666", alignSelf: "center" }}>{stats?.logs?.total ?? 0} total • {stats?.logs?.allTimeTokens?.toLocaleString() ?? 0} tokens all-time • avg {stats?.logs?.avgLatencyMs ?? 0}ms/{stats?.logs?.avgTokens ?? 0} tok • {Math.round((stats?.logs?.errorRate || 0) * 100)}% err</span>
       </div>
       {stats && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div className="card">
-              <h3>Requests by Provider</h3>
+              <h3>{t("dashboard.requests_by_provider")}</h3>
               {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}>
@@ -74,10 +76,10 @@ export default function Logs() {
                     <Bar dataKey="count" fill="#2563eb" />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+              ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
             </div>
             <div className="card">
-              <h3>Tokens by Provider (last 100)</h3>
+              <h3>{t("dashboard.tokens_by_provider")}</h3>
               {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}>
@@ -88,7 +90,7 @@ export default function Logs() {
                     <Bar dataKey="tokens" fill="#9333ea" />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+              ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
             </div>
             <div className="card">
               <h3>Status Distribution</h3>
@@ -104,7 +106,7 @@ export default function Logs() {
                     <Tooltip /><Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+              ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
             </div>
           </div>
           <div className="card" style={{ fontSize: 12, marginBottom: 12 }}><b>Tokens:</b> {(stats.logs.totalTokens ?? 0).toLocaleString()} last 100 ({(stats.logs.promptTokens ?? 0).toLocaleString()} prompt + {(stats.logs.completionTokens ?? 0).toLocaleString()} completion, avg {stats.logs.avgTokens ?? 0}/req) • <b>All-time:</b> {(stats.logs.allTimeTokens ?? 0).toLocaleString()} • <b>By provider:</b> {Object.entries(stats.logs.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}</div>
@@ -145,7 +147,7 @@ export default function Logs() {
           })}
         </tbody>
       </table>
-      {logs.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>Chưa có log — gọi <code>POST /v1/chat/completions</code> để tạo.</p>}
+      {logs.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>{t("logs.no_logs")}</p>}
     </div>
   );
 }
