@@ -31,8 +31,6 @@
 |:---:|:---:|
 | ![Providers — 43 live, health 5s](docs/images/providers.png) | ![Models — 324 live verify](docs/images/models.png) |
 
-> **Dashboard** 5 routes `Dashboard → Providers → Models → Keys → Logs` — Pagination 25/50 sticky, `hasKey` filter, `Sync Live Now` probe 24h, `Check Live (8s)` per-model, `Only with keys`, `Hide 404` persist strikethrough.
-
 ---
 
 ## ✨ Tính năng
