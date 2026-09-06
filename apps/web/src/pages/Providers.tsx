@@ -11,19 +11,33 @@ export default function Providers() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [q, setQ] = useState("");
+  const [hasKeyOnly, setHasKeyOnly] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = () => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (q) params.set("q", q);
+    if (hasKeyOnly) params.set("hasKey", "1");
     fetch(`/api/providers?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setData).catch(() => {});
+  };
+  const syncLive = async () => {
+    if (!confirm("Sync Live sẽ gọi provider.models() bằng key thật để cập nhật live list, có thể mất 20s. Tiếp tục?")) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`/api/models/live/sync`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" } });
+      const data = await res.json().catch(() => null);
+      await fetch(`/api/verify`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) }).catch(() => {});
+      alert(data ? `Sync xong: ${data.total} live models` : "Sync done");
+      load();
+    } catch (e: any) { alert("Sync failed: " + e.message); } finally { setSyncing(false); }
   };
   const checkHealth = () => {
     setLoadingHealth(true);
     fetch("/api/providers/health", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setHealth).finally(() => setLoadingHealth(false));
   };
 
-  useEffect(() => { load(); }, [page, limit, q]);
-  useEffect(() => { setPage(1); }, [q, limit]);
+  useEffect(() => { load(); }, [page, limit, q, hasKeyOnly]);
+  useEffect(() => { setPage(1); }, [q, limit, hasKeyOnly]);
 
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "provider" ? "asc" : "desc" }));
   const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
@@ -38,8 +52,10 @@ export default function Providers() {
             <pre style={{ fontSize: 11 }}>{JSON.stringify(data.tiers, null, 2)}</pre>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input placeholder="Filter provider..." value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: 6, width: 220, border: "1px solid #ddd", borderRadius: 6 }} />
+              <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12, background: hasKeyOnly ? "#dcfce7" : "white", border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 8, cursor: "pointer" }}><input type="checkbox" checked={hasKeyOnly} onChange={(e) => setHasKeyOnly(e.target.checked)} /> Chỉ hiện đã nhập key</label>
               <label style={{ fontSize: 12 }}>LOV <select value={limit} onChange={(e) => setLimit(parseInt(e.target.value))} style={{ padding: 6, border: "1px solid #ddd", borderRadius: 6 }}><option value={25}>25</option><option value={50}>50</option></select></label>
-              <button onClick={checkHealth} disabled={loadingHealth}>{loadingHealth ? "Checking..." : "Live Health Check (40 providers, 5s)"}</button>
+              <button onClick={syncLive} disabled={syncing} style={{ background: "#16a34a", color: "white", border: "1px solid #16a34a", opacity: syncing ? 0.6 : 1 }}>{syncing ? "Syncing..." : "↻ Sync Live Now"}</button>
+              <button onClick={checkHealth} disabled={loadingHealth}>{loadingHealth ? "Checking..." : "Live Health Check (43 providers, 5s)"}</button>
             </div>
             {health && <pre style={{ fontSize: 11, maxHeight: 200, overflow: "auto", marginTop: 8 }}>{JSON.stringify(health.summary || health, null, 2)}</pre>}
           </div>

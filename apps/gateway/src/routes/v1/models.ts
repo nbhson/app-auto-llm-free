@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { providers } from "../../providers/registry.js";
 import fs from "node:fs";
 import { resolveDataPath, readDataJson } from "../../lib/paths.js";
+import { config } from "../../config.js";
+import { isPublicProvider } from "../../lib/router.js";
 
 export const modelsRoute = new Hono();
 
@@ -59,6 +61,27 @@ function loadHealthMap(): Map<string, any> {
   for (const [id, v] of Object.entries(data || {})) map.set(id, v);
   return map;
 }
+function loadLiveModels(): any[] {
+  const data = readDataJson<any>("live-models.json", null as any);
+  if (!data || !Array.isArray(data.models)) return [];
+  return data.models.map((m: any) => ({
+    id: m.id,
+    raw_id: m.id,
+    object: "model",
+    owned_by: m.provider || m.id.split("/")[0],
+    provider: m.provider || m.id.split("/")[0],
+    display_name: m.display_name || m.id.split("/").pop(),
+    context_length: m.context_length || 8192,
+    score: 50,
+    tier: "live",
+    freellms_verified: false,
+    no_card: true,
+    capabilities: ["text"],
+    limit: "live",
+    created: 1715433600,
+    live_status: "live",
+  }));
+}
 
 const freellmsModels = loadFreellmsModels();
 
@@ -71,14 +94,54 @@ modelsRoute.get("/", async (c) => {
   const rawLimit = parseInt(c.req.query("limit") || c.req.query("per_page") || "25", 10);
   const limit = [25, 50].includes(rawLimit) ? rawLimit : 25;
   const q = (c.req.query("q") || "").toLowerCase();
+  const hasKeyOnly = c.req.query("hasKey") === "1" || c.req.query("has_key") === "1";
   const verifiedMap = loadVerifiedMap();
   const healthMap = loadHealthMap();
+  const liveModelsCache = loadLiveModels();
 
   const all: any[] = [];
 
-  if (freellmsModels.length > 0) {
+  // If hasKeyOnly and we have live cache, use live provider list as source of truth (not freellms)
+  if (hasKeyOnly && liveModelsCache.length > 0) {
+    for (const m of liveModelsCache) {
+      if (providerFilter && m.owned_by !== providerFilter) continue;
+      if (q && !m.id.toLowerCase().includes(q) && !(m.display_name || "").toLowerCase().includes(q) && !(m.owned_by || "").toLowerCase().includes(q)) continue;
+      const h = healthMap.get(m.id);
+      if (h && (h.http_status === 404 || h.http_status === 410)) continue; // skip persisted 404 even in live
+      if (verifiedFilter === "deprecated" && !(h && (h.http_status === 404 || h.http_status === 410))) continue;
+      if (verifiedFilter === "free" || verifiedFilter === "unverified") continue; // live already is free verified
+      all.push({ ...m, live_status: "live", health: h, persisted_404: false });
+    }
+    // also add gateway aliases and extraModels if hasKey
+    const extraModels = [
+      { id: "kilo-code/kilo-auto", object: "model", owned_by: "kilo-code", provider: "kilo-code", display_name: "kilo-auto", context_length: 262000, score: 70, tier: "quota", live_status: "alias", capabilities: ["text"], limit: "~200 req/hr", created: 1715433600 },
+      { id: "kilo-code/auto", object: "model", owned_by: "kilo-code", provider: "kilo-code", display_name: "auto", context_length: 262000, score: 70, tier: "quota", live_status: "alias", capabilities: ["text"], limit: "~200 req/hr", created: 1715433600 },
+      { id: "openrouter/auto", object: "model", owned_by: "openrouter", provider: "openrouter", display_name: "openrouter/auto", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day", created: 1715433600 },
+      { id: "agnes-ai/agnes-2.5-flash", object: "model", owned_by: "agnes-ai", provider: "agnes-ai", display_name: "agnes-2.5-flash", context_length: 256000, score: 82, tier: "permanent", live_status: "alias", capabilities: ["text","vision"], limit: "30 RPM", created: 1715433600 },
+    ];
+    for (const em of extraModels) {
+      if (providerFilter && em.owned_by !== providerFilter) continue;
+      const keys = config.providerKeys[em.owned_by] || [];
+      const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
+      if (!hasRealKey) continue;
+      const exists = all.some((m) => m.id === em.id);
+      if (!exists) all.push(em as any);
+    }
+    if (!providerFilter || providerFilter === "gateway") {
+      all.unshift(
+        { id: "auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
+        { id: "gpt-4", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, live_status: "alias" },
+        { id: "gpt-3.5", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, live_status: "alias" },
+      );
+    }
+  } else if (freellmsModels.length > 0) {
     for (const m of freellmsModels) {
       if (providerFilter && m.owned_by !== providerFilter) continue;
+      if (hasKeyOnly) {
+        const keys = config.providerKeys[m.owned_by] || [];
+        const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(m.owned_by);
+        if (!hasRealKey) continue;
+      }
       if (q && !m.id.toLowerCase().includes(q) && !(m.display_name || "").toLowerCase().includes(q) && !(m.owned_by || "").toLowerCase().includes(q)) continue;
       const v = verifiedMap.get(m.id) || verifiedMap.get((m as any).raw_id);
       const h = healthMap.get(m.id) || healthMap.get((m as any).raw_id);
@@ -125,6 +188,11 @@ modelsRoute.get("/", async (c) => {
       ];
       for (const em of extraModels) {
         if (providerFilter && em.owned_by !== providerFilter) continue;
+        if (hasKeyOnly) {
+          const keys = config.providerKeys[em.owned_by] || [];
+          const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
+          if (!hasRealKey) continue;
+        }
         if (verifiedFilter && verifiedFilter !== "free" && em.live_status !== verifiedFilter) continue;
         const exists = all.some((m) => m.id === em.id);
         if (!exists) all.push(em as any);
@@ -170,7 +238,7 @@ modelsRoute.get("/", async (c) => {
     free: freellmsModels.length,
     verified: verifiedSummary,
     pagination: { page: curPage, limit, total, total_pages: totalPages, has_next: curPage < totalPages, has_prev: curPage > 1 },
-    filters: { provider: providerFilter || null, verified: verifiedFilter || null, q: q || null },
+    filters: { provider: providerFilter || null, verified: verifiedFilter || null, q: q || null, hasKey: hasKeyOnly || false },
   });
 });
 

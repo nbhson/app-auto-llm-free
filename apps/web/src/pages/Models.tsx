@@ -29,11 +29,14 @@ export default function Models() {
   const [limit, setLimit] = useState(25);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [hasKeyOnly, setHasKeyOnly] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchModels = () => {
     const params = new URLSearchParams();
     if (verified !== "all") params.set("verified", verified);
     if (q) params.set("q", q);
+    if (hasKeyOnly) params.set("hasKey", "1");
     params.set("page", String(page));
     params.set("limit", String(limit));
     fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } })
@@ -58,10 +61,24 @@ export default function Models() {
       }).catch(() => {});
   };
 
-  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, q]);
-  useEffect(() => { setSelected(new Set()); setLive({}); }, [verified, q, page, limit]);
+  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, q, hasKeyOnly]);
+  useEffect(() => { setSelected(new Set()); setLive({}); }, [verified, q, page, limit, hasKeyOnly]);
   // Debounce q -> reset page
-  useEffect(() => { setPage(1); }, [q, verified, limit]);
+  useEffect(() => { setPage(1); }, [q, verified, limit, hasKeyOnly]);
+
+  const syncLive = async () => {
+    if (!confirm("Sync Live sẽ gọi provider.models() bằng key thật trong .env để cập nhật danh sách model mới nhất (có thể mất 10-20s). Tiếp tục?")) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`/api/models/live/sync`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" } });
+      const data = await res.json().catch(() => null);
+      // also refresh verify for deprecated tracking
+      await fetch(`/api/verify`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) }).catch(() => {});
+      alert(data ? `Sync xong: ${data.total} live models từ ${data.providers} providers` : "Sync done");
+      fetchModels();
+    } catch (e: any) { alert("Sync failed: " + e.message); }
+    finally { setSyncing(false); }
+  };
 
   const filtered = [...models].sort((a, b) => {
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -161,8 +178,10 @@ export default function Models() {
           <option value="deprecated">Deprecated</option>
           <option value="unverified">Unverified</option>
         </select>
+        <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12, background: hasKeyOnly ? "#dcfce7" : "white", border: "1px solid #e2e8f0", padding: "6px 10px", borderRadius: 8, cursor: "pointer" }}><input type="checkbox" checked={hasKeyOnly} onChange={(e) => setHasKeyOnly(e.target.checked)} /> Chỉ hiện provider đã nhập key</label>
         <label style={{ fontSize: 12 }}>LOV <select value={limit} onChange={(e) => setLimit(parseInt(e.target.value))} style={{ padding: 6, border: "1px solid #ddd", borderRadius: 6 }}><option value={25}>25</option><option value={50}>50</option></select></label>
         <button onClick={fetchModels}>Refresh</button>
+        <button onClick={syncLive} disabled={syncing} style={{ background: "#16a34a", color: "white", border: "1px solid #16a34a", opacity: syncing ? 0.6 : 1 }}>{syncing ? "Syncing..." : "↻ Sync Live Now"}</button>
         <button onClick={checkSelected} disabled={checking || selected.size === 0} style={{ background: selected.size > 0 ? "#2563eb" : "#f1f5f9", color: selected.size > 0 ? "white" : "#64748b", border: selected.size > 0 ? "1px solid #2563eb" : "1px solid #ddd", opacity: checking ? 0.6 : 1 }}>
           {checking ? "Checking..." : `Check Live (${selected.size})`}
         </button>

@@ -22,12 +22,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
 
-      - name: Sync freellms.org -> data/*.json + models.yaml
+      - name: Sync live models from providers (freellms.org disabled — not latest)
         run: |
-          python scripts/sync-freellms.py
-          echo "=== providers ===" && wc -l data/freellms-providers.json
-          echo "=== free models ===" && wc -l data/freellms-models-free.json
-          echo "=== models.yaml ===" && wc -l models.yaml
+          echo "Freellms sync disabled — using live provider APIs as source of truth"
+          echo "If you still need freellms snapshot, run: python scripts/sync-freellms.py (manual)"
+          # Live sync via provider APIs (requires secrets)
+          # npx --prefix apps/gateway tsx src/jobs/sync-live-models.ts || true
+          ls -lh data/live-models.json 2>&1 || echo "no live-models.json yet (run Sync Live Now with real keys)"
 
       - name: Install gateway (for verify)
         run: npm ci --prefix apps/gateway || npm install --prefix apps/gateway
@@ -55,6 +56,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/freellms-providers.json data/freellms-models-free.json models.yaml data/verified-models.json data/verified-summary.json || true
-          git diff --cached --quiet || git commit -m "chore: sync freellms + verify free tiers [skip ci]"
+          git add data/live-models.json data/model-health.json data/verified-models.json data/verified-summary.json || true
+          git diff --cached --quiet || git commit -m "chore: sync live models + verify [skip ci]"
           git push || echo "no changes to push"

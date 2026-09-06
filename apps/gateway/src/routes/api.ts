@@ -38,7 +38,16 @@ apiRoute.get("/providers", (c) => {
       status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key",
     };
   });
+  const hasKeyOnly = c.req.query("hasKey") === "1" || c.req.query("has_key") === "1";
   if (q) detailed = detailed.filter((p) => p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  if (hasKeyOnly) {
+    detailed = detailed.filter((p) => {
+      const keys = config.providerKeys[p.id] || [];
+      const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me"));
+      const isPublic = ["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"].includes(p.id);
+      return hasRealKey || isPublic;
+    });
+  }
   const total = detailed.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const curPage = Math.min(page, totalPages);
@@ -56,7 +65,7 @@ apiRoute.get("/providers", (c) => {
     defaultModel: config.defaultModel,
     detailed: paginated,
     pagination: { page: curPage, limit, total, total_pages: totalPages, has_next: curPage < totalPages, has_prev: curPage > 1 },
-    filters: { q: q || null },
+    filters: { q: q || null, hasKey: hasKeyOnly || false },
   });
 });
 
@@ -149,6 +158,16 @@ apiRoute.post("/verify", async (c) => {
   const report = await verifyFreeModels({ dryRun });
   await saveVerifyReport(report);
   return c.json(report);
+});
+apiRoute.post("/models/live/sync", async (c) => {
+  const { syncLiveModels } = await import("../jobs/sync-live-models.js");
+  const result = await syncLiveModels();
+  return c.json({ ...result, generated_at: new Date().toISOString() });
+});
+apiRoute.get("/models/live", (c) => {
+  const data = readDataJson<any>("live-models.json", null as any);
+  if (!data) return c.json({ total: 0, models: [], generated_at: null, note: "Run POST /api/models/live/sync with real keys to generate" });
+  return c.json(data);
 });
 
 apiRoute.get("/models/health", async (c) => {

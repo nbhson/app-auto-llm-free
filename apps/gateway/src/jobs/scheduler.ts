@@ -1,4 +1,5 @@
 import { verifyFreeModels, saveVerifyReport } from "./verify-free.js";
+import { syncLiveModels } from "./sync-live-models.js";
 import { logger } from "../middleware/logger.js";
 import fs from "node:fs";
 import { resolveDataPath } from "../lib/paths.js";
@@ -25,6 +26,7 @@ export function startScheduler() {
       try {
         const report = await verifyFreeModels({ dryRun: false });
         await saveVerifyReport(report);
+        try { await syncLiveModels(); } catch {}
         logger.info("scheduler: initial verify done");
       } catch (e: any) {
         logger.error({ err: e.message }, "scheduler: initial verify failed");
@@ -40,8 +42,7 @@ export function startScheduler() {
     try {
       const report = await verifyFreeModels({ dryRun: false });
       await saveVerifyReport(report);
-      // Also refresh freellms data if needed (call python script if exists)
-      // We don't auto-run python sync here to avoid extra deps; GitHub Action handles freellms sync.
+      try { await syncLiveModels(); } catch {}
       logger.info({ verified: report.total_verified_free, deprecated: report.total_deprecated }, "scheduler: periodic verify done");
     } catch (e: any) {
       logger.error({ err: e.message }, "scheduler: periodic verify failed");

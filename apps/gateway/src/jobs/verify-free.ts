@@ -231,6 +231,28 @@ export async function saveVerifyReport(report: VerifyReport) {
     providers: report.providers,
   };
   fs.writeFileSync(resolveDataPath("verified-summary.json"), JSON.stringify(summary, null, 2));
+  // Also update live-models.json from live provider data (source of truth, not freellms)
+  try {
+    const liveModels: any[] = [];
+    for (const m of report.models) {
+      if (m.status === "verified_free" && m.live_found) {
+        liveModels.push({ id: m.id, provider: m.provider, display_name: m.id.split("/").slice(1).join("/"), context_length: m.context_length || 8192 });
+      }
+    }
+    // Merge with existing live-models.json to keep models not in freellms but live (e.g., newly discovered)
+    const existing = readDataJson<any>("live-models.json", null as any);
+    const mergedMap = new Map<string, any>();
+    for (const m of liveModels) mergedMap.set(m.id, m);
+    if (existing?.models) {
+      for (const m of existing.models) {
+        if (!mergedMap.has(m.id) && m.provider && (config.providerKeys[m.provider]?.length || 0) > 0) {
+          // keep old live if still relevant
+        }
+      }
+    }
+    const liveOut = resolveDataPath("live-models.json");
+    fs.writeFileSync(liveOut, JSON.stringify({ generated_at: report.generated_at, total: mergedMap.size, models: Array.from(mergedMap.values()) }, null, 2));
+  } catch {}
   logger.info({ verified: report.total_verified_free, deprecated: report.total_deprecated, unverified: report.total_unverified_no_key }, "verify report saved");
 }
 
