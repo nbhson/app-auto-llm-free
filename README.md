@@ -31,6 +31,10 @@
 |:---:|:---:|
 | ![Providers — 43 live, health 5s](docs/images/providers.png) | ![Models — 324 live verify](docs/images/models.png) |
 
+| Dashboard — 4 cards + 3 charts + tokens overview | Logs — request log with charts + SSE stream |
+|:---:|:---:|
+| ![Dashboard — 4 cards + 3 charts + tokens](docs/images/dashboard.png) | ![Logs — charts + SSE](docs/images/logs.png) |
+
 ---
 
 ## ✨ Features
