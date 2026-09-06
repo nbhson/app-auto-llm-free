@@ -18,6 +18,10 @@ out/
 data.db
 *.db
 *.sqlite
+# Gateway runtime data (ephemeral, contains secrets/logs)
+data/benchmark.json
+data/request-log.json
+data/virtual-keys.json
 
 # Logs
 logs/
