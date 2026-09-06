@@ -14,13 +14,11 @@ export default function Models() {
   const [models, setModels] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [verified, setVerified] = useState<string>("all");
-  const [provider, setProvider] = useState<string>("");
   const [live, setLive] = useState<Record<string, any>>({});
   const [checking, setChecking] = useState(false);
 
   const fetchModels = () => {
     const params = new URLSearchParams();
-    if (provider) params.set("provider", provider);
     if (verified !== "all") params.set("verified", verified);
     fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } })
       .then((r) => r.json())
@@ -28,9 +26,9 @@ export default function Models() {
       .catch(() => setModels([]));
   };
 
-  useEffect(() => { fetchModels(); }, [verified, provider]);
+  useEffect(() => { fetchModels(); }, [verified]);
 
-  const filtered = models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase()) || (m.provider || "").toLowerCase().includes(q.toLowerCase()));
+  const filtered = models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase()) || (m.provider || "").toLowerCase().includes(q.toLowerCase()) || (m.owned_by || "").toLowerCase().includes(q.toLowerCase()));
 
   const checkLive = async (ids: string[]) => {
     setChecking(true);
@@ -49,14 +47,13 @@ export default function Models() {
     <div>
       <h2>Models ({filtered.length})</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <input placeholder="Filter id/provider..." value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: 8, width: 280, border: "1px solid #ddd", borderRadius: 6 }} />
+        <input placeholder="Filter id/provider... (vd: nvidia-nim, gemini...)" value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: 8, width: 320, border: "1px solid #ddd", borderRadius: 6 }} />
         <select value={verified} onChange={(e) => setVerified(e.target.value)} style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}>
           <option value="all">All (316)</option>
           <option value="free">Verified free</option>
           <option value="deprecated">Deprecated</option>
           <option value="unverified">Unverified</option>
         </select>
-        <input placeholder="provider (nvidia-nim...)" value={provider} onChange={(e) => setProvider(e.target.value)} style={{ padding: 8, width: 200, border: "1px solid #ddd", borderRadius: 6 }} />
         <button onClick={fetchModels}>Refresh</button>
         <button onClick={() => checkLive([])} disabled={checking} style={{ background: checking ? "#f1f5f9" : "white" }}>{checking ? "Checking..." : "Check Live (10)"}</button>
         <button onClick={() => { const ids = filtered.slice(0, 5).map((m) => m.id); if (ids.length) checkLive(ids); }} disabled={checking}>Check 5 visible</button>
