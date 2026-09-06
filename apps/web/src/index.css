@@ -1,0 +1,10 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #fafafa; color: #111; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+button { cursor: pointer; padding: 8px 14px; border-radius: 6px; border: 1px solid #ddd; background: white; }
+button:hover { background: #f8fafc; }
+.card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 16px; }

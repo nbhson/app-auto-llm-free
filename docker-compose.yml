@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gateway
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U gateway"], interval: 5s, retries: 5 }
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: redis-server --save "" --appendonly no
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 5 }
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    ports: ["8080:8080"]
+    env_file: .env
+    environment:
+      PORT: 8080
+      # override DATABASE_URL to postgres when using compose
+      DATABASE_URL: postgres://gateway:gateway@postgres:5432/gateway
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports: ["3000:80"]
+    depends_on: [gateway]
+
+volumes:
+  pgdata:

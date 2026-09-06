@@ -1,0 +1,29 @@
+{
+  "name": "app-auto-llm-free",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:gateway": "npm run dev -w apps-gateway",
+    "dev:web": "npm run dev -w apps-web",
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:web\"",
+    "build": "npm run build -w apps-gateway && npm run build -w apps-web",
+    "build:gateway": "npm run build -w apps-gateway",
+    "build:web": "npm run build -w apps-web",
+    "start:gateway": "npm run start -w apps-gateway",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test -w apps-gateway",
+    "db:generate": "npm run db:generate -w apps-gateway",
+    "db:migrate": "npm run db:migrate -w apps-gateway",
+    "sync:providers": "npm run sync:providers -w apps-gateway"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
