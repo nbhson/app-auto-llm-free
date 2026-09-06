@@ -169,6 +169,8 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 
 ## 8. Common Errors
 
+> **Node 20–26 & `better-sqlite3`**: gateway uses `better-sqlite3@^13.0.3` (`apps/gateway/package.json:34`) with prebuilds for Node 20–26 (ABI 115–147). If `npm install` fails with `gyp ERR!` / `v8-internal.h: concept/requires` on Node 26, run `rm -rf node_modules package-lock.json && npm install` after upgrading — Docker (`node:20-alpine`) is unaffected.
+
 | Error | Cause | Fix |
 |-----|-------|-----|
 | `401 Invalid API key` | Using `MASTER_KEY` for `/v1/chat/completions` instead of `fgk-...`, or `fgk-...` not yet created | Create a new key at `/keys` and use that `fgk-...` for `/v1/*` |
@@ -179,6 +181,7 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 | `Only 7 models` | Running old `npm run dev:gateway` without rebuilding after the `paths.ts` fix | `git pull && npm run build -w apps-gateway && docker compose up -d --build` + hard reload `Ctrl+Shift+R` |
 | `Hide 404 not hiding` | model-health not persisted | Tick checkbox then Check Live 410 → persists to `data/model-health.json`; toggle `Hide 404 models` default checked |
 | `verified 0/316` | Missing `ENCRYPTION_KEY`/provider keys, scheduler not yet run | Wait 5s after starting the gateway (scheduler auto-verifies + syncLiveModels dry-run) or `POST /api/verify` / `POST /api/models/live/sync` with `{"freeOnly":true}` |
+| `npm i` fails `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + old `better-sqlite3@9` has no prebuild (ABI 147) | Fixed at `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. If still fails, use Node 22 LTS (`brew install node@22`) or `npm i --build-from-source` with Xcode CLT `xcode-select --install` |
 
 ## 9. Useful Commands
 

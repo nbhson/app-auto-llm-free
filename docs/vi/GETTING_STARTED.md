@@ -169,6 +169,8 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 
 ## 8. Lỗi thường gặp
 
+> **Node 20–26 & `better-sqlite3`**: gateway dùng `better-sqlite3@^13.0.3` (`apps/gateway/package.json:34`) với prebuild cho Node 20–26 (ABI 115–147). Nếu `npm install` báo `gyp ERR!` / `v8-internal.h: concept/requires` trên Node 26, chạy `rm -rf node_modules package-lock.json && npm install` sau khi upgrade — Docker (`node:20-alpine`) không ảnh hưởng.
+
 | Lỗi | Nguyên nhân | Sửa |
 |-----|-------------|-----|
 | `401 Invalid API key` | Dùng `MASTER_KEY` cho `/v1/chat/completions` thay vì `fgk-...`, hoặc `fgk-...` chưa tạo | Tạo key mới ở `/keys` và dùng `fgk-...` đó cho `/v1/*` |
@@ -179,6 +181,7 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 | `Models chỉ 7` | Chạy `npm run dev:gateway` cũ chưa rebuild sau fix `paths.ts` | `git pull && npm run build -w apps-gateway && docker compose up -d --build` + hard reload `Ctrl+Shift+R` |
 | `Hide 404 không ẩn` | Chưa persist model-health | Tick checkbox rồi Check Live 410 → tự persist `data/model-health.json`; toggle `Ẩn model 404` mặc định checked |
 | `verified 0/316` | Chưa có `ENCRYPTION_KEY`/provider keys, scheduler chưa chạy | Đợi 5s sau khi start gateway (scheduler tự verify + syncLiveModels dry-run) hoặc `POST /api/verify` / `POST /api/models/live/sync` với `{"freeOnly":true}` |
+| `npm i` lỗi `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + `better-sqlite3@9` cũ không có prebuild (ABI 147) | Đã fix ở `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. Nếu vẫn lỗi, dùng Node 22 LTS (`brew install node@22`) hoặc `npm i --build-from-source` với Xcode CLT `xcode-select --install` |
 
 ## 9. Lệnh hữu ích
 

@@ -4,6 +4,9 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 
 ## [Unreleased]
 
+### Fixed
+- **better-sqlite3 Node 26**: upgrade `better-sqlite3` `^9.2.2` → `^13.0.3` (`apps/gateway/package.json:34`) với prebuild Node 20–26 (ABI 147). Fix `npm i` lỗi `node-gyp` / `v8-internal.h: concept/requires` trên Node 26 + Apple clang 21. Docs thêm troubleshooting Node 20–26 ở `docs/GETTING_STARTED.md:8`, `docs/en/GETTING_STARTED.md:8`, `docs/vi/GETTING_STARTED.md:8` — Docker (`node:20-alpine`) không ảnh hưởng.
+
 ### Added
 - **P1 Scaffold**: Hono 4.x + Vite React, Drizzle SQLite, Docker Compose, `.env.example` 30 providers, `GET /v1/health` + `GET /v1/models` (316 free)
 - **Freellms Sync**: Scan `https://freellms.org/providers` (30) + `/models` (365, 316 free `data-free=1`), `data/freellms-providers.json`, `data/freellms-models-free.json`, `models.yaml` (316), `scripts/sync-freellms.py`
