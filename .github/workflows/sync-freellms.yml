@@ -1,0 +1,60 @@
+name: Sync freellms (daily 02:00 UTC) + verify
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no live probe, only freellms sync)"
+        required: false
+        default: "false"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      - name: Sync freellms.org -> data/*.json + models.yaml
+        run: |
+          python scripts/sync-freellms.py
+          echo "=== providers ===" && wc -l data/freellms-providers.json
+          echo "=== free models ===" && wc -l data/freellms-models-free.json
+          echo "=== models.yaml ===" && wc -l models.yaml
+
+      - name: Install gateway (for verify)
+        run: npm ci --prefix apps/gateway || npm install --prefix apps/gateway
+
+      - name: Verify free tiers (dry-run by default in CI, needs secrets for live)
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run only"
+            npx --prefix apps/gateway tsx src/jobs/verify-free.ts --dry-run
+          else
+            # Live verify requires API keys as secrets; if not set, it will mark unverified_no_key
+            # Provide keys via GitHub Secrets: GROQ_API_KEYS, CEREBRAS_API_KEYS, etc.
+            # We default to dry-run in CI unless SECRETS present
+            if [ -n "${{ secrets.GROQ_API_KEYS }}" ]; then
+              echo "Live verify with secrets"
+              GROQ_API_KEYS="${{ secrets.GROQ_API_KEYS }}" CEREBRAS_API_KEYS="${{ secrets.CEREBRAS_API_KEYS }}" NVIDIA_API_KEYS="${{ secrets.NVIDIA_API_KEYS }}" npx --prefix apps/gateway tsx src/jobs/verify-free.ts || npx --prefix apps/gateway tsx src/jobs/verify-free.ts --dry-run
+            else
+              echo "No secrets, dry-run"
+              npx --prefix apps/gateway tsx src/jobs/verify-free.ts --dry-run
+            fi
+          fi
+          ls -lh data/verified-*.json || true
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/freellms-providers.json data/freellms-models-free.json models.yaml data/verified-models.json data/verified-summary.json || true
+          git diff --cached --quiet || git commit -m "chore: sync freellms + verify free tiers [skip ci]"
+          git push || echo "no changes to push"

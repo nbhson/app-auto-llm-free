@@ -2,14 +2,16 @@
 
 Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 
-## P1 — Scaffold (1-2 ngày) ✅ Plannned
+## P1 — Scaffold (1-2 ngày) ✅ Done 2026-09-06
 
-- [ ] `bun create hono` → `apps/gateway` (Hono + zod-validator + hono/proxy)
-- [ ] `apps/web` Vite + React + shadcn/ui + TanStack Query
-- [ ] Drizzle ORM + SQLite (dev) / Postgres (prod), `drizzle.config.ts`, migrate đầu tiên
-- [ ] Docker + docker-compose.yml + .env.example
-- [ ] `GET /v1/models` mock + `GET /v1/health`
-- [ ] CI: `bun run lint`, `bun run typecheck`
+- [x] `bun create hono` → `apps/gateway` (Hono + zod-validator + hono/proxy)
+- [x] `apps/web` Vite + React + shadcn/ui + TanStack Query
+- [x] Drizzle ORM + SQLite (dev) / Postgres (prod), `drizzle.config.ts`, migrate đầu tiên
+- [x] Docker + docker-compose.yml + .env.example
+- [x] `GET /v1/models` (316 free từ freellms) + `GET /v1/health`
+- [x] CI: `bun run lint`, `bun run typecheck`
+- [x] Freellms sync: 30 providers, 316 free, `data/*.json` + `models.yaml` + `scripts/sync-freellms.py`
+- [x] Verify live (24h): `jobs/verify-free.ts` + `jobs/scheduler.ts` + `/api/verify` + GitHub Actions daily 02:00 UTC
 
 ## P2 — Gateway Core (3-5 ngày)
 

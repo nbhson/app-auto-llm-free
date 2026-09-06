@@ -14,7 +14,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "sync:providers": "tsx src/jobs/sync.ts",
-    "sync:freellms": "python ../../scripts/sync-freellms.py"
+    "sync:freellms": "python ../../scripts/sync-freellms.py",
+    "verify:free": "tsx src/jobs/verify-free.ts",
+    "verify:free:dry": "tsx src/jobs/verify-free.ts --dry-run"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

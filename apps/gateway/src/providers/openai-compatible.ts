@@ -30,13 +30,13 @@ export function createOpenAICompatibleProvider(opts: {
       });
     },
     async models(apiKey?: string): Promise<ModelInfo[]> {
-      if (!apiKey) return [];
       const url = `${opts.baseUrl.replace(/\/$/, "")}${modelsPath}`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
+      const headers: Record<string, string> = {};
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      // Allow no-key for public providers (llm7, huggingface router still needs key but we try)
+      const res = await fetch(url, { headers });
       if (!res.ok) return [];
-      const data: any = await res.json();
+      const data: any = await res.json().catch(() => ({}));
       const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
       return list.map((m: any) => ({
         id: `${opts.id}/${m.id || m.name}`,
@@ -48,7 +48,9 @@ export function createOpenAICompatibleProvider(opts: {
     async health(apiKey: string): Promise<boolean> {
       try {
         const url = `${opts.baseUrl.replace(/\/$/, "")}${modelsPath}`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+        const headers: Record<string, string> = {};
+        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+        const res = await fetch(url, { headers });
         return res.ok;
       } catch {
         return false;

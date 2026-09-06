@@ -87,6 +87,36 @@ apiRoute.get("/models/sync", (c) => {
   });
 });
 
+apiRoute.get("/verify", (c) => {
+  try {
+    const p = path.resolve("data/verified-models.json");
+    if (!fs.existsSync(p)) return c.json({ status: "no_data", message: "Run POST /api/verify or wait for 24h scheduler" }, 404);
+    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    return c.json(data);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+apiRoute.get("/verify/summary", (c) => {
+  try {
+    const p = path.resolve("data/verified-summary.json");
+    if (!fs.existsSync(p)) return c.json({ status: "no_data" }, 404);
+    return c.json(JSON.parse(fs.readFileSync(p, "utf-8")));
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+apiRoute.post("/verify", async (c) => {
+  const { verifyFreeModels, saveVerifyReport } = await import("../jobs/verify-free.js");
+  const body = await c.req.json().catch(() => ({}));
+  const dryRun = body.dryRun ?? false;
+  const report = await verifyFreeModels({ dryRun });
+  await saveVerifyReport(report);
+  return c.json(report);
+});
+
 apiRoute.get("/keys", (c) => c.json({ keys: [], _mock: true }));
 apiRoute.post("/keys", async (c) => {
   const body = await c.req.json().catch(() => ({}));
