@@ -1,29 +1,29 @@
 > **English** | [🇻🇳 Tiếng Việt](../vi/OPERATIONS.md) | [Docs Index](../README.md)
 
-# Operations & Free Tier Verification (24h Sync)
+# Operations & Free Tier Verification (24h Sync — Live is Source of Truth)
 
-## Problem: freellms.org May Be Outdated
+## Problem: freellms.org May Be Outdated (now disabled)
 
-`data/freellms-models-free.json` (316 free) is a snapshot from 2026-09-06. Providers may have already withdrawn their free tier (e.g. Groq 16/23 paid, Ollama Cloud 5/8 paid, OpenRouter 28/45 paid in the scan). A **live** check is needed every 24 hours.
+`data/freellms-models-free.json` (316 free) is a snapshot from 2026-09-06. Providers may have already withdrawn their free tier (e.g. Groq 16/23 paid, Ollama Cloud 5/8 paid, OpenRouter 28/45 paid in the scan). **Freellms sync is now disabled** (not latest) — live provider APIs are the new source of truth.
 
-## Solution: 2-Layer Sync
+## Solution: 2-Layer Sync (historical freellms + live current)
 
-### Layer 1 — Freellms Sync (Initial Source of Truth)
+### Layer 1 — Freellms Sync (Historical, disabled)
 
 ```bash
 python scripts/sync-freellms.py
 # Fetch https://freellms.org/providers + /models -> data/*.json + models.yaml
-# Runs every 24h via GitHub Actions at 02:00 UTC or manually
+# Previously ran every 24h via GitHub Actions at 02:00 UTC — NOW DISABLED, not latest
 ```
 
-Files:
+Files (historical):
 - `data/freellms-providers.json` — 30 providers, caps/tier
 - `data/freellms-models-free.json` — 316 free, includes `score/limit/verified`
-- `models.yaml` — 316 entries for the gateway
+- `models.yaml` — 316 entries for the gateway (snapshot)
 
-### Layer 2 — Live Verify (Is It Still Actually Free?)
+### Layer 2 — Live Verify (Is It Still Actually Free?) + Live Sync (New Source of Truth)
 
-`apps/gateway/src/jobs/verify-free.ts` compares **freellms FREE** vs **live /models** from the provider.
+**A. Verify free** `apps/gateway/src/jobs/verify-free.ts` compares **freellms FREE** vs **live /models** from the provider.
 
 **Logic:**
 
@@ -55,12 +55,39 @@ for each provider in registry (30):
 - `data/verified-models.json` — 316 detailed rows (`live_free`, `last_verified`, `error`)
 - `data/verified-summary.json` — aggregated summary (`verified_free`, `deprecated`, `unverified_no_key`)
 
-## Automatic Scheduler (24h)
+**B. Live sync (new source of truth)** `apps/gateway/src/jobs/sync-live-models.ts` fetches **live provider.models()** via real keys (`hasRealKey: k.length>20 && !k.includes('xxx')`) → `data/live-models.json`.
+
+**freeOnly logic (default true):**
+
+```
+freeOnly = true (default)
+for each provider with hasRealKey or public:
+  live = await provider.models(key) // 2185 total fetched
+  if freeOnly:
+    if provider tier_type === permanent: keep all (all live are free)
+    else if id includes ":free" or "(free)": keep
+    else if in freellms free set: keep
+    else skip (quota paid)
+  -> filtered: 882 free, 853 hasKey
+save to data/live-models.json { total, providers, free_only, total_fetched, models[] }
+```
+
+- `data/live-models.json` — `total:2185, free_only:true, total_fetched, providers, models[]` (882 free / 853 hasKey, alias adds 2190 total when served)
+- `POST /api/models/live/sync {freeOnly:true}` — trigger sync (UI button **Sync Live Now** only pulls freeOnly)
+- `GET /api/models/live` — get cache
+- `GET /v1/models?hasKey=1` — when live cache exists serves **live 2190 total** instead of freellms 324
+- `GET /api/providers?hasKey=1` — filter real keys, highlight green
+- **Models UI**: pill `hasKey` (Only providers with keys) + `hide404` (Hide 404 models, checked by default, `hide404_migrated` + `hide404` localStorage), 404 strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json`, hidden when hide404 checked.
+- **Sync Live Now** now only pulls free models (freeOnly=true) — filtered by Permanent Free tier or `:free` suffix or freellms free list.
+
+**Rate limit fix**: Frontend debounces `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` increases limit for list endpoints to 4x (min 200) to avoid 429 while typing/pagination.
+
+## Automatic Scheduler (24h — verify + live sync)
 
 `apps/gateway/src/jobs/scheduler.ts` runs inside the gateway:
 
-- On startup: if `data/verified-models.json` is older than `SYNC_INTERVAL_MS` (default 86400000 = 24h) → verify after 5s
-- Then `setInterval` every 24h → `verifyFreeModels()` + `saveVerifyReport()`
+- On startup: if `data/verified-models.json` is older than `SYNC_INTERVAL_MS` (default 86400000 = 24h) → verify + syncLiveModels after 5s
+- Then `setInterval` every 24h → `verifyFreeModels()` + `saveVerifyReport()` + `syncLiveModels({freeOnly:true})`
 
 Configuration:
 
@@ -73,22 +100,38 @@ DISABLE_SCHEDULER=0   # set to 1 to disable
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/models?verified=free` | Return only `verified_free` models (316 vs 7 bug fix `lib/paths.ts`) |
-| `GET` | `/v1/models?verified=deprecated` | Only deprecated |
+| `GET` | `/v1/models?hasKey=1` | **Live source of truth** when cache exists (2190 total) — `q` 400ms debounce, `page`/`limit` LOV 25/50 at sticky bottom, `provider` filter |
+| `GET` | `/v1/models?verified=free` | Return only `verified_free` models (316 vs 7 bug fix `lib/paths.ts`) — freellms snapshot |
+| `GET` | `/v1/models?verified=deprecated` | Only deprecated (including persisted 404/410) |
 | `GET` | `/v1/models?verified=unverified` | Only unverified |
-| `GET` | `/v1/models?provider=nvidia-nim` | Filter by provider (the separate provider input was removed; use the first filter `Filter id/provider...`) |
+| `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter by provider + hasKey (real keys) |
+| `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, 400ms debounce) |
+| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `Get Key` URL, `status` — pagination 25/50 sticky bottom, `q` 400ms debounce |
+| `GET` | `/api/providers/health` | Live ping of 43 providers in 5s |
+| `POST` | `/api/models/live/sync` | **New**: Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
+| `GET` | `/api/models/live` | **New**: Get live cache |
 | `GET` | `/api/models/health?model=` | Probe 1 model with chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
+| `GET` | `/api/models/health/persisted` | Persisted 404/410 (`data/model-health.json`) — `hide404` default checked, `hide404_migrated` |
+| `POST` | `/api/models/health/mark` | Mark 404/410 `{ids:[],http_status:404,error}` persist + strikethrough |
 | `GET` | `/api/verify` | Full report `verified-models.json` |
 | `GET` | `/api/verify/summary` | Quick summary |
-| `POST` | `/api/verify` | Trigger immediate verify (body `{dryRun: false}`), requires master key |
-| `GET` | `/api/providers` | `detailed[]` with `free_models`, `keys`, `Get Key` URL, `status` |
-| `GET` | `/api/providers/health` | Live ping of 40 providers in 5s |
+| `POST` | `/api/verify` | Trigger immediate verify (body `{dryRun: false}`), scheduler also syncs live |
 | `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `free_models:316`, `breakers` |
+| `GET` | `/api/logs` | Paginated logs |
+| `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, duplicate Auto sync 5s removed |
+| `GET` | `/api/models/sync` | Freellms sync info (historical, disabled) |
 
 Examples:
 
 ```bash
+# Live source of truth
+curl "http://localhost:8080/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer fgk-xxx" | jq '.total, .pagination'
+curl "http://localhost:8080/api/models/live" -H "Authorization: Bearer fgk-master-xxx" | jq
+curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer fgk-master-xxx" -d '{"freeOnly":true}' | jq '.total, .free_only'
+curl "http://localhost:8080/api/providers?hasKey=1" -H "Authorization: Bearer fgk-master-xxx" | jq '.detailed[].hasRealKey'
+
+# Freellms snapshot
 curl http://localhost:8080/v1/models?verified=free -H "Authorization: Bearer fgk-xxx" | jq '.total'
 curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer fgk-master-xxx" | jq
 curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer fgk-master-xxx" -d '{"dryRun":false}' | jq '.total_verified_free'
@@ -104,27 +147,38 @@ npm run verify:free:dry -w apps-gateway
 npm run verify:free -w apps-gateway
 # or
 npx tsx apps/gateway/src/jobs/verify-free.ts --dry-run
+npx tsx apps/gateway/src/jobs/sync-live-models.ts # live sync freeOnly
 ```
 
 ## GitHub Actions (daily 02:00 UTC)
 
-`.github/workflows/sync-freellms.yml` runs:
+`.github/workflows/sync-freellms.yml` runs (historical):
 
-1. `python scripts/sync-freellms.py` → updates `data/*` + `models.yaml`
+1. `python scripts/sync-freellms.py` → updates `data/*` + `models.yaml` (now disabled)
 2. `tsx verify-free.ts --dry-run` (or live if secrets `GROQ_API_KEYS` etc. are present)
 3. Commit if changed → push to `main`
 
-Add secrets in repo Settings → Secrets: `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA_API_KEYS`, `GEMINI_API_KEYS`… for live verification instead of dry-run.
+Currently recommended: add secrets `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA_API_KEYS`, `GEMINI_API_KEYS`… so `jobs/sync-live-models.ts` runs live instead of dry-run. Freellms cron is kept as backup but no longer the main source.
 
 ## Operational Recommendations
 
-- **Dev**: freellms data alone is sufficient; no verify needed (dry-run takes <1s)
-- **Prod**: configure at least 5 P0 keys (NVIDIA, Groq, Cerebras, Gemini, GitHub) to verify 60–70% of models every 24h; remaining providers will stay `unverified_no_key` but still serve with a warning
-- **Dashboard**: shows badges `verified_free` (green), `deprecated` (red), `unverified_no_key` (yellow) on the `/models` page — to be implemented in P4
+- **Dev**: live data via `POST /api/models/live/sync` with 1–2 real keys or freellms snapshot is sufficient; no full verify needed (dry-run <1s)
+- **Prod**: configure at least 5 P0 keys (NVIDIA, Groq, Cerebras, Gemini, GitHub) for live sync of 882 free (853 hasKey) every 24h; scheduler auto-calls both verify and syncLiveModels. Remaining providers will stay `unverified_no_key` but still serve with a warning
+- **Dashboard**:
+  - `/models`: top filter `q` (400ms debounce) + `verified` + pill `hasKey` (green) / `hide404` (red, default checked) + second row 3 centered buttons `Check Live` — `Sync Live Now` (freeOnly green) — `Refresh`; sticky bottom pagination `Page X/Y` + `LOV 25/50`; table strikethrough `#dc2626` + disabled checkbox + `hide404` hide
+  - `/providers`: filter `q` 400ms debounce + pill `hasKey` + `hasRealKey` green highlight; sticky bottom `LOV 25/50`
+  - `/logs`: only **Live ON** (SSE + 2s poll), duplicate `Auto sync 5s` removed
+  - Rate limit for list endpoints increased to 4x (200) to prevent 429 while typing/pagination
 
 ## What Happens When a Model Is Deprecated?
 
 The gateway will:
-- Still keep it in `GET /v1/models` but with `live_status: deprecated`
+- Still keep it in `GET /v1/models` but with `live_status: deprecated` + `persisted_404: true` + strikethrough
 - If `?verified=free`, exclude deprecated from the list (so clients only see tiers that are still actually free)
-- The router will skip deprecated entries in `getProvidersForRequest` if verified data exists (P3 will implement `quota-tracker` using the verified map)
+- `POST /api/models/health/mark` persists 404/410 to `data/model-health.json` + localStorage `hide404`, router will skip deprecated entries in `getProvidersForRequest` if verified data exists (combined with `quota-tracker` verified map)
+- `hide404` pill default checked will hide 404 rows from UI (persist `hide404_migrated`)
+
+## Rate limit 429 fix
+
+- Frontend: `qDebounced` 400ms `setTimeout` in `Models.tsx`/`Providers.tsx` — reduces request rate while typing
+- Backend: `middleware/rate-limit.ts` `isListEndpoint` (`/v1/models`, `/api/providers`, `/api/models/health`) → `effectiveLimit = max(vk.rpmLimit*4, 200)` — 4x increase for list/pagination/search

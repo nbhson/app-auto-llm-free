@@ -4,7 +4,7 @@
 
 ## Environment Variables
 
-See the full `.env.example` (30 providers from freellms.org). The key groups are below:
+See the full `.env.example` (30 providers from freellms.org, live sync is now source of truth — freellms disabled). The key groups are below:
 
 ### Gateway
 
@@ -17,9 +17,11 @@ See the full `.env.example` (30 providers from freellms.org). The key groups are
 | `MASTER_KEY` | (required) | Admin key `fgk-master-...` for creating virtual keys |
 | `ENCRYPTION_KEY` | (required) | 32-byte hex for AES-256-GCM (e.g. `openssl rand -hex 32`) |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
-| `CORS_ORIGIN` | `*` | Allow Dashboard origin |
+| `CORS_ORIGIN` | `*` | Allow Dashboard origin (2-row header + i18n VI/EN) |
+| `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler for verify + live sync |
+| `DISABLE_SCHEDULER` | `0` | Set to `1` to disable scheduler |
 
-### Provider Keys (pooled, comma-separated) — 30 freellms providers
+### Provider Keys (pooled, comma-separated) — 30 freellms providers, live via real keys
 
 ```env
 # Core
@@ -40,7 +42,7 @@ SAMBANOVA_API_KEYS=sn_xxx
 CHUTES_API_KEYS=ch_xxx
 HUGGINGFACE_API_KEYS=hf_xxx
 
-# Freellms — new (2026-09-06 scan, 316 free models)
+# Freellms — new (2026-09-06 scan, 316 free models — historical, live now 882 free)
 MODELSCOPE_API_KEYS=ms_xxx
 OVHCLOUD_API_KEYS=ovh_xxx
 KILO_CODE_API_KEYS=kc_xxx
@@ -59,7 +61,7 @@ AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # usually not needed
 ```
 
-Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). See the full table in `docs/PROVIDERS.md:1`.
+Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). Real-key check for `hasKey`/`Sync Live Now`: `k.length>20 && !k.includes('xxx') && !k.includes('change-me')`. See the full table in `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -70,9 +72,13 @@ Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped pr
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before opening the circuit |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | Cooldown duration |
 
-## models.yaml — 316 free models (freellms)
+### Rate Limit
 
-Synced from freellms.org:
+`middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) get 4x (`Math.max(rpmLimit*4, 200)`), frontend debounces search `q` by 400ms (Models/Providers) to reduce 429.
+
+## models.yaml — 316 free models (freellms snapshot, historical) + live-models.json (882 free)
+
+Synced historically from freellms.org:
 
 ```yaml
 models:
@@ -87,18 +93,19 @@ models:
     limit: "Up to 40 RPM"
 ```
 
-Sync job (freellms):
+Sync job **new** (live source of truth):
 
 ```bash
-python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml
+npx tsx apps/gateway/src/jobs/sync-live-models.ts        # fetch live -> data/live-models.json (2185 total, 882 free, freeOnly)
+curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+# Historical
+python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml (disabled)
 npm run sync:freellms -w apps-gateway  # alias
-# legacy
-bun run sync:providers   # fetch from provider APIs + LiteLLM pricing (stub)
 ```
 
-The gateway `GET /v1/models` reads `data/freellms-models-free.json:1` (316 rows), and `GET /api/providers` returns `detailed[]` with `free_models`, `limit`, and `verified`.
+The gateway `GET /v1/models` reads `data/live-models.json:1` (live 882) when `?hasKey=1` with real keys, otherwise `data/freellms-models-free.json:1` (316 rows), and `GET /api/providers` returns `detailed[]` with `free_models`, `hasRealKey` (green highlight), `limit`, and `verified`, pagination LOV 25/50 at sticky bottom (400ms debounce).
 
-## Rate Limit Config — per-provider (from freellms)
+## Rate Limit Config — per-provider (from freellms, live uses same)
 
 | Provider | RPM | RPD | TPM/TPD | Notes |
 |----------|-----|-----|---------|-------|
@@ -112,7 +119,7 @@ The gateway `GET /v1/models` reads `data/freellms-models-free.json:1` (316 rows)
 | OpenRouter | — | 200 free | — | — |
 | Kilo Code | ~200/hr | — | — | `:free` suffix |
 
-Stored in `models.yaml:1` `limit` and enforced by `apps/gateway/src/lib/quota-tracker.ts`. Token usage `allTimeTokens` + `tokensByProvider` from `lib/request-log.ts:1` powers the Dashboard 4th card and Logs charts (recharts).
+Stored in `models.yaml:1` `limit` and enforced by `apps/gateway/src/lib/quota-tracker.ts` + `middleware/rate-limit.ts` 4x for list. Token usage `allTimeTokens` + `tokensByProvider` from `lib/request-log.ts:1` powers the Dashboard 4th card and Logs charts (recharts, Live ON SSE + 2s poll).
 
 In the `virtual_keys` table:
 
@@ -125,6 +132,18 @@ In the `virtual_keys` table:
   "scopes": { "models": ["*"], "providers": ["nvidia-nim","groq","google-gemini"] }
 }
 ```
+
+## i18n
+
+`apps/web/src/lib/i18n.tsx` — `VI/EN` dict, `LangProvider`, `localStorage lang` (`vi` default), selector in header row 1 (alongside Master). Docs have `docs/vi/` + `docs/en/` with own banners, root `README.md` default English + `README.vi.md` Vietnamese.
+
+## 2-Row Header
+
+`apps/web/src/main.tsx:40` — `display: flex; flexDirection: column; gap:10`: row 1 `justifyContent: space-between` left logo + health + `30 providers • 316 free` / right `VI/EN` + `Master` input; row 2 nav 5 tabs centered `alignSelf: center`. Previously single row with grid/nav centered — now split into 2 rows.
+
+## Persisted 404 + hide404
+
+`data/model-health.json` + `localStorage hide404`/`hide404_migrated` — 404/410 strikethrough `line-through #dc2626`, disabled checkbox, `hide404` pill default checked hides from UI, `POST /api/models/health/mark` persists.
 
 ## Drizzle Config
 

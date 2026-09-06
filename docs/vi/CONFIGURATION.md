@@ -4,7 +4,7 @@
 
 ## Biến môi trường
 
-Xem `.env.example` đầy đủ (30 providers freellms.org). Dưới đây là nhóm quan trọng:
+Xem `.env.example` đầy đủ (30 providers freellms.org, live sync là source of truth — freellms disabled). Dưới đây là nhóm quan trọng:
 
 ### Gateway
 
@@ -17,9 +17,11 @@ Xem `.env.example` đầy đủ (30 providers freellms.org). Dưới đây là n
 | `MASTER_KEY` | (required) | Key admin `fgk-master-...` để tạo virtual keys |
 | `ENCRYPTION_KEY` | (required) | 32 bytes hex cho AES-256-GCM (vd: `openssl rand -hex 32`) |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
-| `CORS_ORIGIN` | `*` | Cho phép Dashboard |
+| `CORS_ORIGIN` | `*` | Cho phép Dashboard (header 2 hàng + i18n VI/EN) |
+| `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler cho verify + live sync |
+| `DISABLE_SCHEDULER` | `0` | Đặt `1` để tắt scheduler |
 
-### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers
+### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers, live via real keys
 
 ```env
 # Core
@@ -40,7 +42,7 @@ SAMBANOVA_API_KEYS=sn_xxx
 CHUTES_API_KEYS=ch_xxx
 HUGGINGFACE_API_KEYS=hf_xxx
 
-# Freellms — new (2026-09-06 scan, 316 free models)
+# Freellms — new (2026-09-06 scan, 316 free models — lịch sử, live hiện 882 free)
 MODELSCOPE_API_KEYS=ms_xxx
 OVHCLOUD_API_KEYS=ovh_xxx
 KILO_CODE_API_KEYS=kc_xxx
@@ -59,7 +61,7 @@ AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # thường không cần
 ```
 
-Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
+Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Real key check cho `hasKey`/`Sync Live Now`: `k.length>20 && !k.includes('xxx') && !k.includes('change-me')`. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -70,9 +72,13 @@ POLLINATIONS_API_KEY= # thường không cần
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | fails để open |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | — |
 
-## models.yaml — 316 free models (freellms)
+### Rate limit
 
-Sync từ freellms.org:
+`middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) được 4x (`Math.max(rpmLimit*4, 200)`), frontend debounce search `q` 400ms (Models/Providers) để giảm 429.
+
+## models.yaml — 316 free models (freellms snapshot, lịch sử) + live-models.json (882 free)
+
+Sync lịch sử từ freellms.org:
 
 ```yaml
 models:
@@ -87,18 +93,19 @@ models:
     limit: "Up to 40 RPM"
 ```
 
-Sync job (freellms):
+Sync job **mới** (live source of truth):
 
 ```bash
-python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml
+npx tsx apps/gateway/src/jobs/sync-live-models.ts        # fetch live -> data/live-models.json (2185 total, 882 free, freeOnly)
+curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+# Lịch sử
+python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml (disabled)
 npm run sync:freellms -w apps-gateway  # alias
-# legacy
-bun run sync:providers   # fetch từ provider APIs + LiteLLM pricing (stub)
 ```
 
-Gateway `GET /v1/models` đọc `data/freellms-models-free.json:1` (316 rows), `GET /api/providers` trả `detailed[]` với `free_models`, `limit`, `verified`.
+Gateway `GET /v1/models` đọc `data/live-models.json:1` (live 882) khi `?hasKey=1` với real keys, ngược lại `data/freellms-models-free.json:1` (316 rows), `GET /api/providers` trả `detailed[]` với `free_models`, `hasRealKey` (highlight xanh lá), `limit`, `verified`, pagination LOV 25/50 ở sticky bottom (debounce 400ms).
 
-## Rate Limit config — per-provider (từ freellms)
+## Rate Limit config — per-provider (từ freellms, live vẫn dùng)
 
 | Provider | RPM | RPD | TPM/TPD | Ghi chú |
 |----------|-----|-----|---------|---------|
@@ -112,7 +119,7 @@ Gateway `GET /v1/models` đọc `data/freellms-models-free.json:1` (316 rows), `
 | OpenRouter | — | 200 free | — | — |
 | Kilo Code | ~200/hr | — | — | `:free` suffix |
 
-Lưu trong `models.yaml:1` `limit` + `apps/gateway/src/lib/quota-tracker.ts` enforce. Token usage `allTimeTokens` + `tokensByProvider` từ `lib/request-log.ts:1` hiện Dashboard 4th card + Logs charts (recharts).
+Lưu trong `models.yaml:1` `limit` + `apps/gateway/src/lib/quota-tracker.ts` enforce + `middleware/rate-limit.ts` 4x cho list. Token usage `allTimeTokens` + `tokensByProvider` từ `lib/request-log.ts:1` hiện Dashboard 4th card + Logs charts (recharts, chỉ Live ON SSE + 2s poll).
 
 Trong `virtual_keys` table:
 
@@ -125,6 +132,18 @@ Trong `virtual_keys` table:
   "scopes": { "models": ["*"], "providers": ["nvidia-nim","groq","google-gemini"] }
 }
 ```
+
+## i18n
+
+`apps/web/src/lib/i18n.tsx` — `VI/EN` dict, `LangProvider`, `localStorage lang` (`vi` default), selector trong header hàng 1 (cùng Master). Docs có `docs/vi/` + `docs/en/` với banner riêng, root `README.md` mặc định English + `README.vi.md` Vietnamese.
+
+## Header 2 hàng
+
+`apps/web/src/main.tsx:40` — `display: flex; flexDirection: column; gap:10`: hàng 1 `justifyContent: space-between` trái logo + health + `30 providers • 316 free` / phải `VI/EN` + `Master` input; hàng 2 nav 5 tabs căn giữa `alignSelf: center`. Trước đây single row với grid/nav centered — hiện đã tách 2 hàng.
+
+## Persisted 404 + hide404
+
+`data/model-health.json` + `localStorage hide404`/`hide404_migrated` — 404/410 strikethrough `line-through #dc2626`, disabled checkbox, `hide404` pill mặc định checked ẩn khỏi UI, `POST /api/models/health/mark` lưu.
 
 ## Drizzle config
 

@@ -2,11 +2,11 @@
 
 # Triển khai (Deployment)
 
-> Nav **Providers trước Models** (sticky), Dashboard 4 cards + 3 charts + tokens, `lib/paths.ts` fix 7→316 cho `cwd=apps/gateway`.
+> Nav **Providers trước Models** (sticky), Dashboard 4 cards + 3 charts + tokens, `lib/paths.ts` fix 7→316 cho `cwd=apps/gateway`, **header 2 hàng** (row1 `30 providers • 316 free` + Master + VI/EN cùng hàng, row2 nav centered), **live sync là source of truth** (freellms disabled).
 
 ## 1. Docker Compose (khuyến nghị)
 
-Production-ready, gồm gateway + postgres + redis, kèm 24h verify scheduler + `GET /api/models/health` per-model probe.
+Production-ready, gồm gateway + postgres + redis, kèm 24h verify + live sync scheduler + `GET /api/models/health` per-model probe + rate-limit 4x cho list endpoints.
 
 ```yaml
 # docker-compose.yml
@@ -37,7 +37,7 @@ volumes: { pgdata: {} }
 
 ```bash
 cp .env.example .env
-# điền MASTER_KEY, ENCRYPTION_KEY, provider keys (30 providers freellms)
+# điền MASTER_KEY, ENCRYPTION_KEY, provider keys (30 providers, real keys cho hasKey)
 # SYNC_INTERVAL_MS=86400000 (24h) hoặc DISABLE_SCHEDULER=1
 docker compose up -d --build
 docker compose logs -f gateway
@@ -45,7 +45,9 @@ docker compose logs -f gateway
 
 Health check: `curl http://localhost:8080/v1/health` → `providers:43`, `tiers` 4-tier freellms  
 Verify check: `curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER_KEY"`  
-Sync trigger: `curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER_KEY" -d '{"dryRun":false}'`
+Live sync: `curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER_KEY"` (2185 total) + `curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -d '{"freeOnly":true}'`  
+Live models: `curl "http://localhost:8080/v1/models?hasKey=1" -H "Authorization: Bearer $MASTER_KEY"` → 2190 total  
+Sync trigger (freellms lịch sử, disabled): `curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER_KEY" -d '{"dryRun":false}'`
 
 ## 2. Bare Metal / VPS
 
@@ -54,14 +56,17 @@ npm install
 npm run build
 # Postgres + Redis phải chạy sẵn
 DATABASE_URL=postgres://... REDIS_URL=redis://... SYNC_INTERVAL_MS=86400000 npm run start:gateway -w apps-gateway
-# Dashboard build static
+# Dashboard build static (header 2 hàng + i18n VI/EN)
 npm run build -w apps-web && npm run preview -w apps-web
 pm2 start ecosystem.config.cjs
 ```
 
-Freellms sync thủ công:
+Live sync thủ công:
 
 ```bash
+npx tsx apps/gateway/src/jobs/sync-live-models.ts          # live fetch -> data/live-models.json (882 free, freeOnly)
+curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+# Freellms (lịch sử, disabled)
 python scripts/sync-freellms.py          # 30 providers, 316 free -> data/*.json + models.yaml
 npm run verify:free:dry -w apps-gateway  # dry-run không cần keys
 npm run verify:free -w apps-gateway      # live cần .env keys (NVIDIA, Groq...)
@@ -80,6 +85,7 @@ server {
     proxy_read_timeout 300s;
   }
   location /api/verify { proxy_pass http://127.0.0.1:8080; }
+  location /api/models/live { proxy_pass http://127.0.0.1:8080; }
 }
 ```
 
@@ -99,11 +105,11 @@ Hono hỗ trợ multi-runtime (WinterCG). Cần thay Redis → KV, scheduler dù
 npm run deploy:cf -w apps-gateway
 ```
 
-Lưu ý: Workers không có `better-sqlite3`, dùng `@libsql/client` (Turso) thay thế. Scheduler trên Workers dùng `scheduled` event thay vì `setInterval`.
+Lưu ý: Workers không có `better-sqlite3`, dùng `@libsql/client` (Turso) thay thế. Scheduler trên Workers dùng `scheduled` event thay vì `setInterval` (cả verify + syncLiveModels).
 
 ## 4. Vercel
 
-Dashboard (`apps/web`) deploy trực tiếp Vercel (Vite). Gateway có thể deploy như Vercel Function nhưng khuyến nghị giữ trên VPS/Workers để SSE ổn định và scheduler 24h chạy liên tục.
+Dashboard (`apps/web`) deploy trực tiếp Vercel (Vite, header 2 hàng, i18n VI/EN persist `localStorage lang`). Gateway có thể deploy như Vercel Function nhưng khuyến nghị giữ trên VPS/Workers để SSE ổn định và scheduler 24h chạy liên tục.
 
 ## 5. Biến môi trường production
 
@@ -111,15 +117,17 @@ Dashboard (`apps/web`) deploy trực tiếp Vercel (Vite). Gateway có thể dep
 * `ENCRYPTION_KEY` sinh bằng `openssl rand -hex 32` và lưu secret manager (không commit)
 * `MASTER_KEY` dạng `fgk-master-$(openssl rand -hex 16)`
 * `CORS_ORIGIN=https://yourdomain.com` (không để `*`)
-* `SYNC_INTERVAL_MS=86400000` (24h), `DISABLE_SCHEDULER=0`
-* Provider keys: ít nhất 5 P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để verify 60-70% models; các provider còn lại sẽ `unverified_no_key` nhưng vẫn phục vụ
-* Freellms sync: cron GitHub Actions 02:00 UTC đã cấu hình `.github/workflows/sync-freellms.yml:1`
+* `SYNC_INTERVAL_MS=86400000` (24h), `DISABLE_SCHEDULER=0` — scheduler gọi cả `verifyFreeModels` + `syncLiveModels` mỗi 24h
+* Provider keys: ít nhất 5 P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để live sync 882 free / 853 hasKey; các provider còn lại sẽ `unverified_no_key` nhưng vẫn phục vụ; real key check `!xxx`, length>20 cho `hasKey`
+* Freellms sync: cron GitHub Actions 02:00 UTC đã cấu hình `.github/workflows/sync-freellms.yml:1` (lịch sử, disabled; live sync thay thế)
+* Rate limit: `middleware/rate-limit.ts` đã tăng 4x (min 200) cho `/v1/models`, `/api/providers`, `/api/models/health` + debounce 400ms frontend
 
 ## 6. Monitoring & Verify
 
 * `/v1/health` cho uptime check (UptimeRobot)
-* `/api/stats` cho Grafana (poll 10s) — `free_models:316`, `providers:43`
-* `/api/verify/summary` cho alert nếu `deprecated` tăng đột biến (freellms stale)
-* `/api/verify` chi tiết per-model `live_status`
-* GitHub Actions daily: `sync-freellms.yml` tự động commit `data/` + `models.yaml` nếu có thay đổi
-* Logs: `docker compose logs` hoặc `pino-pretty` local, `OTEL_EXPORTER_OTLP_ENDPOINT` → Langfuse/Axiom
+* `/api/stats` cho Grafana (poll 10s) — `free_models:316`, `providers:43`, live `data/live-models.json:1` 2185/882
+* `/api/verify/summary` cho alert nếu `deprecated` tăng đột biến (freellms stale) + `/api/models/live` check live cache freshness
+* `/api/verify` chi tiết per-model `live_status` + `/api/models/health/persisted` 404 strikethrough
+* GitHub Actions daily: `sync-freellms.yml` tự động commit `data/` + `models.yaml` nếu có thay đổi (hiện live sync thay)
+* Logs: `docker compose logs` hoặc `pino-pretty` local, `OTEL_EXPORTER_OTLP_ENDPOINT` → Langfuse/Axiom; Logs page chỉ **Live ON (SSE + 2s poll)**, đã bỏ `Auto sync 5s` duplicate
+* Docs: `docs/vi/` + `docs/en/` với banner riêng; root `README.md` mặc định English (trước đây Vietnamese), `README.vi.md` Vietnamese; UI ngôn ngữ chọn ở header và persist `localStorage lang` (`lib/i18n.tsx`)

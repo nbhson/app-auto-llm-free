@@ -2,56 +2,57 @@
 
 # Providers
 
-> **Nguồn chính: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 ids.**  
-> Dashboard nav **Providers (30) trước Models (316)**. Cột **Get Key ↗** (console trực tiếp + freellms ↗) trong `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs).
-> Chi tiết: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`  
-> Gateway `apps/gateway/src/providers/registry.ts:1` 43 ids (30 slugs + alias), `models.yaml:1` 316 free, `lib/paths.ts:1` fix 7→316 bug.
+> **Nguồn lịch sử: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 ids — hiện live sync là source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total).**  
+> Dashboard nav **Providers (30) trước Models (316)**. Cột **Get Key ↗** (console trực tiếp + freellms ↗) trong `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs). Bảng **highlight hasRealKey**: `background #f0fdf4` + `borderLeft 3px #16a34a` + badge `● has key` xanh lá + `Keys` `✓ real` xanh + `Get Key` xanh lá khi hasRealKey. **Top filter** debounce 400ms `q` + pill `hasKey`, **sticky bottom pagination** LOV 25/50 (không còn trên top).  
+> Chi tiết lịch sử: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`; **live**: `data/live-models.json:1` / `GET /api/models/live` / `POST /api/models/live/sync`  
+> Gateway `apps/gateway/src/providers/registry.ts:1` 43 ids (30 slugs + alias), `models.yaml:1` 316 free (snapshot), `lib/paths.ts:1` fix 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
 
-## 1. Tổng quan freellms.org
+## 1. Tổng quan freellms.org (lịch sử) + live hiện tại
 
-| Chỉ số | Giá trị |
-|--------|---------|
-| Providers | **30** (26 Permanent Free, 4 Quota) |
-| Models | **365** (316 FREE `data-free=1`, 49 paid) |
-| No Card | 29/30 (chỉ Grok xAI yêu cầu) |
-| OpenAI Compatible | 30/30 |
-| Scan date | 2026-09-06, script `scripts/sync-freellms.py` |
+| Chỉ số | Giá trị (freellms snapshot) | Live hiện tại (sync-live-models.ts) |
+|--------|------------------------------|-------------------------------------|
+| Providers | **30** (26 Permanent Free, 4 Quota) | 30 (real keys + public) |
+| Models | **365** (316 FREE `data-free=1`, 49 paid) | **2185 total fetched / 882 free (freeOnly) / 853 hasKey** |
+| `GET /v1/models?hasKey=1` | — | **2190 total** (live + alias) |
+| No Card | 29/30 (chỉ Grok xAI yêu cầu) | — |
+| OpenAI Compatible | 30/30 | live fetch qua `provider.models()` |
+| Scan date | 2026-09-06, script `scripts/sync-freellms.py` **disabled, không còn latest** | Live sync mỗi 24h via `jobs/scheduler.ts` + `POST /api/models/live/sync {freeOnly:true}` |
 
-## 2. Danh sách 30 providers (từ freellms.org)
+## 2. Danh sách 30 providers (từ freellms.org — lịch sử, live fetch qua real keys)
 
 ### Permanent Free — No Card (ưu tiên P0)
 
-| Provider | Slug | Base URL | Free Models | Limit | Caps | Env Key |
-|----------|------|----------|-------------|-------|------|---------|
-| **NVIDIA NIM** | `nvidia-nim` | `https://integrate.api.nvidia.com/v1` | 97 | Up to 40 RPM, 8K–1M | text,reasoning,image,video,embedding | `NVIDIA_API_KEYS` |
-| **ModelScope** | `modelscope` | `https://api-inference.modelscope.cn/v1` | 43 | 2K RPD total, ≤500/model | text,image,video,audio | `MODELSCOPE_API_KEYS` |
-| **Cloudflare Workers AI** | `cloudflare-workers-ai` | `https://api.cloudflare.com/client/v4/accounts/{id}/ai/run` | 35 | 10K neurons/day | text,image,reasoning,code | `CLOUDFLARE_API_TOKEN` + `ACCOUNT_ID` |
-| **Google Gemini** | `google-gemini` / `gemini` | `https://generativelanguage.googleapis.com/v1beta` | 15 | 15 RPM/1.5K RPD (Flash), 30 RPM Lite | text,image,video,audio | `GEMINI_API_KEYS` |
-| **OVHcloud AI Endpoints** | `ovhcloud-ai-endpoints` | `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1` | 10 | 2 RPM anon | text,image,video | `OVHCLOUD_API_KEYS` |
-| **Cohere** | `cohere` | `https://api.cohere.com/v2` | 10 | — | text,reasoning,embedding,rerank | `COHERE_API_KEYS` |
-| **SambaNova** | `sambanova` | `https://api.sambanova.ai/v1` | 4 | — | text,reasoning | `SAMBANOVA_API_KEYS` |
-| **SiliconFlow** | `siliconflow` | `https://api.siliconflow.cn/v1` | 2 | — | text,reasoning | `SILICONFLOW_API_KEYS` |
-| **Chutes.ai** | `chutes-ai` / `chutes` | `https://api.chutes.ai/v1` | 2 | — | text,reasoning | `CHUTES_API_KEYS` |
-| **Glhf.chat** | `glhf-chat` / `glhf` | `https://glhf.chat/api/openai/v1` | 2 | — | text | `GLHF_API_KEYS` |
-| **Z AI (Zhipu)** | `z-ai-zhipu-ai` | `https://open.bigmodel.cn/api/paas/v4` | 4 | — | text,reasoning | `Z_AI_API_KEYS` |
-| **Agnes AI** | `agnes-ai` | `https://apihub.agnes-ai.com/v1` | 5 | 30 RPM | text,vision | `AGNES_API_KEYS` |
-| **Aion Labs** | `aion-labs` | `https://api.aionlabs.ai/v1` | 5 | — | text | `AION_API_KEYS` |
-| **LLM7.io** | `llm7-io` | `https://api.llm7.io/v1` | 6 | — | text,reasoning | `LLM7_API_KEYS` |
-| **Cerebras** | `cerebras` | `https://api.cerebras.ai/v1` | 5 | 15 RPM/30K TPM/1M TPD, 128K ctx | text,reasoning | `CEREBRAS_API_KEYS` |
-| **Groq** | `groq` | `https://api.groq.com/openai/v1` | 7 / 23 total | 30 RPM/250 RPD primary, 14.4K RPD large | text,reasoning | `GROQ_API_KEYS` |
-| **Hugging Face** (quota) | `hugging-face` | `https://router.huggingface.co/v1` | 4 | IP limit | text,code | `HUGGINGFACE_API_KEYS` |
-| **OpenCode Zen** | `opencode` | `https://opencode.ai/zen/v1` | 8 | — | reasoning,vision | `OPENCODE_API_KEYS` |
-| **Ollama Cloud** | `ollama-cloud` | `https://api.ollama.com` | 3 / 8 total | Session/weekly limits | text,reasoning | `OLLAMA_CLOUD_API_KEYS` |
-| **Groq xAI** | `grok-xai` / `xai` | `https://api.x.ai/v1` | 2 | — | text | `GROK_API_KEYS` / `XAI_API_KEYS` |
+| Provider | Slug | Base URL | Free Models (freellms) | Live free (hasKey) | Limit | Caps | Env Key |
+|----------|------|----------|-----------------------|-------------------|-------|------|---------|
+| **NVIDIA NIM** | `nvidia-nim` | `https://integrate.api.nvidia.com/v1` | 97 | live 97 | Up to 40 RPM, 8K–1M | text,reasoning,image,video,embedding | `NVIDIA_API_KEYS` |
+| **ModelScope** | `modelscope` | `https://api-inference.modelscope.cn/v1` | 43 | live Permanent → all | 2K RPD total, ≤500/model | text,image,video,audio | `MODELSCOPE_API_KEYS` |
+| **Cloudflare Workers AI** | `cloudflare-workers-ai` | `https://api.cloudflare.com/client/v4/accounts/{id}/ai/run` | 35 | live Permanent → all | 10K neurons/day | text,image,reasoning,code | `CLOUDFLARE_API_TOKEN` + `ACCOUNT_ID` |
+| **Google Gemini** | `google-gemini` / `gemini` | `https://generativelanguage.googleapis.com/v1beta` | 15 | live Permanent → all | 15 RPM/1.5K RPD (Flash), 30 RPM Lite | text,image,video,audio | `GEMINI_API_KEYS` |
+| **OVHcloud AI Endpoints** | `ovhcloud-ai-endpoints` | `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1` | 10 | live Permanent → all | 2 RPM anon | text,image,video | `OVHCLOUD_API_KEYS` |
+| **Cohere** | `cohere` | `https://api.cohere.com/v2` | 10 | live Permanent → all | — | text,reasoning,embedding,rerank | `COHERE_API_KEYS` |
+| **SambaNova** | `sambanova` | `https://api.sambanova.ai/v1` | 4 | live | — | text,reasoning | `SAMBANOVA_API_KEYS` |
+| **SiliconFlow** | `siliconflow` | `https://api.siliconflow.cn/v1` | 2 | live | — | text,reasoning | `SILICONFLOW_API_KEYS` |
+| **Chutes.ai** | `chutes-ai` / `chutes` | `https://api.chutes.ai/v1` | 2 | live | — | text,reasoning | `CHUTES_API_KEYS` |
+| **Glhf.chat** | `glhf-chat` / `glhf` | `https://glhf.chat/api/openai/v1` | 2 | live public | — | text | `GLHF_API_KEYS` |
+| **Z AI (Zhipu)** | `z-ai-zhipu-ai` | `https://open.bigmodel.cn/api/paas/v4` | 4 | live | — | text,reasoning | `Z_AI_API_KEYS` |
+| **Agnes AI** | `agnes-ai` | `https://apihub.agnes-ai.com/v1` | 5 | live | 30 RPM | text,vision | `AGNES_API_KEYS` |
+| **Aion Labs** | `aion-labs` | `https://api.aionlabs.ai/v1` | 5 | live | — | text | `AION_API_KEYS` |
+| **LLM7.io** | `llm7-io` | `https://api.llm7.io/v1` | 6 | live public | — | text,reasoning | `LLM7_API_KEYS` |
+| **Cerebras** | `cerebras` | `https://api.cerebras.ai/v1` | 5 | live | 15 RPM/30K TPM/1M TPD, 128K ctx | text,reasoning | `CEREBRAS_API_KEYS` |
+| **Groq** | `groq` | `https://api.groq.com/openai/v1` | 7 / 23 total | live | 30 RPM/250 RPD primary, 14.4K RPD large | text,reasoning | `GROQ_API_KEYS` |
+| **Hugging Face** (quota) | `hugging-face` | `https://router.huggingface.co/v1` | 4 | live public | IP limit | text,code | `HUGGINGFACE_API_KEYS` |
+| **OpenCode Zen** | `opencode` | `https://opencode.ai/zen/v1` | 8 | live | — | reasoning,vision | `OPENCODE_API_KEYS` |
+| **Ollama Cloud** | `ollama-cloud` | `https://api.ollama.com` | 3 / 8 total | live public | Session/weekly limits | text,reasoning | `OLLAMA_CLOUD_API_KEYS` |
+| **Groq xAI** | `grok-xai` / `xai` | `https://api.x.ai/v1` | 2 | live | — | text | `GROK_API_KEYS` / `XAI_API_KEYS` |
 
 ### Quota / Trial (P1 — dùng sau Permanent)
 
-| Provider | Slug | Free | Limit | Env Key |
-|----------|------|------|-------|---------|
-| **GitHub Models** | `github-models` | 13 | PAT, quota | `GITHUB_TOKENS` |
-| **Mistral AI** | `mistral-ai` / `mistral` | 9 | 5 RPS free | `MISTRAL_API_KEYS` |
-| **Kilo Code** | `kilo-code` | 8 | ~200 req/hr, `:free` suffix | `KILO_CODE_API_KEYS` |
-| **Hugging Face** | `hugging-face` | 4 | — | `HUGGINGFACE_API_KEYS` |
+| Provider | Slug | Free (freellms) | Live free (freeOnly lọc `:free`/Permanent/freellms list) | Limit | Env Key |
+|----------|------|----------------|--------------------------------------------------------|-------|---------|
+| **GitHub Models** | `github-models` | 13 | lọc freellms list | PAT, quota | `GITHUB_TOKENS` |
+| **Mistral AI** | `mistral-ai` / `mistral` | 9 | lọc | 5 RPS free | `MISTRAL_API_KEYS` |
+| **Kilo Code** | `kilo-code` | 8 | `:free` suffix | ~200 req/hr, `:free` suffix | `KILO_CODE_API_KEYS` |
+| **Hugging Face** | `hugging-face` | 4 | public | — | `HUGGINGFACE_API_KEYS` |
 
 ### Legacy / extra (vẫn hỗ trợ)
 
@@ -65,17 +66,18 @@
 
 > Cảnh báo scraped: Pollinations/LLM7 không ổn định, cần health cron và auto-disable trong P3.
 
-## 3. Model Catalog — 316 free models
+## 3. Model Catalog — freellms 316 free (lịch sử) + live 882 free
 
-`models.yaml:1` đã được sync từ freellms:
+`models.yaml:1` đã được sync từ freellms (lịch sử):
 
 ```bash
-python scripts/sync-freellms.py   # fetch freellms.org -> data/*.json + models.yaml
-# hoặc
-npm run sync:freellms -w apps-gateway
+python scripts/sync-freellms.py   # fetch freellms.org -> data/*.json + models.yaml (disabled, không còn latest)
+# Live hiện tại (source of truth)
+curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total, .free_only'
 ```
 
-Mỗi entry:
+Mỗi entry freellms:
 
 ```yaml
 - id: nvidia-nim/z-ai/glm-5.2
@@ -88,7 +90,9 @@ Mỗi entry:
   limit: "Up to 40 RPM"
 ```
 
-Dashboard `/models` (Vite) và `GET /v1/models?provider=nvidia-nim` phục vụ từ `data/freellms-models-free.json:1` (316 rows, có `score`, `verified`, `limit`). Alias vẫn hỗ trợ:
+Live `data/live-models.json` (freeOnly): mỗi model `{id, provider, display_name, context_length, owned_by}` — lọc: Permanent Free → tất cả live là free; Quota → chỉ `:free` suffix hoặc trong freellms free list.
+
+Dashboard `/models` (Vite) và `GET /v1/models?hasKey=1` phục vụ từ `data/live-models.json` (live 882) khi hasRealKey, ngược lại từ `data/freellms-models-free.json:1` (316 rows, có `score`, `verified`, `limit`). Alias vẫn hỗ trợ:
 
 ```
 auto           -> nvidia-nim, groq, cerebras, google-gemini, cloudflare
@@ -101,7 +105,7 @@ glm            -> z-ai-zhipu-ai, nvidia-nim, modelscope
 code           -> kilo-code, opencode, cohere, mistral-ai
 ```
 
-Chi tiết top 30 theo score: xem `docs/FREELLMS_FREE_TIER.md:1`.
+Chi tiết top 30 theo score: xem `docs/FREELLMS_FREE_TIER.md:1` (lịch sử).
 
 ## 4. Fallback Tiers (đã cập nhật trong .env.example & config.ts)
 
@@ -109,7 +113,7 @@ Chi tiết top 30 theo score: xem `docs/FREELLMS_FREE_TIER.md:1`.
 FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]
 ```
 
-Router `apps/gateway/src/lib/router.ts:1` dùng tier này + `providerMeta` để fallback khi 429/timeout.
+Router `apps/gateway/src/lib/router.ts:1` dùng tier này + `providerMeta` để fallback khi 429/timeout. `hasKey` filter (`!xxx`, length>20) quyết định live cache.
 
 ## 5. Thêm provider mới
 
@@ -122,7 +126,7 @@ export const myProvider = createOpenAICompatibleProvider({ id: "my-provider", ba
 export const providers = { ..., myProvider };
 ```
 
-4. Chạy `python scripts/sync-freellms.py` để cập nhật `models.yaml` nếu provider có trên freellms
+4. Chạy `POST /api/models/live/sync` với real key để cập nhật `data/live-models.json` (thay vì `python scripts/sync-freellms.py` lịch sử)
 5. Test:
 
 ```bash
@@ -132,11 +136,14 @@ curl http://localhost:8080/v1/chat/completions \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-## 6. Health Check (live)
+## 6. Health Check (live) + hasRealKey highlight + rate limit
 
-* `GET /api/providers` — `detailed[]` với `free_models`, `keys`, `status`, **Get Key ↗** (link console) + freellms ↗
+* `GET /api/providers?page=&limit=&q=&hasKey=` — `detailed[]` với `free_models`, `keys`, `hasRealKey` (check `!xxx`, length>20), `status`, **Get Key ↗** (link console) + freellms ↗. **UI highlight**: row có hasRealKey → `background #f0fdf4` + `borderLeft 3px solid #16a34a` + badge `● has key` xanh lá + cell `Keys: ✓ real` xanh + nút `Get Key` nền xanh lá. Pagination **LOV 25/50 ở sticky bottom**, top filter chỉ có `q` (debounce 400ms) + pill `hasKey`.
 * `GET /api/providers/health` — live ping 43 providers parallel 5s (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
 * `GET /api/models/health?model=pollinations/openai` — probe chat 1 model (`usable` 2457ms, `unusable 410 Gone`)
 * `GET /api/models/health?provider=nvidia-nim&limit=2` — bulk probe, summary `usable/unusable/no-key`
-* `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (từ logs) — biết model nào thực sự usable
+* `GET /api/models/health/persisted` — list persisted 404/410 Strikethrough `#dc2626` + `hide404` pill
+* `GET /v1/models?hasKey=1` + `POST /api/models/live/sync {freeOnly:true}` — biết model nào thực sự free từ live (882 free)
+* `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (từ logs) — biết model nào thực sự usable (freellms snapshot)
 * `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers`
+* **Rate limit**: `middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) limit 4x (min 200), debounce search `q` 400ms để tránh 429.
