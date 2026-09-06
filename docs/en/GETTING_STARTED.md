@@ -182,10 +182,14 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 | `Hide 404 not hiding` | model-health not persisted | Tick checkbox then Check Live 410 → persists to `data/model-health.json`; toggle `Hide 404 models` default checked |
 | `verified 0/316` | Missing `ENCRYPTION_KEY`/provider keys, scheduler not yet run | Wait 5s after starting the gateway (scheduler auto-verifies + syncLiveModels dry-run) or `POST /api/verify` / `POST /api/models/live/sync` with `{"freeOnly":true}` |
 | `npm i` fails `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + old `better-sqlite3@9` has no prebuild (ABI 147) | Fixed at `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. If still fails, use Node 22 LTS (`brew install node@22`) or `npm i --build-from-source` with Xcode CLT `xcode-select --install` |
+| `EADDRINUSE :::8080` on `npm run dev` | Old gateway still running (`nohup npm run dev:gateway` or `tsx watch` not killed) | `pkill -f "tsx watch"; lsof -ti:8080 \| xargs kill -9; sleep 2; lsof -i :8080` (empty) then `npm run dev` |
 
 ## 9. Useful Commands
 
 ```bash
+# Kill old gateway if EADDRINUSE :::8080
+pkill -f "tsx watch"; lsof -ti:8080 | xargs kill -9; sleep 2; lsof -i :8080
+
 # Health
 curl http://localhost:8080/v1/health
 curl http://localhost:8080/api/providers/health -H "Authorization: Bearer $MASTER"

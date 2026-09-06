@@ -95,9 +95,9 @@ modelsRoute.get("/", async (c) => {
   const limit = [25, 50, 100, 200, 500, 1000].includes(rawLimit) ? rawLimit : 25;
   const rawQ = (c.req.query("q") || "").trim().toLowerCase();
   const qTokens = rawQ ? rawQ.split(/[\s\-_\/:]+/).filter(Boolean) : [];
-  const matchesQ = (id: string, display: string, owned: string) => {
+  const matchesQ = (id: string) => {
     if (!rawQ) return true;
-    const hay = `${id} ${display} ${owned}`.toLowerCase();
+    const hay = id.toLowerCase();
     const normHay = hay.replace(/[^a-z0-9]/g, "");
     return qTokens.every((tok) => {
       const normTok = tok.replace(/[^a-z0-9]/g, "");
@@ -115,7 +115,7 @@ modelsRoute.get("/", async (c) => {
   if (hasKeyOnly && liveModelsCache.length > 0) {
     for (const m of liveModelsCache) {
       if (providerFilter && m.owned_by !== providerFilter) continue;
-      if (!matchesQ(m.id, m.display_name || "", m.owned_by || "")) continue;
+      if (!matchesQ(m.id)) continue;
       const h = healthMap.get(m.id);
       if (h && (h.http_status === 404 || h.http_status === 410)) continue; // skip persisted 404 even in live
       if (verifiedFilter === "deprecated" && !(h && (h.http_status === 404 || h.http_status === 410))) continue;
@@ -151,7 +151,7 @@ modelsRoute.get("/", async (c) => {
         const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(m.owned_by);
         if (!hasRealKey) continue;
       }
-      if (!matchesQ(m.id, m.display_name || "", m.owned_by || "")) continue;
+      if (!matchesQ(m.id)) continue;
       const v = verifiedMap.get(m.id) || verifiedMap.get((m as any).raw_id);
       const h = healthMap.get(m.id) || healthMap.get((m as any).raw_id);
       let live_status: string = v ? v.status : "unverified_no_data";

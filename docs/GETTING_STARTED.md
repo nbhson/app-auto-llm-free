@@ -170,10 +170,14 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 | `Models chỉ 7` | Chạy `npm run dev:gateway` cũ chưa rebuild sau fix `paths.ts` | `git pull && npm run build -w apps-gateway && docker compose up -d --build` + hard reload `Ctrl+Shift+R` |
 | `verified 0/316` | Chưa có `ENCRYPTION_KEY`/provider keys, scheduler chưa chạy | Đợi 5s sau khi start gateway (scheduler tự verify dry-run) hoặc `POST /api/verify` với `{"dryRun":true}` |
 | `npm i` lỗi `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + `better-sqlite3@9` cũ không có prebuild (ABI 147) | Đã fix ở `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. Nếu vẫn lỗi, dùng Node 22 LTS (`brew install node@22`) hoặc `npm i --build-from-source` với Xcode CLT `xcode-select --install` |
+| `EADDRINUSE :::8080` khi `npm run dev` | Gateway cũ vẫn chạy (`nohup npm run dev:gateway` hoặc `tsx watch` trước chưa kill) | `pkill -f "tsx watch"; lsof -ti:8080 \| xargs kill -9; sleep 2; lsof -i :8080` (trống) rồi `npm run dev` lại |
 
 ## 9. Lệnh hữu ích
 
 ```bash
+# Kill gateway cũ nếu EADDRINUSE :::8080
+pkill -f "tsx watch"; lsof -ti:8080 | xargs kill -9; sleep 2; lsof -i :8080
+
 # Health
 curl http://localhost:8080/v1/health
 curl http://localhost:8080/api/providers/health -H "Authorization: Bearer $MASTER"

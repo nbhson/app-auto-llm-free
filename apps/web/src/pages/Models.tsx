@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, X, Check } from "lucide-react";
+import { Search, RefreshCw, X, Check, ChevronDown, Filter } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
@@ -45,6 +45,7 @@ export default function Models() {
     if (v === null) { localStorage.setItem("hidePayment", "1"); return true; }
     return v !== "0";
   });
+  const [filterOpen, setFilterOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
@@ -167,7 +168,7 @@ export default function Models() {
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[280px] max-w-[380px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input placeholder={t("models.filter_placeholder")} value={q} onChange={(e) => setQ(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
+            <input placeholder="Filter by ID..." value={q} onChange={(e) => setQ(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
           </div>
           <select value={verified} onChange={(e) => setVerified(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold">
             <option value="all">{t("models.verified_all")} ({total})</option>
@@ -175,10 +176,33 @@ export default function Models() {
             <option value="deprecated">{t("models.verified_deprecated")}</option>
             <option value="unverified">{t("models.verified_unverified")}</option>
           </select>
-          <div className="flex gap-2 ml-auto flex-wrap">
-            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${hasKeyOnly ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white text-slate-600 border-slate-200"}`}><input type="checkbox" checked={hasKeyOnly} onChange={(e) => setHasKeyOnly(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> {t("models.hasKey")}</label>
-            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${hide404 ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-white text-slate-600 border-slate-200"}`}><input type="checkbox" checked={hide404} onChange={(e) => setHide404(e.target.checked)} className="w-4 h-4 accent-rose-600" /> {t("models.hide404")}</label>
-            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${hidePayment ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-white text-slate-600 border-slate-200"}`} title="Hide models with 'out of credits' / 'no payment method' / 402"><input type="checkbox" checked={hidePayment} onChange={(e) => setHidePayment(e.target.checked)} className="w-4 h-4 accent-amber-600" /> Hide credits/payment</label>
+          <div className="relative ml-auto">
+            <button type="button" onClick={() => setFilterOpen(!filterOpen)} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs">
+              <Filter className="w-3.5 h-3.5 text-slate-500" /> Filters {(hasKeyOnly?1:0)+(hide404?1:0)+(hidePayment?1:0) > 0 && <span className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded-full">{(hasKeyOnly?1:0)+(hide404?1:0)+(hidePayment?1:0)}</span>} <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
+            </button>
+            {filterOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20">
+                <label className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" checked={hasKeyOnly} onChange={(e) => setHasKeyOnly(e.target.checked)} className="w-4 h-4 rounded border-slate-300 accent-emerald-600" />
+                  <span className="text-xs font-semibold text-slate-700 flex-1">{t("models.hasKey")}</span>
+                  {hasKeyOnly && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                </label>
+                <label className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" checked={hide404} onChange={(e) => setHide404(e.target.checked)} className="w-4 h-4 rounded border-slate-300 accent-rose-600" />
+                  <span className="text-xs font-semibold text-slate-700 flex-1">{t("models.hide404")}</span>
+                  {hide404 && <Check className="w-3.5 h-3.5 text-rose-600" />}
+                </label>
+                <label className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" checked={hidePayment} onChange={(e) => setHidePayment(e.target.checked)} className="w-4 h-4 rounded border-slate-300 accent-amber-600" />
+                  <span className="text-xs font-semibold text-slate-700 flex-1">Hide credits/payment</span>
+                  {hidePayment && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                </label>
+                <div className="border-t border-slate-100 mt-2 pt-2 px-3 flex justify-between items-center">
+                  <span className="text-[11px] text-slate-400">{(hasKeyOnly?1:0)+(hide404?1:0)+(hidePayment?1:0)} active</span>
+                  <button onClick={() => { setHasKeyOnly(true); setHide404(true); setHidePayment(true); }} className="text-[11px] font-semibold text-slate-600 hover:text-slate-900">Reset default</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-2 justify-center pt-2 border-t border-slate-100">
