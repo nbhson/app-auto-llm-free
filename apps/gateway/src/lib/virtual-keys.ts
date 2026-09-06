@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 import { timingSafeEqual } from "./auth.js";
+import { resolveDataPath } from "./paths.js";
 
 export interface VirtualKey {
   id: string;
@@ -20,7 +21,7 @@ export interface VirtualKey {
   requestCount?: number;
 }
 
-const STORE_PATH = path.resolve("data/virtual-keys.json");
+const STORE_PATH = resolveDataPath("virtual-keys.json");
 
 function hashKey(key: string): string {
   return crypto.createHash("sha256").update(key).digest("hex");

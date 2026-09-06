@@ -4,15 +4,10 @@ import { config } from "../config.js";
 import { listVirtualKeys, createVirtualKey, deleteVirtualKey } from "../lib/virtual-keys.js";
 import { getLogs, getStats, onLog } from "../lib/request-log.js";
 import { getAllStates } from "../lib/circuit-breaker.js";
-import fs from "node:fs";
-import path from "node:path";
+import { readDataJson } from "../lib/paths.js";
 
 function loadProvidersJson() {
-  try {
-    const p = path.resolve("data/freellms-providers.json");
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf-8"));
-  } catch {}
-  return [];
+  return readDataJson<any[]>("freellms-providers.json", []);
 }
 
 export const apiRoute = new Hono();
@@ -122,24 +117,15 @@ apiRoute.get("/models/sync", (c) => {
 });
 
 apiRoute.get("/verify", (c) => {
-  try {
-    const p = path.resolve("data/verified-models.json");
-    if (!fs.existsSync(p)) return c.json({ status: "no_data", message: "Run POST /api/verify or wait for 24h scheduler" }, 404);
-    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
-    return c.json(data);
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
+  const data = readDataJson<any>("verified-models.json", null as any);
+  if (!data) return c.json({ status: "no_data", message: "Run POST /api/verify or wait for 24h scheduler" }, 404);
+  return c.json(data);
 });
 
 apiRoute.get("/verify/summary", (c) => {
-  try {
-    const p = path.resolve("data/verified-summary.json");
-    if (!fs.existsSync(p)) return c.json({ status: "no_data" }, 404);
-    return c.json(JSON.parse(fs.readFileSync(p, "utf-8")));
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
+  const data = readDataJson<any>("verified-summary.json", null as any);
+  if (!data) return c.json({ status: "no_data" }, 404);
+  return c.json(data);
 });
 
 apiRoute.post("/verify", async (c) => {
@@ -206,18 +192,15 @@ apiRoute.get("/logs/stream", (c) => {
 
 apiRoute.get("/stats", (c) => {
   const freellms = loadProvidersJson();
-  let freeModels = 0;
-  try {
-    const p = path.resolve("data/freellms-models-free.json");
-    if (fs.existsSync(p)) freeModels = JSON.parse(fs.readFileSync(p, "utf-8")).length;
-  } catch {}
+  const freeModelsArr = readDataJson<any[]>("freellms-models-free.json", []);
+  const freeModels = freeModelsArr.length || 316;
   const logStats = getStats();
   return c.json({
     uptime: process.uptime(),
     requests: logStats.total,
     providers: providerIds.length,
     freellms_providers: freellms.length || 30,
-    free_models: freeModels || 316,
+    free_models: freeModels,
     total_models: 365,
     tiers: config.fallbackTiers,
     logs: logStats,

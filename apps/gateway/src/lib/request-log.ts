@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { resolveDataPath } from "./paths.js";
 
 export interface RequestLog {
   id: string;
@@ -17,7 +18,7 @@ export interface RequestLog {
   verifiedStatus?: string;
 }
 
-const LOG_PATH = path.resolve("data/request-log.json");
+const LOG_PATH = resolveDataPath("request-log.json");
 const MAX_LOGS = 1000;
 let logs: RequestLog[] = [];
 

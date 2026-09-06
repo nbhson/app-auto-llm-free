@@ -1,10 +1,10 @@
 import { verifyFreeModels, saveVerifyReport } from "./verify-free.js";
 import { logger } from "../middleware/logger.js";
 import fs from "node:fs";
-import path from "node:path";
+import { resolveDataPath } from "../lib/paths.js";
 
 const INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS || "86400000", 10); // 24h
-const VERIFIED_PATH = path.resolve("data/verified-models.json");
+const VERIFIED_PATH = resolveDataPath("verified-models.json");
 
 function isStale(): boolean {
   try {

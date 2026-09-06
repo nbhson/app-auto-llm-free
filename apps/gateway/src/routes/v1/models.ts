@@ -1,48 +1,37 @@
 import { Hono } from "hono";
 import { providers } from "../../providers/registry.js";
 import fs from "node:fs";
-import path from "node:path";
+import { resolveDataPath, readDataJson } from "../../lib/paths.js";
 
 export const modelsRoute = new Hono();
 
 // Load freellms free models if available (316 models)
 function loadFreellmsModels(): any[] {
-  try {
-    const p = path.resolve("data/freellms-models-free.json");
-    if (fs.existsSync(p)) {
-      const raw = fs.readFileSync(p, "utf-8");
-      const arr = JSON.parse(raw);
-      return arr.map((m: any) => ({
-        id: `${m.slug}/${m.name}`,
-        object: "model",
-        owned_by: m.slug,
-        provider: m.slug,
-        display_name: m.name,
-        context_length: parseInt(m.context) || 8192,
-        score: parseInt(m.score) || 0,
-        tier: m.tier_type,
-        freellms_verified: m.verified,
-        no_card: m.nocard,
-        capabilities: m.modality,
-        limit: m.limit,
-        created: 1715433600,
-      }));
-    }
-  } catch {}
-  return [];
+  const arr = readDataJson<any[]>("freellms-models-free.json", []);
+  if (arr.length === 0) return [];
+  return arr.map((m: any) => ({
+    id: `${m.slug}/${m.name}`,
+    object: "model",
+    owned_by: m.slug,
+    provider: m.slug,
+    display_name: m.name,
+    context_length: parseInt(m.context) || 8192,
+    score: parseInt(m.score) || 0,
+    tier: m.tier_type,
+    freellms_verified: m.verified,
+    no_card: m.nocard,
+    capabilities: m.modality,
+    limit: m.limit,
+    created: 1715433600,
+  }));
 }
 
 function loadVerifiedMap(): Map<string, any> {
-  try {
-    const p = path.resolve("data/verified-models.json");
-    if (!fs.existsSync(p)) return new Map();
-    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
-    const map = new Map<string, any>();
-    for (const m of data.models || []) map.set(m.id, m);
-    return map;
-  } catch {
-    return new Map();
-  }
+  const data = readDataJson<any>("verified-models.json", null);
+  if (!data) return new Map();
+  const map = new Map<string, any>();
+  for (const m of (data as any).models || []) map.set(m.id, m);
+  return map;
 }
 
 const freellmsModels = loadFreellmsModels();
@@ -110,13 +99,7 @@ modelsRoute.get("/", async (c) => {
     }
   }
 
-  const verifiedSummary = (() => {
-    try {
-      const p = path.resolve("data/verified-summary.json");
-      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf-8"));
-    } catch {}
-    return null;
-  })();
+  const verifiedSummary = readDataJson<any>("verified-summary.json", null);
 
   return c.json({
     object: "list",

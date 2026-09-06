@@ -3,6 +3,7 @@ import path from "node:path";
 import { providers } from "../providers/registry.js";
 import { config } from "../config.js";
 import { logger } from "../middleware/logger.js";
+import { readDataJson, resolveDataPath } from "../lib/paths.js";
 
 export type VerifyStatus = "verified_free" | "verified_paid" | "deprecated" | "unverified_no_key" | "error" | "unverified_no_data";
 
@@ -41,15 +42,11 @@ export interface VerifyReport {
 }
 
 function loadFreellmsFree(): any[] {
-  const p = path.resolve("data/freellms-models-free.json");
-  if (!fs.existsSync(p)) return [];
-  return JSON.parse(fs.readFileSync(p, "utf-8"));
+  return readDataJson<any[]>("freellms-models-free.json", []);
 }
 
 function loadFreellmsProviders(): any[] {
-  const p = path.resolve("data/freellms-providers.json");
-  if (!fs.existsSync(p)) return [];
-  return JSON.parse(fs.readFileSync(p, "utf-8"));
+  return readDataJson<any[]>("freellms-providers.json", []);
 }
 
 /**
@@ -222,10 +219,9 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
 }
 
 export async function saveVerifyReport(report: VerifyReport) {
-  const out = path.resolve("data/verified-models.json");
+  const out = resolveDataPath("verified-models.json");
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(report, null, 2));
-  // Also write summary for gateway to use quickly
   const summary = {
     generated_at: report.generated_at,
     total_freellms_free: report.total_freellms_free,
@@ -234,7 +230,7 @@ export async function saveVerifyReport(report: VerifyReport) {
     total_unverified_no_key: report.total_unverified_no_key,
     providers: report.providers,
   };
-  fs.writeFileSync(path.resolve("data/verified-summary.json"), JSON.stringify(summary, null, 2));
+  fs.writeFileSync(resolveDataPath("verified-summary.json"), JSON.stringify(summary, null, 2));
   logger.info({ verified: report.total_verified_free, deprecated: report.total_deprecated, unverified: report.total_unverified_no_key }, "verify report saved");
 }
 
