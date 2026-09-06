@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "free-llm-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Multi-runtime Hono (WinterCG)
+  "vars": {
+    "NODE_ENV": "production",
+    "DATABASE_URL": "libsql://your-turso.db",
+    "SYNC_INTERVAL_MS": "86400000"
+  },
+  "kv_namespaces": [
+    { "binding": "RATE_LIMIT_KV", "id": "your-kv-id", "preview_id": "preview-kv-id" }
+  ],
+  "r2_buckets": [],
+  "d1_databases": [],
+  "triggers": { "crons": ["0 2 * * *"] },
+  "build": { "command": "npm run build" }
+}

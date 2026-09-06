@@ -49,13 +49,16 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 - [x] Dashboard Vite — `main.tsx` masterKey input, 5 routes: `/` Dashboard (providers 40, verify 314/316, requests avg ms, recent logs), `/models` 316 + filter `verified` + badge xanh/đỏ/vàng, `/providers` detailed + live health check, `/keys` CRUD `fgk-...` với scopes, `/logs` live SSE + polling
 - [x] Test e2e: `POST /api/keys` master → `fgk-...`, `GET /api/keys` list 3, `POST /v1/chat/completions` pollinations với virtual key → `gpt-oss-20b`, scope violation `nvidia-nim` → 403, RPM 2 → 429 `Virtual key RPM limit 2 exceeded`, logs SSE, stats `byProvider`
 
-## P5 — Hardening & Deploy (2 ngày)
+## P5 — Hardening & Deploy (2 ngày) ✅ Done 2026-09-06 (P5.1)
 
-- [ ] AES key rotation, `MASTER_KEY` bootstrap
-- [ ] OTel GenAI, `pino` logger (đã có), `bodyLimit` 10MB (đã có)
-- [ ] Dockerfile multi-stage, `wrangler.jsonc` Cloudflare preset, `docker-compose.yml` (đã có)
-- [ ] Benchmark (`benchmark.py` port) + `PROVIDER_TEST_RESULTS.md` (dùng `data/verified-models.json` làm benchmark)
-- [ ] `SECURITY.md`, rate-limit hardening, CORS (đã có cơ bản)
+- [x] `scripts/rotate-keys.ts` — AES-256-GCM re-encrypt (OLD_KEY/NEW_KEY, `openssl rand -hex 32`), `MASTER_KEY` bootstrap docs
+- [x] `lib/otel.ts` — GenAI OTel semantic conventions (`gen_ai.system/request.model/usage`, `trace_id`, `duration_ms`), `otelEnabled()` check `OTEL_EXPORTER_OTLP_ENDPOINT`, `withTrace` helper, `pino` pretty dev / JSON prod
+- [x] `app.ts` — `secureHeaders()` (Hono), `cors` `maxAge 86400`, `bodyLimit` 10MB (đã có), `virtualKeyRateLimit` + `quota-tracker` + `circuit-breaker` hardening
+- [x] `apps/gateway/Dockerfile` — multi-stage cache deps → build → prod (non-root `app`, `HEALTHCHECK 30s`, `chown`, copy `data` + `models.yaml`)
+- [x] `apps/gateway/wrangler.jsonc` — Cloudflare Workers preset (WinterCG, `nodejs_compat`, `RATE_LIMIT_KV`, `SYNC_INTERVAL_MS`, `crons 0 2 * * *`)
+- [x] `scripts/benchmark.ts` — health 40 + chat pollinations latency + models/verified, `data/benchmark.json` + `PROVIDER_TEST_RESULTS.md` (online 13/offline 25, chat 1539ms, verified 314/316)
+- [x] `SECURITY.md` — encryption at rest, virtual keys hash, master rotate, rate-limit 2-layer, breaker, secureHeaders, CORS, logs, OTel, rotation checklist, hardening checklist prod
+- [x] `PROVIDER_TEST_RESULTS.md` — generated 2026-09-06T08:26 (health summary, chat latency, models, providers table, verified json)
 
 ## Sau MVP (Backlog)
 
@@ -74,7 +77,7 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 | M1 | 2026-09-06 | P1 done: Gateway 40 providers, 316 models, `/v1/models?verified=free`, scheduler 24h |
 | M2 | 2026-09-06 | P2 done: 30 adapters, streaming Gemini SSE, `auto` 15-tier → pollinations live, `x-router` pin |
 | M3 | 2026-09-06 | P3 done: key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health live 40 (online 13) |
-| M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE + Dashboard 5 routes (models badges, keys, logs) |
-| M5 | P5 (next) | Docker prod + Cloudflare + benchmark + OTel + AES rotation |
+| M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE + Dashboard 5 routes |
+| M5 | 2026-09-06 | P5 done: wrangler + Dockerfile prod + OTel + benchmark + SECURITY rotate + PROVIDER_TEST_RESULTS |
 
 Gantt tham khảo trong `docs/ARCHITECTURE.md:1`.

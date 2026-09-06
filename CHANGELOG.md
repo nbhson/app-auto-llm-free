@@ -27,7 +27,12 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 - `README.md` cập nhật 30 providers / 316 models / P2+P3+P4 done
 
 ### Planned
-- P5 Hardening: benchmark verified, OTel, Cloudflare deploy, AES rotation
+- Post-MVP: `/v1/embeddings`, `/v1/images`, Anthropic compat, BYOK, OAuth
+
+## [1.0.0] - 2026-09-06
+
+- **P5 Hardening**: `wrangler.jsonc` Cloudflare Workers (WinterCG `nodejs_compat`, KV, crons 02:00), `Dockerfile` multi-stage prod (non-root `app`, HEALTHCHECK 30s, copy `data`+`models.yaml`), `lib/otel.ts` GenAI OTel (`gen_ai.*`, `trace_id`, `withTrace`), `app.ts` `secureHeaders` + `cors maxAge 86400` + `bodyLimit` 10MB, `scripts/benchmark.ts` (health 40 + chat pollinations + models/verified → `data/benchmark.json` + `PROVIDER_TEST_RESULTS.md` online 13/offline 25), `scripts/rotate-keys.ts` AES re-encrypt, `SECURITY.md` hardening checklist + rotation docs, `PROVIDER_TEST_RESULTS.md` 2026-09-06T08:26
+- MVP 100%: 30 providers, 316 free, 40 ids, 5 Dashboard routes, 24h verify, 15-tier fallback, streaming + tools
 
 ## [0.2.0] - 2026-09-06
 

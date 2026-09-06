@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
 import { config } from "./config.js";
 import { requestLogger } from "./middleware/logger.js";
 import { virtualKeyRateLimit } from "./middleware/rate-limit.js";
@@ -15,7 +16,8 @@ import { isValidVirtualKeyLive } from "./lib/virtual-keys.js";
 export function createApp() {
   const app = new Hono();
 
-  app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id"] }));
+  app.use("*", secureHeaders());
+  app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id"], maxAge: 86400 }));
   app.use("*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
   app.use("*", requestLogger);
   app.use("*", virtualKeyRateLimit);
