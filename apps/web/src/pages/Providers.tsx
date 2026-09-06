@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getKeyUrl } from "../lib/getKeyUrls";
+import { getBaseUrl } from "../lib/getBaseUrls";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
 export default function Providers() {
@@ -28,11 +29,13 @@ export default function Providers() {
             <button onClick={checkHealth} disabled={loadingHealth}>{loadingHealth ? "Checking..." : "Live Health Check (40 providers, 5s)"}</button>
             {health && <pre style={{ fontSize: 11, maxHeight: 200, overflow: "auto", marginTop: 8 }}>{JSON.stringify(health.summary || health, null, 2)}</pre>}
           </div>
+          <div style={{ overflowX: "auto" }}>
           <table>
-            <thead><tr><th>Provider</th><th>Tier</th><th>Free</th><th>Keys</th><th>Health</th><th>Caps</th><th>Get Key</th></tr></thead>
+            <thead><tr><th>Provider</th><th>Tier</th><th>Free</th><th>Keys</th><th>Health</th><th>Caps</th><th>Base URL</th><th>Get Key</th></tr></thead>
             <tbody>
               {(data.detailed || []).map((p: any) => {
                 const h = health?.providers?.find((x: any) => x.id === p.id);
+                const baseUrl = p.baseUrl || getBaseUrl(p.id);
                 return (
                   <tr key={p.id}>
                     <td><code style={{ fontSize: 12 }}>{p.id}</code><div style={{ fontSize: 11, color: "#666" }}>{p.name}</div></td>
@@ -41,12 +44,14 @@ export default function Providers() {
                     <td style={{ fontSize: 12 }}>{p.keys} {h && h.status !== "no-key" && <span style={{ fontSize: 11, color: h.status === "online" ? "#16a34a" : "#dc2626" }}>• {h.status} {h.latency_ms}ms</span>}</td>
                     <td style={{ fontSize: 11 }}>{p.status} {h?.breaker === "open" && <span style={{ color: "#dc2626" }}>[breaker open]</span>}</td>
                     <td style={{ fontSize: 11 }}>{(p.caps || []).slice(0, 3).join(", ")}</td>
-                    <td><a href={getKeyUrl(p.id)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, background: "#2563eb", color: "white", padding: "4px 10px", borderRadius: 6, textDecoration: "none", display: "inline-block" }}>Get Key ↗</a><div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}><a href={`https://freellms.org/providers/${p.id}`} target="_blank" rel="noopener" style={{ color: "#64748b" }}>freellms ↗</a></div></td>
+                    <td style={{ fontSize: 11, maxWidth: 220, wordBreak: "break-all" }}>{baseUrl ? <><code style={{ fontSize: 11, wordBreak: "break-all" }}>{baseUrl}</code><button onClick={() => navigator.clipboard.writeText(baseUrl)} style={{ marginLeft: 6, fontSize: 11, padding: "2px 6px" }} title="Copy">⎘</button></> : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td><a href={getKeyUrl(p.id)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, background: "#2563eb", color: "white", padding: "4px 10px", borderRadius: 6, textDecoration: "none", display: "inline-block", whiteSpace: "nowrap" }}>Get Key ↗</a><div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}><a href={`https://freellms.org/providers/${p.id}`} target="_blank" rel="noopener" style={{ color: "#64748b" }}>freellms ↗</a></div></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          </div>
         </>
       )}
     </div>
