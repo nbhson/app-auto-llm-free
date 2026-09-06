@@ -40,6 +40,9 @@ export function getProvidersForRequest(model: string, strategy: Strategy = "tier
     return k.length > 20 && !k.includes("xxx") && !k.includes("change-me");
   }
   ordered.sort((a, b) => {
+    // agnes-ai luôn chốt cuối cùng (final fallback) - không bị sort kéo lên
+    if (a === "agnes-ai" && b !== "agnes-ai") return 1;
+    if (b === "agnes-ai" && a !== "agnes-ai") return -1;
     const aReal = isRealKey(a);
     const bReal = isRealKey(b);
     if (aReal !== bReal) return aReal ? -1 : 1;
@@ -51,6 +54,10 @@ export function getProvidersForRequest(model: string, strategy: Strategy = "tier
     if (aHas !== bHas) return aHas ? -1 : 1;
     return 0;
   });
+  // Đảm bảo agnes-ai luôn ở cuối ngay cả khi sort ổn định thay đổi
+  if (ordered.includes("agnes-ai")) {
+    return [...ordered.filter((p) => p !== "agnes-ai"), "agnes-ai"];
+  }
   return ordered;
 }
 

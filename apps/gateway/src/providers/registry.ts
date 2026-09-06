@@ -120,6 +120,7 @@ export const modelAliases: Record<string, string[]> = {
     "orcarouter",
     "freeai",
     "cline",
+    "agnes-ai",
   ],
   // Opencode custom — agnes
   "agnes-2.5-flash": ["agnes-ai"],

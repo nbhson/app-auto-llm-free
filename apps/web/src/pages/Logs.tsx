@@ -10,11 +10,15 @@ export default function Logs() {
   const [live, setLive] = useState(false);
   const [stats, setStats] = useState<any>(null);
 
+  const DISPLAY_LIMIT = 50;
   const [authError, setAuthError] = useState<string | null>(null);
   const load = () => {
     fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { setAuthError(r.status === 401 ? "Unauthorized — check MASTER_KEY in header" : `Error ${r.status}`); return { data: [] }; } setAuthError(null); return r.json(); }).then((d) => setLogs(d.data || [])).catch(() => {});
     fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { if (r.status === 401) setAuthError("Unauthorized — check MASTER_KEY in header"); return null; } return r.json(); }).then((d) => { if (d?.logs) setStats(d); else if (d && !d.logs) setStats(null); }).catch(() => {});
   };
+  const visibleLogs = logs.slice(0, DISPLAY_LIMIT);
+  const totalCount = stats?.logs?.total ?? logs.length;
+  const moreCount = Math.max(0, totalCount - DISPLAY_LIMIT);
   useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!live) return;
@@ -96,7 +100,7 @@ export default function Logs() {
               <tr><th className="px-4 py-3"></th><th className="px-4 py-3">Time</th><th className="px-4 py-3">Key</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Model</th><th className="px-4 py-3">Tokens</th><th className="px-4 py-3">MS</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Verified</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {logs.map((l) => {
+              {visibleLogs.map((l) => {
                 const expanded = (l as any)._expanded;
                 return (
                   <>
@@ -129,6 +133,11 @@ export default function Logs() {
           </table>
         </div>
         {logs.length === 0 && <div className="p-8 text-center text-sm text-slate-400">{t("logs.no_logs")}</div>}
+        {moreCount > 0 && (
+          <div className="px-4 py-3 text-center text-xs font-mono text-slate-500 bg-slate-50 border-t border-slate-200/80">
+            ... + {moreCount} more
+          </div>
+        )}
       </div>
     </div>
   );

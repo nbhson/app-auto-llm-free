@@ -35,6 +35,7 @@ function parseTiers(): string[][] {
         ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
         ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
         ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
+        ["agnes-ai"],
       ];
     return JSON.parse(raw);
   } catch {
@@ -43,6 +44,7 @@ function parseTiers(): string[][] {
       ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
       ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
       ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
+      ["agnes-ai"],
     ];
   }
 }
