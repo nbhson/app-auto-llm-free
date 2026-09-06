@@ -73,7 +73,7 @@ Mid-stream error sẽ emit `data: {"error": {"message": "...", "type": "provider
 
 ### GET /v1/models
 
-Liệt kê models (324 — 316 freellms + 8 alias/persisted, pagination 25/50 sticky). Hỗ trợ lọc live verify (xem `docs/OPERATIONS.md`).
+Liệt kê models (324 — 316 freellms + 8 alias/persisted, pagination 25/50 sticky, filter `q` + `provider` datalist 20 debounce 400ms). Hỗ trợ lọc live verify (xem `docs/OPERATIONS.md`). Vừa `Check Live` 404 vẫn hiện (hide chỉ với `m.health` persisted).
 
 ```bash
 curl http://localhost:8080/v1/models -H "Authorization: Bearer fgk-xxx"

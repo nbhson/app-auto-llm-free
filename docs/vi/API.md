@@ -75,7 +75,7 @@ Mid-stream error sẽ emit `data: {"error": {"message": "...", "type": "provider
 
 ### GET /v1/models
 
-Liệt kê models — **live là source of truth khi `?hasKey=1`**: nếu có `data/live-models.json` (2185 total, 882 free, 853 hasKey) và `hasKey=1`, gateway trả live cache 2190 total (kèm alias). Ngược lại trả freellms snapshot 324 (316 free). Hỗ trợ lọc live verify + persisted 404 + pagination **LOV 25/50 ở sticky bottom** (không còn trên top filter bar), debounce 400ms frontend.
+Liệt kê models — **live là source of truth khi `?hasKey=1`**: nếu có `data/live-models.json` (2185 total, 882 free, 853 hasKey) và `hasKey=1`, gateway trả live cache 2190 total (kèm alias). Ngược lại trả freellms snapshot 324 (316 free). Hỗ trợ lọc live verify + persisted 404 + pagination **LOV 25/50 ở sticky bottom** (không còn trên top filter bar), debounce 400ms cho `q` + `provider` (filter theo provider, datalist 20, `?provider=` exact).
 
 ```bash
 curl http://localhost:8080/v1/models -H "Authorization: Bearer fgk-xxx"
@@ -112,7 +112,7 @@ curl "http://localhost:8080/v1/models?provider=groq&verified=free&q=llama&page=1
 }
 ```
 
-Khi `?hasKey=1` với live cache: `total: 2190`, `free: 316` (snapshot), `pagination` vẫn 25/50, `filters.hasKey: true`. Top filter bar chỉ có `q`, `verified`, pill `hasKey`/`hide404`; **LOV 25/50 dời xuống sticky bottom pagination** cùng `Page X/Y`.
+Khi `?hasKey=1` với live cache: `total: 2190`, `free: 316` (snapshot), `pagination` vẫn 25/50, `filters.hasKey: true`. Top filter bar có `q`, `provider` (datalist 20, `?provider=` exact), `verified`, pill `hasKey`/`hide404`/`hidePayment`; **LOV 25/50 dời xuống sticky bottom pagination** cùng `Page X/Y`. Row vừa `Check Live` 404/payment vẫn hiện với strikethrough (hide chỉ áp dụng với `m.health` persisted) nên kết quả không biến mất tức thì.
 
 Query params:
 

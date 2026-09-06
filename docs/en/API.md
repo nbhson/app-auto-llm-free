@@ -75,7 +75,7 @@ Mid-stream errors emit `data: {"error": {"message": "...", "type": "provider_err
 
 ### GET /v1/models
 
-List models — **live is source of truth when `?hasKey=1`**: if `data/live-models.json` exists (2185 total, 882 free, 853 hasKey) and `hasKey=1`, gateway serves live cache 2190 total (incl alias). Otherwise serves freellms snapshot 324 (316 free). Supports live-verify + persisted 404 + **pagination LOV 25/50 at sticky bottom** (no longer on top filter bar), frontend debounce 400ms.
+List models — **live is source of truth when `?hasKey=1`**: if `data/live-models.json` exists (2185 total, 882 free, 853 hasKey) and `hasKey=1`, gateway serves live cache 2190 total (incl alias). Otherwise serves freellms snapshot 324 (316 free). Supports live-verify + persisted 404 + **pagination LOV 25/50 at sticky bottom** (no longer on top filter bar), frontend debounce 400ms for `q` + `provider` (provider filter text input with datalist 20, `?provider=` exact).
 
 ```bash
 curl http://localhost:8080/v1/models -H "Authorization: Bearer fgk-xxx"
@@ -112,7 +112,7 @@ curl "http://localhost:8080/v1/models?provider=groq&verified=free&q=llama&page=1
 }
 ```
 
-When `?hasKey=1` with live cache: `total: 2190`, `free: 316` (snapshot), `pagination` still 25/50, `filters.hasKey: true`. Top filter bar only has `q`, `verified`, pill `hasKey`/`hide404`; **LOV 25/50 moved to sticky bottom pagination** with `Page X/Y`.
+When `?hasKey=1` with live cache: `total: 2190`, `free: 316` (snapshot), `pagination` still 25/50, `filters.hasKey: true`. Top filter bar has `q`, `provider` (datalist 20, `?provider=` exact), `verified`, pill `hasKey`/`hide404`/`hidePayment`; **LOV 25/50 moved to sticky bottom pagination** with `Page X/Y`. Just-checked 404/payment rows keep visible with strikethrough (hide only applies to persisted `m.health`), so `Check Live` result does not instantly disappear.
 
 Query params:
 
