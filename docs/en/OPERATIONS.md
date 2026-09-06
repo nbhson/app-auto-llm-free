@@ -1,38 +1,38 @@
 > **English** | [🇻🇳 Tiếng Việt](../vi/OPERATIONS.md) | [Docs Index](../README.md)
 
-# Vận hành & Xác thực Free Tier (24h Sync)
+# Operations & Free Tier Verification (24h Sync)
 
-## Vấn đề: freellms.org có thể lỗi thời
+## Problem: freellms.org May Be Outdated
 
-`data/freellms-models-free.json` (316 free) là snapshot 2026-09-06. Provider có thể đã rút free tier (ví dụ Groq 16/23 paid, Ollama Cloud 5/8 paid, OpenRouter 28/45 paid trong scan). Cần kiểm tra **thực tế** mỗi 24h.
+`data/freellms-models-free.json` (316 free) is a snapshot from 2026-09-06. Providers may have already withdrawn their free tier (e.g. Groq 16/23 paid, Ollama Cloud 5/8 paid, OpenRouter 28/45 paid in the scan). A **live** check is needed every 24 hours.
 
-## Giải pháp: 2-layer sync
+## Solution: 2-Layer Sync
 
-### Layer 1 — Freellms sync (Nguồn chân lý ban đầu)
+### Layer 1 — Freellms Sync (Initial Source of Truth)
 
 ```bash
 python scripts/sync-freellms.py
 # Fetch https://freellms.org/providers + /models -> data/*.json + models.yaml
-# Chạy mỗi 24h qua GitHub Actions 02:00 UTC hoặc thủ công
+# Runs every 24h via GitHub Actions at 02:00 UTC or manually
 ```
 
-File:
+Files:
 - `data/freellms-providers.json` — 30 providers, caps/tier
-- `data/freellms-models-free.json` — 316 free, có `score/limit/verified`
-- `models.yaml` — 316 entries cho gateway
+- `data/freellms-models-free.json` — 316 free, includes `score/limit/verified`
+- `models.yaml` — 316 entries for the gateway
 
-### Layer 2 — Live verify (Thực sự còn free không?)
+### Layer 2 — Live Verify (Is It Still Actually Free?)
 
-`apps/gateway/src/jobs/verify-free.ts` so sánh **freellms FREE** vs **live /models** từ provider.
+`apps/gateway/src/jobs/verify-free.ts` compares **freellms FREE** vs **live /models** from the provider.
 
 **Logic:**
 
 ```
 for each provider in registry (30):
-  keys = config.providerKeys[provider] // từ .env
+  keys = config.providerKeys[provider] // from .env
   if !keys && provider not in [pollinations, llm7-io]:
      mark all its models -> unverified_no_key
-     => cần cấu hình API key để xác thực
+     => API key configuration is needed to verify
   else:
      live = await provider.models(keys[0]) // GET {baseUrl}/models
      for each freellms model in that provider:
@@ -40,53 +40,53 @@ for each provider in registry (30):
         status = found ? verified_free : deprecated
 ```
 
-**Trạng thái (`status`):**
+**Statuses (`status`):**
 
-| status | Ý nghĩa | Hành động |
-|--------|---------|-----------|
-| `verified_free` | Provider trả về model, còn free | Dùng bình thường |
-| `deprecated` | Freellms nói free nhưng live không còn list → có thể đã rút, đổi tên | Báo deprecated, gateway sẽ skip trong fallback nếu `?verified=free` |
-| `unverified_no_key` | Chưa cấu hình API key nên không probe được | Cảnh báo trong `/api/providers` -> `no-key`, cần thêm key vào `.env` |
-| `error` | Provider unreachable / 429 | Retry sau |
-| `unverified_no_data` | Chưa chạy verify lần nào | Hiển thị freellms data với badge unverified |
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `verified_free` | Provider returns the model and it is still free | Use normally |
+| `deprecated` | Freellms says free but the live list no longer includes it → may have been withdrawn or renamed | Flag as deprecated; gateway will skip it in fallback if `?verified=free` |
+| `unverified_no_key` | No API key configured, so probing is not possible | Warning in `/api/providers` -> `no-key`; add a key to `.env` |
+| `error` | Provider unreachable / 429 | Retry later |
+| `unverified_no_data` | Verify has never been run | Show freellms data with an unverified badge |
 
 **Output:**
 
-- `data/verified-models.json` — 316 rows chi tiết (`live_free`, `last_verified`, `error`)
-- `data/verified-summary.json` — tổng hợp (`verified_free`, `deprecated`, `unverified_no_key`)
+- `data/verified-models.json` — 316 detailed rows (`live_free`, `last_verified`, `error`)
+- `data/verified-summary.json` — aggregated summary (`verified_free`, `deprecated`, `unverified_no_key`)
 
-## Scheduler tự động (24h)
+## Automatic Scheduler (24h)
 
-`apps/gateway/src/jobs/scheduler.ts` chạy trong gateway:
+`apps/gateway/src/jobs/scheduler.ts` runs inside the gateway:
 
-- Khi start: nếu `data/verified-models.json` cũ hơn `SYNC_INTERVAL_MS` (default 86400000 = 24h) → verify sau 5s
-- Sau đó `setInterval` mỗi 24h → `verifyFreeModels()` + `saveVerifyReport()`
+- On startup: if `data/verified-models.json` is older than `SYNC_INTERVAL_MS` (default 86400000 = 24h) → verify after 5s
+- Then `setInterval` every 24h → `verifyFreeModels()` + `saveVerifyReport()`
 
-Cấu hình:
+Configuration:
 
 ```env
 SYNC_INTERVAL_MS=86400000
-DISABLE_SCHEDULER=0   # đặt 1 để tắt
+DISABLE_SCHEDULER=0   # set to 1 to disable
 ```
 
 ## Endpoints
 
-| Method | Path | Mô tả |
-|--------|------|-------|
-| `GET` | `/v1/models?verified=free` | Chỉ trả models `verified_free` (316 vs 7 bug fix `lib/paths.ts`) |
-| `GET` | `/v1/models?verified=deprecated` | Chỉ deprecated |
-| `GET` | `/v1/models?verified=unverified` | Chỉ unverified |
-| `GET` | `/v1/models?provider=nvidia-nim` | Filter theo provider (đã bỏ ô riêng, dùng filter đầu tiên `Filter id/provider...`) |
-| `GET` | `/api/models/health?model=` | Probe 1 model chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/models?verified=free` | Return only `verified_free` models (316 vs 7 bug fix `lib/paths.ts`) |
+| `GET` | `/v1/models?verified=deprecated` | Only deprecated |
+| `GET` | `/v1/models?verified=unverified` | Only unverified |
+| `GET` | `/v1/models?provider=nvidia-nim` | Filter by provider (the separate provider input was removed; use the first filter `Filter id/provider...`) |
+| `GET` | `/api/models/health?model=` | Probe 1 model with chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
 | `GET` | `/api/verify` | Full report `verified-models.json` |
-| `GET` | `/api/verify/summary` | Summary nhanh |
-| `POST` | `/api/verify` | Trigger verify ngay (body `{dryRun: false}`), cần master key |
-| `GET` | `/api/providers` | `detailed[]` có `free_models`, `keys`, `Get Key` URL, `status` |
-| `GET` | `/api/providers/health` | Live ping 40 providers 5s |
+| `GET` | `/api/verify/summary` | Quick summary |
+| `POST` | `/api/verify` | Trigger immediate verify (body `{dryRun: false}`), requires master key |
+| `GET` | `/api/providers` | `detailed[]` with `free_models`, `keys`, `Get Key` URL, `status` |
+| `GET` | `/api/providers/health` | Live ping of 40 providers in 5s |
 | `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `free_models:316`, `breakers` |
 
-Ví dụ:
+Examples:
 
 ```bash
 curl http://localhost:8080/v1/models?verified=free -H "Authorization: Bearer fgk-xxx" | jq '.total'
@@ -97,34 +97,34 @@ curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer fgk-mast
 ## CLI
 
 ```bash
-# Dry-run (không cần key, dùng freellms làm live)
+# Dry-run (no key needed, uses freellms as live source)
 npm run verify:free:dry -w apps-gateway
 
-# Live (cần .env keys)
+# Live (requires .env keys)
 npm run verify:free -w apps-gateway
-# hoặc
+# or
 npx tsx apps/gateway/src/jobs/verify-free.ts --dry-run
 ```
 
 ## GitHub Actions (daily 02:00 UTC)
 
-`.github/workflows/sync-freellms.yml` chạy:
+`.github/workflows/sync-freellms.yml` runs:
 
-1. `python scripts/sync-freellms.py` → update `data/*` + `models.yaml`
-2. `tsx verify-free.ts --dry-run` (hoặc live nếu có secrets `GROQ_API_KEYS` v.v.)
-3. Commit nếu có thay đổi → push `main`
+1. `python scripts/sync-freellms.py` → updates `data/*` + `models.yaml`
+2. `tsx verify-free.ts --dry-run` (or live if secrets `GROQ_API_KEYS` etc. are present)
+3. Commit if changed → push to `main`
 
-Thêm secrets trong repo Settings → Secrets: `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA_API_KEYS`, `GEMINI_API_KEYS`… để live verify thay vì dry-run.
+Add secrets in repo Settings → Secrets: `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA_API_KEYS`, `GEMINI_API_KEYS`… for live verification instead of dry-run.
 
-## Khuyến nghị vận hành
+## Operational Recommendations
 
-- **Dev**: chỉ cần `freellms` data, không cần verify (chiếm <1s dry-run)
-- **Prod**: cấu hình ít nhất 5 keys P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để verify 60–70% models mỗi 24h; các provider còn lại sẽ ở `unverified_no_key` nhưng vẫn phục vụ với cảnh báo
-- **Dashboard**: hiển thị badge `verified_free` (xanh), `deprecated` (đỏ), `unverified_no_key` (vàng) trong `/models` page — sẽ làm trong P4
+- **Dev**: freellms data alone is sufficient; no verify needed (dry-run takes <1s)
+- **Prod**: configure at least 5 P0 keys (NVIDIA, Groq, Cerebras, Gemini, GitHub) to verify 60–70% of models every 24h; remaining providers will stay `unverified_no_key` but still serve with a warning
+- **Dashboard**: shows badges `verified_free` (green), `deprecated` (red), `unverified_no_key` (yellow) on the `/models` page — to be implemented in P4
 
-## Khi model bị deprecated thì sao?
+## What Happens When a Model Is Deprecated?
 
-Gateway sẽ:
-- Vẫn giữ trong `GET /v1/models` nhưng kèm `live_status: deprecated`
-- Nếu `?verified=free`, loại bỏ deprecated khỏi list (để client chỉ thấy tier thực sự free)
-- Router sẽ skip deprecated trong `getProvidersForRequest` nếu có verified data (P3 sẽ implement `quota-tracker` dùng verified map)
+The gateway will:
+- Still keep it in `GET /v1/models` but with `live_status: deprecated`
+- If `?verified=free`, exclude deprecated from the list (so clients only see tiers that are still actually free)
+- The router will skip deprecated entries in `getProvidersForRequest` if verified data exists (P3 will implement `quota-tracker` using the verified map)

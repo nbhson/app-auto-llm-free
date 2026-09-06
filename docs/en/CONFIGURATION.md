@@ -1,25 +1,25 @@
 > **English** | [🇻🇳 Tiếng Việt](../vi/CONFIGURATION.md) | [Docs Index](../README.md)
 
-# Cấu hình (Configuration)
+# Configuration
 
-## Biến môi trường
+## Environment Variables
 
-Xem `.env.example` đầy đủ (30 providers freellms.org). Dưới đây là nhóm quan trọng:
+See the full `.env.example` (30 providers from freellms.org). The key groups are below:
 
 ### Gateway
 
-| Biến | Mặc định | Mô tả |
-|------|----------|-------|
-| `PORT` | `8080` | Port gateway |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | Gateway port |
 | `NODE_ENV` | `development` | `development`/`production` |
-| `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) hoặc `postgres://user:pass@host/db` |
-| `REDIS_URL` | `redis://localhost:6379` | Redis cho rate limit; nếu trống fallback in-memory |
-| `MASTER_KEY` | (required) | Key admin `fgk-master-...` để tạo virtual keys |
-| `ENCRYPTION_KEY` | (required) | 32 bytes hex cho AES-256-GCM (vd: `openssl rand -hex 32`) |
+| `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) or `postgres://user:pass@host/db` |
+| `REDIS_URL` | `redis://localhost:6379` | Redis for rate limiting; falls back to in-memory if empty |
+| `MASTER_KEY` | (required) | Admin key `fgk-master-...` for creating virtual keys |
+| `ENCRYPTION_KEY` | (required) | 32-byte hex for AES-256-GCM (e.g. `openssl rand -hex 32`) |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
-| `CORS_ORIGIN` | `*` | Cho phép Dashboard |
+| `CORS_ORIGIN` | `*` | Allow Dashboard origin |
 
-### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers
+### Provider Keys (pooled, comma-separated) — 30 freellms providers
 
 ```env
 # Core
@@ -56,23 +56,23 @@ ALIBABA_API_KEYS=sk-xxx
 NSCALE_API_KEYS=nsc_xxx
 NEBIUS_API_KEYS=nebius_xxx
 AI21_API_KEYS=ai21_xxx
-POLLINATIONS_API_KEY= # thường không cần
+POLLINATIONS_API_KEY= # usually not needed
 ```
 
-Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
+Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). See the full table in `docs/PROVIDERS.md:1`.
 
 ### Router
 
-| Biến | Mặc định | Mô tả |
-|------|----------|-------|
-| `DEFAULT_MODEL` | `auto` | model khi client không truyền |
-| `FALLBACK_TIERS` | `[[...]]` | JSON tiers freellms: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
-| `CIRCUIT_BREAKER_THRESHOLD` | `5` | fails để open |
-| `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | — |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEFAULT_MODEL` | `auto` | Model used when the client sends none |
+| `FALLBACK_TIERS` | `[[...]]` | JSON freellms tiers: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
+| `CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before opening the circuit |
+| `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | Cooldown duration |
 
 ## models.yaml — 316 free models (freellms)
 
-Sync từ freellms.org:
+Synced from freellms.org:
 
 ```yaml
 models:
@@ -93,15 +93,15 @@ Sync job (freellms):
 python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml
 npm run sync:freellms -w apps-gateway  # alias
 # legacy
-bun run sync:providers   # fetch từ provider APIs + LiteLLM pricing (stub)
+bun run sync:providers   # fetch from provider APIs + LiteLLM pricing (stub)
 ```
 
-Gateway `GET /v1/models` đọc `data/freellms-models-free.json:1` (316 rows), `GET /api/providers` trả `detailed[]` với `free_models`, `limit`, `verified`.
+The gateway `GET /v1/models` reads `data/freellms-models-free.json:1` (316 rows), and `GET /api/providers` returns `detailed[]` with `free_models`, `limit`, and `verified`.
 
-## Rate Limit config — per-provider (từ freellms)
+## Rate Limit Config — per-provider (from freellms)
 
-| Provider | RPM | RPD | TPM/TPD | Ghi chú |
-|----------|-----|-----|---------|---------|
+| Provider | RPM | RPD | TPM/TPD | Notes |
+|----------|-----|-----|---------|-------|
 | NVIDIA NIM | 40 shared | — | — | phone required |
 | Groq | 30 | 250–14.4K | — | per-model |
 | Cerebras | 15 | — | 30K TPM / 1M TPD | — |
@@ -112,9 +112,9 @@ Gateway `GET /v1/models` đọc `data/freellms-models-free.json:1` (316 rows), `
 | OpenRouter | — | 200 free | — | — |
 | Kilo Code | ~200/hr | — | — | `:free` suffix |
 
-Lưu trong `models.yaml:1` `limit` + `apps/gateway/src/lib/quota-tracker.ts` enforce. Token usage `allTimeTokens` + `tokensByProvider` từ `lib/request-log.ts:1` hiện Dashboard 4th card + Logs charts (recharts).
+Stored in `models.yaml:1` `limit` and enforced by `apps/gateway/src/lib/quota-tracker.ts`. Token usage `allTimeTokens` + `tokensByProvider` from `lib/request-log.ts:1` powers the Dashboard 4th card and Logs charts (recharts).
 
-Trong `virtual_keys` table:
+In the `virtual_keys` table:
 
 ```json
 {
@@ -126,7 +126,7 @@ Trong `virtual_keys` table:
 }
 ```
 
-## Drizzle config
+## Drizzle Config
 
 `drizzle.config.ts`:
 

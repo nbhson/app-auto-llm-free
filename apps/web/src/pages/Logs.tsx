@@ -54,9 +54,9 @@ export default function Logs() {
   return (
     <div>
       <h2>Logs & Stats</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <button onClick={load}>Refresh</button>
-        <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white" }}>{live ? "● Live ON" : "Live OFF"}</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <button onClick={load}>↻ Refresh</button>
+        <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white", border: `1px solid ${live ? "#86efac" : "#e2e8f0"}`, display: "flex", gap: 6, alignItems: "center" }}>{live ? "● Live ON" : "○ Live OFF"}</button>
         <span style={{ fontSize: 12, color: "#666", alignSelf: "center" }}>{stats?.logs?.total ?? 0} total • {stats?.logs?.allTimeTokens?.toLocaleString() ?? 0} tokens all-time • avg {stats?.logs?.avgLatencyMs ?? 0}ms/{stats?.logs?.avgTokens ?? 0} tok • {Math.round((stats?.logs?.errorRate || 0) * 100)}% err</span>
       </div>
       {stats && (

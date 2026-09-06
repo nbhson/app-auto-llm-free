@@ -1,12 +1,12 @@
 > **English** | [🇻🇳 Tiếng Việt](../vi/DEPLOYMENT.md) | [Docs Index](../README.md)
 
-# Triển khai (Deployment)
+# Deployment
 
-> Nav **Providers trước Models** (sticky), Dashboard 4 cards + 3 charts + tokens, `lib/paths.ts` fix 7→316 cho `cwd=apps/gateway`.
+> Nav order **Providers before Models** (sticky), Dashboard with 4 cards + 3 charts + tokens, `lib/paths.ts` fixes 7→316 when `cwd=apps/gateway`.
 
-## 1. Docker Compose (khuyến nghị)
+## 1. Docker Compose (recommended)
 
-Production-ready, gồm gateway + postgres + redis, kèm 24h verify scheduler + `GET /api/models/health` per-model probe.
+Production-ready, includes gateway + postgres + redis, plus a 24h verify scheduler and `GET /api/models/health` per-model probe.
 
 ```yaml
 # docker-compose.yml
@@ -37,8 +37,8 @@ volumes: { pgdata: {} }
 
 ```bash
 cp .env.example .env
-# điền MASTER_KEY, ENCRYPTION_KEY, provider keys (30 providers freellms)
-# SYNC_INTERVAL_MS=86400000 (24h) hoặc DISABLE_SCHEDULER=1
+# fill in MASTER_KEY, ENCRYPTION_KEY, provider keys (30 freellms providers)
+# SYNC_INTERVAL_MS=86400000 (24h) or DISABLE_SCHEDULER=1
 docker compose up -d --build
 docker compose logs -f gateway
 ```
@@ -52,19 +52,19 @@ Sync trigger: `curl -X POST http://localhost:8080/api/verify -H "Authorization: 
 ```bash
 npm install
 npm run build
-# Postgres + Redis phải chạy sẵn
+# Postgres + Redis must already be running
 DATABASE_URL=postgres://... REDIS_URL=redis://... SYNC_INTERVAL_MS=86400000 npm run start:gateway -w apps-gateway
-# Dashboard build static
+# Dashboard static build
 npm run build -w apps-web && npm run preview -w apps-web
 pm2 start ecosystem.config.cjs
 ```
 
-Freellms sync thủ công:
+Manual freellms sync:
 
 ```bash
 python scripts/sync-freellms.py          # 30 providers, 316 free -> data/*.json + models.yaml
-npm run verify:free:dry -w apps-gateway  # dry-run không cần keys
-npm run verify:free -w apps-gateway      # live cần .env keys (NVIDIA, Groq...)
+npm run verify:free:dry -w apps-gateway  # dry-run, no keys needed
+npm run verify:free -w apps-gateway      # live, requires .env keys (NVIDIA, Groq...)
 ```
 
 Nginx reverse proxy:
@@ -85,7 +85,7 @@ server {
 
 ## 3. Cloudflare Workers
 
-Hono hỗ trợ multi-runtime (WinterCG). Cần thay Redis → KV, scheduler dùng Cron Triggers.
+Hono supports multi-runtime (WinterCG). Replace Redis with KV and use Cron Triggers for the scheduler.
 
 ```bash
 # apps/gateway/wrangler.jsonc
@@ -99,27 +99,27 @@ Hono hỗ trợ multi-runtime (WinterCG). Cần thay Redis → KV, scheduler dù
 npm run deploy:cf -w apps-gateway
 ```
 
-Lưu ý: Workers không có `better-sqlite3`, dùng `@libsql/client` (Turso) thay thế. Scheduler trên Workers dùng `scheduled` event thay vì `setInterval`.
+Note: Workers does not include `better-sqlite3`; use `@libsql/client` (Turso) instead. On Workers, the scheduler uses the `scheduled` event instead of `setInterval`.
 
 ## 4. Vercel
 
-Dashboard (`apps/web`) deploy trực tiếp Vercel (Vite). Gateway có thể deploy như Vercel Function nhưng khuyến nghị giữ trên VPS/Workers để SSE ổn định và scheduler 24h chạy liên tục.
+The Dashboard (`apps/web`) can be deployed directly to Vercel (Vite). The gateway can be deployed as a Vercel Function, but keeping it on a VPS/Workers is recommended for stable SSE and continuous 24h scheduling.
 
-## 5. Biến môi trường production
+## 5. Production Environment Variables
 
 * `NODE_ENV=production`, `LOG_LEVEL=warn`
-* `ENCRYPTION_KEY` sinh bằng `openssl rand -hex 32` và lưu secret manager (không commit)
-* `MASTER_KEY` dạng `fgk-master-$(openssl rand -hex 16)`
-* `CORS_ORIGIN=https://yourdomain.com` (không để `*`)
+* Generate `ENCRYPTION_KEY` with `openssl rand -hex 32` and store it in a secret manager (never commit it)
+* `MASTER_KEY` format `fgk-master-$(openssl rand -hex 16)`
+* `CORS_ORIGIN=https://yourdomain.com` (do not leave as `*`)
 * `SYNC_INTERVAL_MS=86400000` (24h), `DISABLE_SCHEDULER=0`
-* Provider keys: ít nhất 5 P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để verify 60-70% models; các provider còn lại sẽ `unverified_no_key` nhưng vẫn phục vụ
-* Freellms sync: cron GitHub Actions 02:00 UTC đã cấu hình `.github/workflows/sync-freellms.yml:1`
+* Provider keys: at least 5 P0 providers (NVIDIA, Groq, Cerebras, Gemini, GitHub) to verify 60–70% of models; remaining providers will be `unverified_no_key` but still serve traffic
+* Freellms sync: GitHub Actions cron at 02:00 UTC already configured in `.github/workflows/sync-freellms.yml:1`
 
 ## 6. Monitoring & Verify
 
-* `/v1/health` cho uptime check (UptimeRobot)
-* `/api/stats` cho Grafana (poll 10s) — `free_models:316`, `providers:43`
-* `/api/verify/summary` cho alert nếu `deprecated` tăng đột biến (freellms stale)
-* `/api/verify` chi tiết per-model `live_status`
-* GitHub Actions daily: `sync-freellms.yml` tự động commit `data/` + `models.yaml` nếu có thay đổi
-* Logs: `docker compose logs` hoặc `pino-pretty` local, `OTEL_EXPORTER_OTLP_ENDPOINT` → Langfuse/Axiom
+* `/v1/health` for uptime checks (UptimeRobot)
+* `/api/stats` for Grafana (poll every 10s) — `free_models:316`, `providers:43`
+* `/api/verify/summary` to alert if `deprecated` spikes (freellms data is stale)
+* `/api/verify` for per-model `live_status` details
+* GitHub Actions daily: `sync-freellms.yml` auto-commits `data/` + `models.yaml` when changes are detected
+* Logs: `docker compose logs` or `pino-pretty` locally, `OTEL_EXPORTER_OTLP_ENDPOINT` → Langfuse/Axiom

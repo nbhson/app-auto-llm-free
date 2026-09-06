@@ -2,17 +2,17 @@
 
 # API Reference
 
-OpenAI-compatible API của gateway (43 provider ids — 30 freellms + 13 alias, 324 models — 316 freellms + 8 alias/persisted). Dùng trực tiếp với `openai` SDK hoặc `curl`.
+OpenAI-compatible gateway API (43 provider IDs — 30 freellms + 13 aliases, 324 models — 316 freellms + 8 alias/persisted). Use directly with the `openai` SDK or `curl`.
 
-Base URL: `http://localhost:8080/v1` (kèm dashboard tại `http://localhost:3000`)
+Base URL: `http://localhost:8080/v1` (with dashboard at `http://localhost:3000`)
 
-Auth: `Authorization: Bearer fgk-...` (virtual key tạo trong Dashboard hoặc `MASTER_KEY`). Health không cần auth.
+Auth: `Authorization: Bearer fgk-...` (virtual key created in the Dashboard or `MASTER_KEY`). Health check requires no auth.
 
 ## Endpoints
 
 ### POST /v1/chat/completions
 
-Tạo chat completion. Hỗ trợ streaming + tools. Gateway thử 4-tier fallback (`nvidia-nim/groq/cerebras/gemini` → `cloudflare/cohere` → `ovh/modelscope/llm7` → `openrouter/kilo/pollinations`).
+Create a chat completion. Supports streaming and tools. The gateway tries a 4-tier fallback (`nvidia-nim/groq/cerebras/gemini` → `cloudflare/cohere` → `ovh/modelscope/llm7` → `openrouter/kilo/pollinations`).
 
 **Request**:
 
@@ -36,14 +36,14 @@ Tạo chat completion. Hỗ trợ streaming + tools. Gateway thử 4-tier fallba
 }
 ```
 
-Model có thể là alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`) hoặc full `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`, `google-gemini/gemini-3.6-flash` (đã sanitize `gemini 3.6 flash` -> `gemini-3.6-flash`), `openrouter/google/gemma-4-31b:free`. Freellms tên có khoảng trắng `:` `()` đã được sanitize ở `openai-compatible.ts:31` và `models.ts:9`. Router resolve theo `providers/registry.ts:42`.
+Model can be an alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`) or a full ID such as `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`, `google-gemini/gemini-3.6-flash` (sanitized from `gemini 3.6 flash` -> `gemini-3.6-flash`), `openrouter/google/gemma-4-31b:free`. Freellms names containing spaces, `:` or `()` are sanitized in `openai-compatible.ts:31` and `models.ts:9`. The router resolves them via `providers/registry.ts:42`.
 
-**Headers tùy chọn**:
+**Optional Headers**:
 
-| Header | Mô tả |
-|--------|-------|
-| `x-router` | Pin provider: `x-router: nvidia-nim` hoặc `x-router: groq` |
-| `x-router-tier` | Chọn tier: `tier1`, `tier2` (sắp tới) |
+| Header | Description |
+|--------|-------------|
+| `x-router` | Pin a provider: `x-router: nvidia-nim` or `x-router: groq` |
+| `x-router-tier` | Select tier: `tier1`, `tier2` (coming soon) |
 | `x-request-id` | Idempotency / tracing |
 
 **Response (non-stream)**:
@@ -61,7 +61,7 @@ Model có thể là alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, 
 }
 ```
 
-Khi không có key (dev), gateway trả `_mock: true` với `_errors` để debug tier.
+When no provider key is configured (dev mode), the gateway returns `_mock: true` with `_errors` for tier debugging.
 
 **Streaming** (`stream: true`):
 
@@ -71,24 +71,24 @@ data: {"id":"chatcmpl-xxx","object":"chat.completion.chunk","choices":[{"delta":
 data: [DONE]
 ```
 
-Mid-stream error sẽ emit `data: {"error": {"message": "...", "type": "provider_error"}}\n\n` rồi close.
+Mid-stream errors emit `data: {"error": {"message": "...", "type": "provider_error"}}\n\n` and then close the connection.
 
 ### GET /v1/models
 
-Liệt kê models (324 — 316 freellms + 8 alias/persisted, pagination 25/50 sticky). Hỗ trợ lọc live verify (xem `docs/OPERATIONS.md`).
+List models (324 — 316 freellms + 8 alias/persisted, pagination with LOV 25/50 sticky). Supports live-verify filtering (see `docs/OPERATIONS.md`).
 
 ```bash
 curl http://localhost:8080/v1/models -H "Authorization: Bearer fgk-xxx"
 # Pagination LOV 25/50
 curl "http://localhost:8080/v1/models?page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
 curl "http://localhost:8080/v1/models?page=2&limit=50&q=gemma" -H "Authorization: Bearer fgk-xxx"
-# Chỉ verified_free (thực sự còn free sau probe 24h)
+# Only verified_free (still free after 24h probe)
 curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
-# Deprecated (freellms nói free nhưng live không còn, gồm persisted 404/410)
+# Deprecated (freellms says free but live is no longer free, includes persisted 404/410)
 curl "http://localhost:8080/v1/models?verified=deprecated" -H "Authorization: Bearer fgk-xxx"
-# Filter theo provider
+# Filter by provider
 curl "http://localhost:8080/v1/models?provider=nvidia-nim" -H "Authorization: Bearer fgk-xxx"
-# Kết hợp + search
+# Combined + search
 curl "http://localhost:8080/v1/models?provider=groq&verified=free&q=llama&page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
 ```
 
@@ -111,16 +111,16 @@ curl "http://localhost:8080/v1/models?provider=groq&verified=free&q=llama&page=1
 
 Query params:
 
-| Param | Mô tả |
-|-------|-------|
-| `provider` | `nvidia-nim`, `groq`, `google-gemini`, `modelscope`… hoặc `gateway` cho alias |
-| `verified` | `free` → chỉ `verified_free`, `deprecated` → chỉ deprecated (kể cả persisted 404/410), `unverified` → unverified_no_key/error, omit → tất cả 324 |
-| `q` | Search `id/display_name/provider` (vd `gemma`, `nvidia`) |
-| `page` | Trang 1-indexed (mặc định 1) |
-| `limit` `per_page` | LOV `25` hoặc `50` (mặc định 25) |
-| `free` | `0` để hiển thị cả paid (hiện tất cả freellms đều free nên ít dùng) |
+| Param | Description |
+|-------|-------------|
+| `provider` | `nvidia-nim`, `groq`, `google-gemini`, `modelscope`… or `gateway` for aliases |
+| `verified` | `free` → only `verified_free`, `deprecated` → only deprecated (including persisted 404/410), `unverified` → unverified_no_key/error, omit → all 324 |
+| `q` | Search `id/display_name/provider` (e.g. `gemma`, `nvidia`) |
+| `page` | 1-indexed page (default 1) |
+| `limit` `per_page` | LOV `25` or `50` (default 25) |
+| `free` | `0` to show paid as well (all freellms are currently free, so rarely used) |
 
-`GET /v1/models/:id` (ví dụ `/v1/models/nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) trả chi tiết + `live_status` + `persisted_404`.
+`GET /v1/models/:id` (e.g. `/v1/models/nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) returns details plus `live_status` and `persisted_404`.
 
 ### POST /v1/embeddings
 
@@ -128,11 +128,11 @@ Query params:
 { "model": "cohere/embed-v3", "input": "Hello world" }
 ```
 
-Stub P1 (P5 sẽ proxy tới Cohere/NVIDIA embedding). Trả mock embedding 8 dims.
+Stub P1 (P5 will proxy to Cohere/NVIDIA embeddings). Returns a mock 8-dim embedding.
 
 ### POST /v1/images/generations
 
-Dùng Pollinations hoặc provider hỗ trợ images.
+Uses Pollinations or any provider that supports images.
 
 ```json
 { "model": "pollinations/flux", "prompt": "a cat", "n": 1, "size": "1024x1024" }
@@ -140,36 +140,36 @@ Dùng Pollinations hoặc provider hỗ trợ images.
 
 ### GET /v1/health
 
-Không cần auth, trả status gateway + provider pool.
+No auth required; returns gateway status and provider pool.
 
 ```json
 { "status":"ok", "providers":43, "tiers":[["nvidia-nim","groq",...]], "uptime":123 }
 ```
 
-### Admin API (`/api/*`, cần `MASTER_KEY` hoặc `admin` role)
+### Admin API (`/api/*`, requires `MASTER_KEY` or `admin` role)
 
-| Method | Path | Mô tả |
-|--------|------|-------|
-| `POST` | `/api/keys` | Tạo virtual key `fgk-...` (hash SHA256, scopes, RPM) |
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/keys` | Create virtual key `fgk-...` (SHA256 hash, scopes, RPM) |
 | `GET` | `/api/keys` | List keys + `requestCount` |
-| `DELETE` | `/api/keys/:id` | Xóa key |
+| `DELETE` | `/api/keys/:id` | Delete a key |
 | `GET` | `/api/providers?page=&limit=&q=` | List providers + `detailed[]` (free_models, keys, caps, `Get Key` URL) — pagination 25/50 LOV |
-| `GET` | `/api/providers/health` | Live ping 43 providers parallel 5s (online/offline/no-key, latency, breaker) |
-| `GET` | `/api/models/health?model=` | Probe **1 model** live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
-| `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models của provider (summary usable/unusable) |
-| `GET` | `/api/models/health/:id` | Probe 1 model full id (vd `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) |
-| `GET` | `/api/models/health/persisted` | List persisted 404/410 (`data/model-health.json`) — giữ strikethrough sau reload |
+| `GET` | `/api/providers/health` | Live ping of 43 providers in parallel, 5s (online/offline/no-key, latency, breaker) |
+| `GET` | `/api/models/health?model=` | Probe **1 model** with live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
+| `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models of a provider (summary usable/unusable) |
+| `GET` | `/api/models/health/:id` | Probe 1 model by full id (e.g. `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) |
+| `GET` | `/api/models/health/persisted` | List persisted 404/410 (`data/model-health.json`) — keeps strikethrough after reload |
 | `POST` | `/api/models/health/mark` | Mark 404/410 `{ids:[],http_status:404,error:"model_not_found"}` -> persist + router skip |
-| `DELETE` | `/api/models/health/persisted/:id` | Xóa 1 persisted, `DELETE /api/models/health/persisted` xóa hết |
+| `DELETE` | `/api/models/health/persisted/:id` | Remove one persisted entry, `DELETE /api/models/health/persisted` removes all |
 | `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:324`, `breakers` |
 | `GET` | `/api/models/sync` | Freellms sync info (source, last_sync, script) |
 | `GET` | `/api/verify` | Full live verify `data/verified-models.json` (316 rows, `verified_free/deprecated`) |
-| `GET` | `/api/verify/summary` | Summary nhanh (per-provider) |
+| `GET` | `/api/verify/summary` | Quick summary (per-provider) |
 | `POST` | `/api/verify` | Trigger verify `{dryRun:false}` |
 | `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
 | `GET` | `/api/logs/stream` | SSE live logs |
 
-**Tạo key**:
+**Create a key**:
 
 ```bash
 curl -X POST http://localhost:8080/api/keys \
@@ -184,45 +184,45 @@ curl -X POST http://localhost:8080/api/keys \
 # -> { "key": "fgk-abc123...", "id": "..." }
 ```
 
-**Verify live** (kiểm tra tier thực sự còn free không — xem `docs/OPERATIONS.md`):
+**Verify live** (check whether the tier is still actually free — see `docs/OPERATIONS.md`):
 
 ```bash
-# Xem summary
+# View summary
 curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER_KEY" | jq
 
-# Trigger live probe (cần keys trong .env, nếu không sẽ dry-run)
+# Trigger live probe (requires keys in .env, otherwise dry-run)
 curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"dryRun":false}' | jq '.total_verified_free'
 
-# Chỉ lấy models thực sự còn free sau probe
+# Only models still free after probing
 curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx" | jq '.total'
 ```
 
 ## Model Aliases (freellms-aware)
 
-`auto`, `gpt-4`, `gpt-3.5`, `claude-3`, `gemini`, `gemini-flash`, `llama`, `qwen`, `glm`, `kimi`, `code`, `embedding`, `rerank`, `deepseek`, `mistral` sẽ được `smart-router` resolve.
+`auto`, `gpt-4`, `gpt-3.5`, `claude-3`, `gemini`, `gemini-flash`, `llama`, `qwen`, `glm`, `kimi`, `code`, `embedding`, `rerank`, `deepseek`, `mistral` are resolved by the `smart-router`.
 
-Ví dụ:
+Examples:
 
 ```ts
-{ model: "auto" } // -> nvidia-nim/z-ai/glm-5.2 hoặc groq/qwen3...
+{ model: "auto" } // -> nvidia-nim/z-ai/glm-5.2 or groq/qwen3...
 { model: "gpt-4" } // -> groq/cerebras/gemini/openrouter
 { model: "glm" } // -> z-ai-zhipu-ai/nvidia-nim/modelscope
 { model: "qwen" } // -> modelscope/ovhcloud/siliconflow/alibaba
 { model: "code" } // -> kilo-code/opencode/cohere/mistral-ai
-{ model: "nvidia-nim/z-ai/glm-5.2" } // pin chính xác
+{ model: "nvidia-nim/z-ai/glm-5.2" } // pin exact model
 ```
 
-Chi tiết alias map: `apps/gateway/src/providers/registry.ts:42`.
+Alias map details: `apps/gateway/src/providers/registry.ts:42`.
 
 ## Error Codes
 
-| Status | Code | Mô tả |
-|--------|------|-------|
-| 401 | `invalid_api_key` | Sai `fgk-` key |
-| 403 | `insufficient_scope` | Key không có quyền model/provider |
-| 429 | `rate_limit_exceeded` | Vượt RPM/TPM, kèm `Retry-After` |
-| 429 | `provider_rate_limit` | Provider hết quota, gateway đã fallback hết pool |
-| 502 | `provider_error` | Tất cả provider fail, kèm `provider_errors` array |
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `invalid_api_key` | Invalid `fgk-` key |
+| 403 | `insufficient_scope` | Key lacks permission for the model/provider |
+| 429 | `rate_limit_exceeded` | RPM/TPM exceeded, includes `Retry-After` |
+| 429 | `provider_rate_limit` | Provider quota exhausted, gateway has exhausted fallback pool |
+| 502 | `provider_error` | All providers failed, includes `provider_errors` array |
 | 504 | `provider_timeout` | Upstream timeout |
 
 ## Rate Limit Headers

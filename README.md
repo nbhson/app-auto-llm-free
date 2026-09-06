@@ -1,59 +1,59 @@
 # app-auto-llm-free
 
-> **Một endpoint duy nhất cho mọi LLM miễn phí.** Tương tự OmniRoute / 9Router / FreeLLMAPI — tự host, OpenAI-compatible, gom toàn bộ provider & model free vào một gateway.
+> **One endpoint for all free LLMs.** Like OmniRoute / 9Router / FreeLLMAPI — self-hosted, OpenAI-compatible, aggregating all free providers & models into a single gateway.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stack: Hono + Bun](https://img.shields.io/badge/Stack-Hono%20%2B%20Bun-orange)](https://hono.dev)
-[![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/vi/API.md)
+[![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/en/API.md)
 
-**Languages / Ngôn ngữ:** 🇻🇳 [Tiếng Việt](docs/vi/GETTING_STARTED.md) | 🇬🇧 [English](docs/en/GETTING_STARTED.md) | [Docs Index](docs/README.md)
+**Languages:** 🇬🇧 [English](README.md) | 🇻🇳 [Tiếng Việt](README.vi.md) | [Docs Index](docs/README.md) — Docs: [🇬🇧 EN](docs/en/GETTING_STARTED.md) | [🇻🇳 VI](docs/vi/GETTING_STARTED.md)
 
 ---
 
-## ✨ Tính năng
+## ✨ Features
 
-| Nhóm | Chi tiết |
+| Group | Details |
 |------|----------|
-| **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — dùng trực tiếp với OpenAI SDK |
-| **Provider Hybrid (30)** | **Permanent Free**: NVIDIA NIM (97), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), SambaNova, SiliconFlow, Groq (7), Cerebras (5), Z AI, Agnes, Aion, LLM7, Chutes, Glhf… <br> **Quota**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4) <br> **Scraped**: Pollinations, LLM7.io, Ollama Cloud (3 free) — Nguồn: freellms.org (316 free models) |
-| **Smart Routing** | Tiered 15 (real key → public free), alias (`auto`/`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router`, skip `deprecated`/`quota`/`breaker` |
-| **Resilience** | Auto fallback 15 providers, circuit breaker 5/30s half-open, TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight |
+| **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — works directly with OpenAI SDK |
+| **Provider Hybrid (43 ids)** | **Permanent Free**: NVIDIA NIM (81 live), ModelScope, Cloudflare, Gemini (3.6), OVH, Cohere, SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf… <br> **Quota**: GitHub Models, Mistral, Kilo Code, HuggingFace <br> **Scraped**: Pollinations, LLM7.io, Ollama Cloud — Source: live provider APIs (freellms.org snapshot disabled, not latest) |
+| **Smart Routing** | Tiered fallback (real key → public free), aliases (`auto`/`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router`, skip `deprecated`/`quota`/`breaker`, `hasKey` filter |
+| **Resilience** | Auto fallback, circuit breaker 5/30s half-open, TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
 | **Key Pool** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, `rotate-keys.ts` |
-| **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (sticky, `providers` trước `models`), **Dashboard** 4 cards + 3 charts (byProvider/latency/verify) + tokens, **Providers** `Get Key ↗` + live health, **Models** 316 checkbox + `Check Live` + `Used/Limit`, **Keys** `fgk-...` CRUD + Key Generator (thay openssl) + Quick Test, **Logs** charts + SSE |
+| **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (header 2 rows, centered nav), **Dashboard** 4 cards + 3 charts + tokens, **Providers** pagination 25/50 sticky + `hasKey` filter + `Sync Live` + `Get Key ↗` + live health, **Models** pagination 25/50 sticky + `hasKey` + `Hide 404` + `Check Live` + `Used/Limit` + strikethrough persist, **Keys** `fgk-...` CRUD + Key Generator + Quick Test, **Logs** charts + SSE |
 | **Observability** | Pino pretty, OTel GenAI (`gen_ai.*`), token estimator, `request-log` 1000 + `X-Verified`, `PROVIDER_TEST_RESULTS` benchmark |
 
-## 🏗️ Kiến trúc
+## 🏗️ Architecture
 
 ```
 Client (OpenAI SDK / Vercel AI SDK) 
   → Hono Gateway (Bun/Node/Cloudflare Workers)
     → Middleware: auth, rate-limit, body-limit, logger
-    → Smart Router (model → provider pool)
+    → Smart Router (model → provider pool, sanitize spaces/colon)
     → Provider Adapters (OpenAI/Gemini/Anthropic/Scraped) + format-translator
-    → Fallback + Retry + Circuit Breaker
+    → Fallback + Retry + Circuit Breaker + persisted 404 skip
     → Normalizer → OpenAI SSE/JSON
-  → Dashboard (Vite + React) → /api/* → Drizzle ORM → SQLite/Postgres + Redis
+  → Dashboard (Vite + React, i18n VI/EN) → /api/* → Drizzle ORM → SQLite/Postgres + Redis
 ```
 
-Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+See [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md)
 
-## 🚀 Quick Start — người mới xem **[GETTING_STARTED.md](docs/GETTING_STARTED.md) 5 phút** (từ 0 tới gọi API đầu tiên)
+## 🚀 Quick Start — new users see **[GETTING_STARTED.md](docs/en/GETTING_STARTED.md) 5 min** (from 0 to first API call)
 
-### Yêu cầu
-- Bun >= 1.1 hoặc Node >= 20
-- Docker (khuyến nghị) hoặc Redis + Postgres/SQLite
+### Requirements
+- Bun >= 1.1 or Node >= 20
+- Docker (recommended) or Redis + Postgres/SQLite
 
-### 1. Clone & cài đặt
+### 1. Clone & install
 
 ```bash
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 cp .env.example .env
-# Điền MASTER_KEY/ENCRYPTION_KEY: mở http://localhost:3000 → Key Generator (thay openssl) hoặc openssl rand -hex
-# Provider keys (GROQ_API_KEYS...) để trống vẫn chạy pollinations
+# Fill MASTER_KEY/ENCRYPTION_KEY: open http://localhost:3000 → Key Generator (replaces openssl) or openssl rand -hex
+# Provider keys (GROQ_API_KEYS...) can be empty — still runs via pollinations
 ```
 
-### 2. Chạy với Docker (khuyến nghị)
+### 2. Run with Docker (recommended)
 
 ```bash
 docker compose up -d
@@ -62,7 +62,7 @@ docker compose up -d
 # Docs: http://localhost:8080/docs
 ```
 
-### 3. Chạy dev local
+### 3. Run dev locally
 
 ```bash
 bun install
@@ -70,18 +70,18 @@ bun run dev:gateway   # Hono @ http://localhost:8080
 bun run dev:web       # Vite @ http://localhost:5173
 ```
 
-### 4. Gọi API (OpenAI SDK)
+### 4. Call API (OpenAI SDK)
 
 ```ts
 import OpenAI from "openai";
 
 const client = new OpenAI({
   baseURL: "http://localhost:8080/v1",
-  apiKey: "fgk-your-virtual-key", // tạo trong Dashboard /api/keys
+  apiKey: "fgk-your-virtual-key", // create in Dashboard /api/keys
 });
 
 const res = await client.chat.completions.create({
-  model: "auto", // hoặc "gpt-4", "gemini-1.5-flash", "llama-3.3-70b"
+  model: "auto", // or "gpt-4", "gemini-3.6-flash", "llama-3.3-70b"
   messages: [{ role: "user", content: "Hello free gateway!" }],
   stream: false,
 });
@@ -98,7 +98,7 @@ for await (const chunk of stream) {
 }
 ```
 
-Hoặc `curl`:
+Or `curl`:
 
 ```bash
 curl http://localhost:8080/v1/chat/completions \
@@ -106,34 +106,33 @@ curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":false}'
 
-# Models: lọc theo provider / verified tier thực sự còn free (24h probe)
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/v1/models?provider=nvidia-nim&verified=free" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/api/verify/summary" -H "Authorization: Bearer fgk-master-xxx"
+# Models: filter by provider / verified tier (live, not freellms)
+curl "http://localhost:8080/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:8080/api/models/live/sync" -X POST -H "Authorization: Bearer fgk-master-xxx"
 ```
 
-## ⚙️ Cấu hình
+## ⚙️ Configuration
 
-Xem [.env.example](.env.example) và [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Sync 24h xem [docs/OPERATIONS.md](docs/OPERATIONS.md).
+See [.env.example](.env.example) and [docs/en/CONFIGURATION.md](docs/en/CONFIGURATION.md). Live sync see [docs/en/OPERATIONS.md](docs/en/OPERATIONS.md).
 
 ```env
 PORT=8080
-DATABASE_URL=file:./data.db          # hoặc postgres://...
+DATABASE_URL=file:./data.db          # or postgres://...
 REDIS_URL=redis://localhost:6379
 MASTER_KEY=fgk-master-xxx
 ENCRYPTION_KEY=32bytes-hex...
 SYNC_INTERVAL_MS=86400000            # 24h verify live
 DISABLE_SCHEDULER=0
 
-# Provider keys (pool, phân tách bằng dấu phẩy, 30 providers freellms)
+# Provider keys (pool, comma-separated, live source)
 GROQ_API_KEYS=gsk_xxx,gsk_yyy
 GEMINI_API_KEYS=AIza_xxx,AIza_yyy
 CEREBRAS_API_KEYS=csk_xxx
 NVIDIA_API_KEYS=nvapi-xxx
-# ... 30 providers, xem .env.example đầy đủ
+# ... 30 providers, see .env.example
 ```
 
-Tạo virtual key:
+Create virtual key:
 
 ```bash
 curl -X POST http://localhost:8080/api/keys \
@@ -142,40 +141,40 @@ curl -X POST http://localhost:8080/api/keys \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
 ```
 
-## 📚 Tài liệu
+## 📚 Documentation
 
-| Tài liệu | Mô tả |
+| Document | Description |
 |----------|-------|
-| [GETTING_STARTED.md](docs/GETTING_STARTED.md) | **Cho người mới — 5 phút** từ 0 tới gọi API đầu tiên, Dashboard, lỗi thường gặp |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Chi tiết kiến trúc, luồng request, provider interface |
-| [PROVIDERS.md](docs/PROVIDERS.md) | Danh sách **30 providers (freellms)**, free tier limits, base URLs, cách thêm provider |
-| [FREELLMS_FREE_TIER.md](docs/FREELLMS_FREE_TIER.md) | Scan freellms.org 2026-09-06 — 316 free models, ranking, rate limits |
-| [OPERATIONS.md](docs/OPERATIONS.md) | Vận hành & xác thực free tier 24h (live verify vs freellms, scheduler, cron) |
-| [API.md](docs/API.md) | Đặc tả OpenAI-compatible endpoints, alias, streaming, error codes |
-| [CONFIGURATION.md](docs/CONFIGURATION.md) | Biến môi trường (30 providers), models.yaml, rate limit |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker, Cloudflare Workers, Vercel, bare metal |
-| [ROADMAP.md](docs/ROADMAP.md) | Lộ trình P1→P5, milestones |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Quy trình đóng góp |
+| [GETTING_STARTED.md](docs/en/GETTING_STARTED.md) | **For newcomers — 5 min** from 0 to first API call, Dashboard, common errors |
+| [ARCHITECTURE.md](docs/en/ARCHITECTURE.md) | Architecture, request flow, provider interface |
+| [PROVIDERS.md](docs/en/PROVIDERS.md) | List of **43 providers**, free tier limits, base URLs, how to add provider |
+| [FREELLMS_FREE_TIER.md](docs/en/FREELLMS_FREE_TIER.md) | Freellms.org snapshot (historical) — live is now source of truth |
+| [OPERATIONS.md](docs/en/OPERATIONS.md) | Operations & live verify (hasKey, Sync Live Now, persisted 404) |
+| [API.md](docs/en/API.md) | OpenAI-compatible endpoints, aliases, streaming, error codes, pagination 25/50 |
+| [CONFIGURATION.md](docs/en/CONFIGURATION.md) | Environment variables, models.yaml, rate limit |
+| [DEPLOYMENT.md](docs/en/DEPLOYMENT.md) | Docker, Cloudflare Workers, Vercel, bare metal |
+| [ROADMAP.md](docs/en/ROADMAP.md) | Roadmap P1→P5, milestones |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 
 ## 🗺️ Roadmap
 
-- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (30 providers, 316 models registry)
-- [x] **Freellms Sync** — Scan freellms.org, `data/*.json` + `models.yaml` (316 free) + `scripts/sync-freellms.py`
-- [x] **P2 Gateway Core** ✅ Done 2026-09-06 — 30 adapters, streaming SSE (Gemini `alt=sse` → OpenAI), tool calling, `auto` 15-tier → pollinations live, `x-router` pin
-- [x] **P3 Resilience** ✅ Done 2026-09-06 — key-manager AES-GCM, quota RPM/TPM (NVIDIA 40/Groq 30/Cerebras 15/1M), breaker 5/30s, `GET /api/providers/health` live 40, `X-Verified` + deprecated skip
-- [x] **P4 Auth + Dashboard** ✅ Done 2026-09-06 — `fgk-...` CRUD (hash SHA256, scopes, RPM), `rate-limit` virtual key, `request-log` SSE, Dashboard 5 routes (Dashboard verify, Models badges, Providers health, Keys CRUD, Logs live)
-- [x] **P5 Hardening** ✅ Done 2026-09-06 — `wrangler.jsonc` Cloudflare, Dockerfile prod non-root + HEALTHCHECK, `otel.ts` GenAI, `secureHeaders` + `bodyLimit`, `benchmark.ts` + `PROVIDER_TEST_RESULTS.md` (online 13/40, chat 1539ms), `rotate-keys.ts` AES rotation, `SECURITY.md` hardening checklist
+- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (43 ids, live models, pagination 25/50)
+- [x] **Freellms Sync** — Historical snapshot (now disabled, live is source)
+- [x] **P2 Gateway Core** ✅ Done — 30 adapters, streaming SSE, `auto` 15-tier, `x-router` pin, sanitize spaces
+- [x] **P3 Resilience** ✅ Done — key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health 43, persisted 404 strikethrough + disable
+- [x] **P4 Auth + Dashboard** ✅ Done — `fgk-...` CRUD, rate-limit, request-log SSE, Dashboard 5 routes with hasKey + Hide 404 + Sync Live
+- [x] **P5 Hardening** ✅ Done — `wrangler.jsonc`, Dockerfile prod, OTel, i18n VI/EN (UI + docs/vi docs/en)
 
-Chi tiết [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/en/ROADMAP.md](docs/en/ROADMAP.md).
 
-## 🤝 Đóng góp
+## 🤝 Contributing
 
-PRs welcome! Xem [CONTRIBUTING.md](CONTRIBUTING.md). Vui lòng chạy `bun run lint` + `bun run test` trước khi push.
+PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md). Please run `bun run lint` + `bun run test` before push.
 
 ## 📜 License
 
-Apache-2.0 — xem [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
 
 ---
 
-**Tham khảo**: [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (271 providers), [9Router](https://github.com/decolua/9router), [Free LLM Gateway](https://github.com/MrFadiAi/free-llm-gateway) (24+ providers), [LiteLLM](https://github.com/BerriAI/litellm), [Hebo Gateway](https://github.com/8monkey-ai/hebo-gateway).
+**References**: [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (271 providers), [9Router](https://github.com/decolua/9router), [Free LLM Gateway](https://github.com/MrFadiAi/free-llm-gateway) (24+ providers), [LiteLLM](https://github.com/BerriAI/litellm), [Hebo Gateway](https://github.com/8monkey-ai/hebo-gateway).

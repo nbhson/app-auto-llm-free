@@ -24,6 +24,7 @@ apiRoute.get("/providers", (c) => {
     const meta = providerMeta[id] || { name: id, tier: "", tier_type: "", caps: [], noCard: true };
     const fre = freellms.find((x: any) => x.slug === id);
     const keys = config.providerKeys[id] || [];
+    const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me"));
     return {
       id,
       name: meta.name || fre?.name || id,
@@ -35,6 +36,7 @@ apiRoute.get("/providers", (c) => {
       free_models: fre?.free_models ?? 0,
       total_models: fre?.total_models ?? 0,
       keys: keys.length > 0 ? `${keys.length} keys` : "none",
+      hasRealKey,
       status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key",
     };
   });
@@ -161,8 +163,10 @@ apiRoute.post("/verify", async (c) => {
 });
 apiRoute.post("/models/live/sync", async (c) => {
   const { syncLiveModels } = await import("../jobs/sync-live-models.js");
-  const result = await syncLiveModels();
-  return c.json({ ...result, generated_at: new Date().toISOString() });
+  const body = await c.req.json().catch(() => ({}));
+  const freeOnly = body.freeOnly ?? true;
+  const result = await syncLiveModels({ freeOnly });
+  return c.json({ ...result, generated_at: new Date().toISOString(), free_only: freeOnly });
 });
 apiRoute.get("/models/live", (c) => {
   const data = readDataJson<any>("live-models.json", null as any);

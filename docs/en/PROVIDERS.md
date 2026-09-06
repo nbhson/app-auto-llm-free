@@ -2,24 +2,24 @@
 
 # Providers
 
-> **Nguồn chính: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 ids.**  
-> Dashboard nav **Providers (30) trước Models (316)**. Cột **Get Key ↗** (console trực tiếp + freellms ↗) trong `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs).
-> Chi tiết: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`  
-> Gateway `apps/gateway/src/providers/registry.ts:1` 43 ids (30 slugs + alias), `models.yaml:1` 316 free, `lib/paths.ts:1` fix 7→316 bug.
+> **Primary source: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 IDs.**  
+> Dashboard nav has **Providers (30) before Models (316)**. The **Get Key ↗** column (direct console + freellms ↗) lives in `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs).
+> Details: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`  
+> Gateway `apps/gateway/src/providers/registry.ts:1` holds 43 IDs (30 slugs + aliases), `models.yaml:1` has 316 free, and `lib/paths.ts:1` fixes the 7→316 bug.
 
-## 1. Tổng quan freellms.org
+## 1. freellms.org Overview
 
-| Chỉ số | Giá trị |
-|--------|---------|
+| Metric | Value |
+|--------|-------|
 | Providers | **30** (26 Permanent Free, 4 Quota) |
 | Models | **365** (316 FREE `data-free=1`, 49 paid) |
-| No Card | 29/30 (chỉ Grok xAI yêu cầu) |
+| No Card | 29/30 (only Grok xAI requires one) |
 | OpenAI Compatible | 30/30 |
 | Scan date | 2026-09-06, script `scripts/sync-freellms.py` |
 
-## 2. Danh sách 30 providers (từ freellms.org)
+## 2. List of 30 Providers (from freellms.org)
 
-### Permanent Free — No Card (ưu tiên P0)
+### Permanent Free — No Card (P0 priority)
 
 | Provider | Slug | Base URL | Free Models | Limit | Caps | Env Key |
 |----------|------|----------|-------------|-------|------|---------|
@@ -44,7 +44,7 @@
 | **Ollama Cloud** | `ollama-cloud` | `https://api.ollama.com` | 3 / 8 total | Session/weekly limits | text,reasoning | `OLLAMA_CLOUD_API_KEYS` |
 | **Groq xAI** | `grok-xai` / `xai` | `https://api.x.ai/v1` | 2 | — | text | `GROK_API_KEYS` / `XAI_API_KEYS` |
 
-### Quota / Trial (P1 — dùng sau Permanent)
+### Quota / Trial (P1 — used after Permanent)
 
 | Provider | Slug | Free | Limit | Env Key |
 |----------|------|------|-------|---------|
@@ -53,7 +53,7 @@
 | **Kilo Code** | `kilo-code` | 8 | ~200 req/hr, `:free` suffix | `KILO_CODE_API_KEYS` |
 | **Hugging Face** | `hugging-face` | 4 | — | `HUGGINGFACE_API_KEYS` |
 
-### Legacy / extra (vẫn hỗ trợ)
+### Legacy / Extra (still supported)
 
 | Provider | Base URL | Env |
 |----------|----------|-----|
@@ -61,21 +61,21 @@
 | Fireworks | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEYS` |
 | Novita | `https://api.novita.ai/v3/openai` | `NOVITA_API_KEYS` |
 | DeepSeek | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEYS` |
-| Pollinations | `https://text.pollinations.ai/openai` | `POLLINATIONS_API_KEY` (không cần) |
+| Pollinations | `https://text.pollinations.ai/openai` | `POLLINATIONS_API_KEY` (not required) |
 
-> Cảnh báo scraped: Pollinations/LLM7 không ổn định, cần health cron và auto-disable trong P3.
+> Scraped warning: Pollinations/LLM7 are not fully stable and need a health cron with auto-disable in P3.
 
-## 3. Model Catalog — 316 free models
+## 3. Model Catalog — 316 Free Models
 
-`models.yaml:1` đã được sync từ freellms:
+`models.yaml:1` is synced from freellms:
 
 ```bash
 python scripts/sync-freellms.py   # fetch freellms.org -> data/*.json + models.yaml
-# hoặc
+# or
 npm run sync:freellms -w apps-gateway
 ```
 
-Mỗi entry:
+Each entry:
 
 ```yaml
 - id: nvidia-nim/z-ai/glm-5.2
@@ -88,7 +88,7 @@ Mỗi entry:
   limit: "Up to 40 RPM"
 ```
 
-Dashboard `/models` (Vite) và `GET /v1/models?provider=nvidia-nim` phục vụ từ `data/freellms-models-free.json:1` (316 rows, có `score`, `verified`, `limit`). Alias vẫn hỗ trợ:
+The Dashboard at `/models` (Vite) and `GET /v1/models?provider=nvidia-nim` are served from `data/freellms-models-free.json:1` (316 rows with `score`, `verified`, `limit`). Aliases are still supported:
 
 ```
 auto           -> nvidia-nim, groq, cerebras, google-gemini, cloudflare
@@ -101,28 +101,28 @@ glm            -> z-ai-zhipu-ai, nvidia-nim, modelscope
 code           -> kilo-code, opencode, cohere, mistral-ai
 ```
 
-Chi tiết top 30 theo score: xem `docs/FREELLMS_FREE_TIER.md:1`.
+Top 30 by score: see `docs/FREELLMS_FREE_TIER.md:1`.
 
-## 4. Fallback Tiers (đã cập nhật trong .env.example & config.ts)
+## 4. Fallback Tiers (updated in .env.example & config.ts)
 
 ```env
 FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]
 ```
 
-Router `apps/gateway/src/lib/router.ts:1` dùng tier này + `providerMeta` để fallback khi 429/timeout.
+The router `apps/gateway/src/lib/router.ts:1` uses this tier along with `providerMeta` to fall back on 429/timeout.
 
-## 5. Thêm provider mới
+## 5. Adding a New Provider
 
-1. Thêm env vào `.env.example` (theo bảng trên)
-2. Thêm vào `apps/gateway/src/config.ts:19` `providerKeys`
-3. Đăng ký trong `apps/gateway/src/providers/registry.ts:1`:
+1. Add the env var to `.env.example` (per the table above)
+2. Add it to `apps/gateway/src/config.ts:19` `providerKeys`
+3. Register it in `apps/gateway/src/providers/registry.ts:1`:
 
 ```ts
 export const myProvider = createOpenAICompatibleProvider({ id: "my-provider", baseUrl: "https://api.myprovider.com/v1" });
 export const providers = { ..., myProvider };
 ```
 
-4. Chạy `python scripts/sync-freellms.py` để cập nhật `models.yaml` nếu provider có trên freellms
+4. Run `python scripts/sync-freellms.py` to update `models.yaml` if the provider is listed on freellms
 5. Test:
 
 ```bash
@@ -134,9 +134,9 @@ curl http://localhost:8080/v1/chat/completions \
 
 ## 6. Health Check (live)
 
-* `GET /api/providers` — `detailed[]` với `free_models`, `keys`, `status`, **Get Key ↗** (link console) + freellms ↗
-* `GET /api/providers/health` — live ping 43 providers parallel 5s (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
-* `GET /api/models/health?model=pollinations/openai` — probe chat 1 model (`usable` 2457ms, `unusable 410 Gone`)
+* `GET /api/providers` — `detailed[]` with `free_models`, `keys`, `status`, **Get Key ↗** (console link) + freellms ↗
+* `GET /api/providers/health` — live ping of 43 providers in parallel with 5s timeout (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
+* `GET /api/models/health?model=pollinations/openai` — single-model chat probe (`usable` 2457ms, `unusable 410 Gone`)
 * `GET /api/models/health?provider=nvidia-nim&limit=2` — bulk probe, summary `usable/unusable/no-key`
-* `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (từ logs) — biết model nào thực sự usable
+* `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (from logs) — identifies which models are actually usable
 * `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers`
