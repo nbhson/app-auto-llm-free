@@ -112,11 +112,37 @@ export default function Logs() {
       )}
       {stats?.logs?.byProvider && <div className="card" style={{ fontSize: 12 }}><b>By provider (last 100):</b> {Object.entries(stats.logs.byProvider).map(([k, v]) => `${k}:${v}`).join(" • ") || "—"}</div>}
       <table>
-        <thead><tr><th>Time</th><th>Key</th><th>Provider</th><th>Model</th><th>Tokens</th><th>MS</th><th>Status</th><th>Verified</th></tr></thead>
+        <thead><tr><th></th><th>Time</th><th>Key</th><th>Provider</th><th>Model</th><th>Tokens</th><th>MS</th><th>Status</th><th>Verified</th></tr></thead>
         <tbody>
-          {logs.map((l) => (
-            <tr key={l.id}><td style={{ fontSize: 11 }}>{new Date(l.timestamp).toLocaleTimeString()}</td><td style={{ fontSize: 11 }}>{l.virtualKeyName || l.virtualKeyId || "-"}</td><td><code style={{ fontSize: 11 }}>{l.provider}</code></td><td style={{ fontSize: 11 }}>{l.model}</td><td style={{ fontSize: 11 }}>{l.totalTokens ?? "-"}</td><td>{l.latencyMs}</td><td>{l.status === 200 ? <span style={{ color: "#16a34a" }}>200</span> : <span style={{ color: "#dc2626" }}>{l.status}</span>}</td><td style={{ fontSize: 11 }}>{l.verifiedStatus || "-"}</td></tr>
-          ))}
+          {logs.map((l) => {
+            const expanded = (l as any)._expanded;
+            return (
+              <>
+                <tr key={l.id} style={{ background: expanded ? "#f8fafc" : "transparent" }}>
+                  <td><button onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !(x as any)._expanded } : x))} style={{ fontSize: 11, padding: "2px 6px", minWidth: 28 }}>{expanded ? "−" : "+"}</button></td>
+                  <td style={{ fontSize: 11 }}>{new Date(l.timestamp).toLocaleTimeString()}</td>
+                  <td style={{ fontSize: 11 }}>{l.virtualKeyName || l.virtualKeyId || "-"}</td>
+                  <td><code style={{ fontSize: 11 }}>{l.provider}</code></td>
+                  <td style={{ fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={l.model}>{l.model}</td>
+                  <td style={{ fontSize: 11 }}>{l.totalTokens ?? "-"}<span style={{ color: "#888", fontSize: 10 }}> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td>
+                  <td>{l.latencyMs}</td>
+                  <td>{l.status === 200 ? <span style={{ color: "#16a34a" }}>200</span> : <span style={{ color: "#dc2626" }}>{l.status}</span>}</td>
+                  <td style={{ fontSize: 11 }}>{l.verifiedStatus || "-"}</td>
+                </tr>
+                {expanded && (
+                  <tr key={l.id + "-detail"}>
+                    <td colSpan={9} style={{ background: "#f8fafc", padding: 12 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12 }}>
+                        <div><b>ID:</b> <code>{l.id}</code><br /><b>Time:</b> {new Date(l.timestamp).toLocaleString()}<br /><b>Key:</b> {l.virtualKeyName} ({l.virtualKeyId})<br /><b>Provider:</b> {l.provider}<br /><b>Model:</b> <code>{l.model}</code></div>
+                        <div><b>Tokens:</b> {l.promptTokens ?? 0} prompt + {l.completionTokens ?? 0} completion = <b>{l.totalTokens ?? 0}</b><br /><b>Latency:</b> {l.latencyMs}ms<br /><b>Status:</b> {l.status} {l.error ? `— ${l.error.slice(0, 200)}` : ""}<br /><b>Verified:</b> {l.verifiedStatus || "-"}<br /><b>Error:</b> <pre style={{ fontSize: 11, background: "white", padding: 8, borderRadius: 6, maxHeight: 120, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 4 }}>{l.error || "—"}</pre></div>
+                      </div>
+                      <div style={{ marginTop: 8 }}><b>Raw JSON:</b><pre style={{ fontSize: 11, background: "white", padding: 8, borderRadius: 6, maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(l, null, 2)}</pre></div>
+                    </td>
+                  </tr>
+                )}
+              </>
+            );
+          })}
         </tbody>
       </table>
       {logs.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>Chưa có log — gọi <code>POST /v1/chat/completions</code> để tạo.</p>}
