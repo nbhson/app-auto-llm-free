@@ -3,12 +3,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
-function randHex(bytes: number) {
-  const a = new Uint8Array(bytes);
-  crypto.getRandomValues(a);
-  return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 export default function Dashboard() {
   const [health, setHealth] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
@@ -117,38 +111,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data — gọi API để có tokens</p>}
       </div>
-
-      <div className="card">
-        <h3>🔑 Key Generator (thay openssl)</h3>
-        <p style={{ fontSize: 12, color: "#555" }}>Tạo <code>MASTER_KEY</code> và <code>ENCRYPTION_KEY</code> ngay trên trình duyệt (client-side, không gửi server). Dùng thay cho <code>openssl rand -hex</code>.</p>
-        <KeyGen />
-      </div>
-    </div>
-  );
-}
-
-function KeyGen() {
-  const [master, setMaster] = useState("");
-  const [enc, setEnc] = useState("");
-  const gen = () => {
-    setMaster(`fgk-master-${randHex(16)}`);
-    setEnc(randHex(32));
-  };
-  useEffect(() => { gen(); }, []);
-  const useMaster = () => {
-    localStorage.setItem("masterKey", master);
-    alert("Đã lưu MASTER_KEY vào ô header (localStorage). Nhớ copy vào .env và restart gateway!");
-    location.reload();
-  };
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}><button onClick={gen}>🎲 Generate mới</button><span style={{ fontSize: 11, color: "#666", alignSelf: "center" }}>Mỗi lần bấm sẽ tạo cặp mới, không gửi server</span></div>
-      <div style={{ display: "grid", gap: 8 }}>
-        <label style={{ fontSize: 12 }}>MASTER_KEY <div style={{ display: "flex", gap: 6 }}><code style={{ flex: 1, wordBreak: "break-all", background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>{master}</code><button onClick={() => navigator.clipboard.writeText(master)}>Copy</button><button onClick={useMaster} style={{ background: "#dcfce7" }}>Use in UI</button></div></label>
-        <label style={{ fontSize: 12 }}>ENCRYPTION_KEY (64 hex) <div style={{ display: "flex", gap: 6 }}><code style={{ flex: 1, wordBreak: "break-all", background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>{enc}</code><button onClick={() => navigator.clipboard.writeText(enc)}>Copy</button></div></label>
-      </div>
-      <pre style={{ fontSize: 11, background: "#f8fafc", padding: 8, borderRadius: 6, overflow: "auto", marginTop: 8 }}>{`# Dán vào .env và restart\nMASTER_KEY=${master}\nENCRYPTION_KEY=${enc}`}</pre>
-      <p style={{ fontSize: 11, color: "#888" }}>Lưu ý: <code>MASTER_KEY</code> dùng để đăng nhập Dashboard và <code>POST /api/keys</code> tạo <code>fgk-...</code> cho app. <code>/keys</code> tạo <code>fgk-...</code> <b>không thể</b> thay thế <code>MASTER_KEY</code> — vì tạo <code>fgk-...</code> cần <code>MASTER_KEY</code> trước.</p>
     </div>
   );
 }
