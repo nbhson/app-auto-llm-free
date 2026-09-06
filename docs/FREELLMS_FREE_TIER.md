@@ -139,4 +139,6 @@ curl -s https://freellms.org/providers/ | grep -o 'ItemList' # check version
 python3 scripts/sync-freellms.py  # (TODO) fetch & regenerate data/
 ```
 
-Last scan: **2026-09-06T07:50 UTC**, freellms.org commit `awesome-freellms-apis`.
+Last scan: **2026-09-06T08:01 UTC** (script `scripts/sync-freellms.py:1`), data `data/verified-models.json:1` (dry-run 314/316 verified, live 5/316 do thiếu keys) — chi tiết live xem `docs/OPERATIONS.md:1` + `GET /api/verify/summary`.
+
+> **Lưu ý verify:** freellms nói free nhưng live có thể đã deprecated (hugging-face 1/4, llm7 4/6 trong probe public). Gateway đánh dấu `deprecated` và có thể lọc `?verified=free` để chỉ thấy tier thực sự còn free sau scheduler 24h.

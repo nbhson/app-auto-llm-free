@@ -103,27 +103,31 @@ curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":false}'
 
-curl http://localhost:8080/v1/models \
-  -H "Authorization: Bearer fgk-xxx"
+# Models: lọc theo provider / verified tier thực sự còn free (24h probe)
+curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:8080/v1/models?provider=nvidia-nim&verified=free" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:8080/api/verify/summary" -H "Authorization: Bearer fgk-master-xxx"
 ```
 
 ## ⚙️ Cấu hình
 
-Xem [.env.example](.env.example) và [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+Xem [.env.example](.env.example) và [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Sync 24h xem [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ```env
-# Gateway
 PORT=8080
 DATABASE_URL=file:./data.db          # hoặc postgres://...
 REDIS_URL=redis://localhost:6379
 MASTER_KEY=fgk-master-xxx
 ENCRYPTION_KEY=32bytes-hex...
+SYNC_INTERVAL_MS=86400000            # 24h verify live
+DISABLE_SCHEDULER=0
 
-# Provider keys (pool, phân tách bằng dấu phẩy để round-robin)
+# Provider keys (pool, phân tách bằng dấu phẩy, 30 providers freellms)
 GROQ_API_KEYS=gsk_xxx,gsk_yyy
 GEMINI_API_KEYS=AIza_xxx,AIza_yyy
 CEREBRAS_API_KEYS=csk_xxx
-# ... xem .env.example đầy đủ
+NVIDIA_API_KEYS=nvapi-xxx
+# ... 30 providers, xem .env.example đầy đủ
 ```
 
 Tạo virtual key:
