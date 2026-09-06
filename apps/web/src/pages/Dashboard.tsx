@@ -26,10 +26,11 @@ export default function Dashboard() {
   return (
     <div>
       <h2>Dashboard</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
         <div className="card"><h3>Providers</h3><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.providers ?? 40}</div><div style={{ fontSize: 12, color: "#666" }}>{stats?.free_models ?? 316} free / 365 total • {stats?.freellms_providers ?? 30} freellms</div></div>
-        <div className="card"><h3>Verify (24h)</h3>{verify ? <><div style={{ fontSize: 20, fontWeight: 600, color: verify.total_verified_free > 300 ? "#16a34a" : "#ea580c" }}>{verify.total_verified_free}/{verify.total_freellms_free} verified</div><div style={{ fontSize: 12 }}>{verify.total_deprecated} deprecated • {verify.total_unverified_no_key} unverified_no_key</div></> : <span style={{ fontSize: 12 }}>loading / no data — run POST /api/verify</span>}</div>
-        <div className="card"><h3>Requests</h3><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.logs?.total ?? stats?.requests ?? 0}</div><div style={{ fontSize: 12, color: "#666" }}>avg {stats?.logs?.avgLatencyMs ?? 0}ms • {Math.round((stats?.logs?.errorRate || 0) * 100)}% errors • {Object.keys(stats?.logs?.byProvider || {}).length} providers used</div></div>
+        <div className="card"><h3>Verify (24h)</h3>{verify ? <><div style={{ fontSize: 20, fontWeight: 600, color: verify.total_verified_free > 300 ? "#16a34a" : "#ea580c" }}>{verify.total_verified_free}/{verify.total_freellms_free} verified</div><div style={{ fontSize: 12 }}>{verify.total_deprecated} deprecated • {verify.total_unverified_no_key} unverified</div></> : <span style={{ fontSize: 12 }}>loading / no data</span>}</div>
+        <div className="card"><h3>Requests</h3><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.logs?.total ?? stats?.requests ?? 0}</div><div style={{ fontSize: 12, color: "#666" }}>avg {stats?.logs?.avgLatencyMs ?? 0}ms • {Math.round((stats?.logs?.errorRate || 0) * 100)}% err • {Object.keys(stats?.logs?.byProvider || {}).length} providers</div></div>
+        <div className="card" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}><h3>Tokens</h3><div style={{ fontSize: 22, fontWeight: 700, color: "#166534" }}>{(stats?.logs?.allTimeTokens ?? 0).toLocaleString()}<span style={{ fontSize: 12, color: "#666", marginLeft: 4 }}>total</span></div><div style={{ fontSize: 11, color: "#666" }}>{(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt • {(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion • avg {stats?.logs?.avgTokens ?? 0}/req (last 100)</div><div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>All-time tokens</div></div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
@@ -93,13 +94,28 @@ export default function Dashboard() {
           ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có verify data</p>}
         </div>
         <div className="card">
-          <h3>Recent Logs (5)</h3>
+          <h3>Recent Logs (5) — tokens</h3>
           {recent.length === 0 ? <p style={{ fontSize: 13, color: "#888" }}>Chưa có request nào — thử gọi <code>POST /v1/chat/completions</code></p> : (
-            <table><thead><tr><th>Time</th><th>Provider</th><th>Model</th><th>MS</th><th>Status</th></tr></thead>
-              <tbody>{recent.map((l) => <tr key={l.id}><td style={{ fontSize: 12 }}>{new Date(l.timestamp).toLocaleTimeString()}</td><td><code>{l.provider}</code></td><td style={{ fontSize: 12 }}>{l.model}</td><td>{l.latencyMs}</td><td>{l.status === 200 ? "✅" : "❌"} {l.status}</td></tr>)}</tbody>
+            <table><thead><tr><th>Time</th><th>Provider</th><th>Model</th><th>Tokens</th><th>MS</th><th>Status</th></tr></thead>
+              <tbody>{recent.map((l) => <tr key={l.id}><td style={{ fontSize: 12 }}>{new Date(l.timestamp).toLocaleTimeString()}</td><td><code>{l.provider}</code></td><td style={{ fontSize: 11 }}>{l.model.split("/").pop()}</td><td style={{ fontSize: 11 }}>{l.totalTokens ?? "-"}<span style={{ color: "#888" }}> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td><td>{l.latencyMs}</td><td>{l.status === 200 ? "✅" : "❌"} {l.status}</td></tr>)}</tbody>
             </table>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>Tokens by Provider (last 100)</h3>
+        {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="tokens" fill="#9333ea" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data — gọi API để có tokens</p>}
       </div>
 
       <div className="card">

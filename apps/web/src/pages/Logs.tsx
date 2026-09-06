@@ -54,44 +54,61 @@ export default function Logs() {
   return (
     <div>
       <h2>Logs & Stats</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <button onClick={load}>Refresh</button>
         <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white" }}>{live ? "● Live ON" : "Live OFF"}</button>
-        <span style={{ fontSize: 12, color: "#666", alignSelf: "center" }}>{stats?.logs?.total ?? 0} total • avg {stats?.logs?.avgLatencyMs ?? 0}ms • {Math.round((stats?.logs?.errorRate || 0) * 100)}% errors</span>
+        <span style={{ fontSize: 12, color: "#666", alignSelf: "center" }}>{stats?.logs?.total ?? 0} total • {stats?.logs?.allTimeTokens?.toLocaleString() ?? 0} tokens all-time • avg {stats?.logs?.avgLatencyMs ?? 0}ms/{stats?.logs?.avgTokens ?? 0} tok • {Math.round((stats?.logs?.errorRate || 0) * 100)}% err</span>
       </div>
       {stats && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-          <div className="card">
-            <h3>Requests by Provider</h3>
-            {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#2563eb" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div className="card">
+              <h3>Requests by Provider</h3>
+              {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#2563eb" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+            </div>
+            <div className="card">
+              <h3>Tokens by Provider (last 100)</h3>
+              {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="tokens" fill="#9333ea" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+            </div>
+            <div className="card">
+              <h3>Status Distribution</h3>
+              {stats?.logs?.total > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={[
+                      { name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) },
+                      { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) },
+                    ]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                      <Cell fill="#16a34a" /><Cell fill="#dc2626" />
+                    </Pie>
+                    <Tooltip /><Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+            </div>
           </div>
-          <div className="card">
-            <h3>Status Distribution</h3>
-            {stats?.logs?.total > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={[
-                    { name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) },
-                    { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) },
-                  ]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
-                    <Cell fill="#16a34a" /><Cell fill="#dc2626" />
-                  </Pie>
-                  <Tooltip /><Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
-          </div>
-        </div>
+          <div className="card" style={{ fontSize: 12, marginBottom: 12 }}><b>Tokens:</b> {(stats.logs.totalTokens ?? 0).toLocaleString()} last 100 ({(stats.logs.promptTokens ?? 0).toLocaleString()} prompt + {(stats.logs.completionTokens ?? 0).toLocaleString()} completion, avg {stats.logs.avgTokens ?? 0}/req) • <b>All-time:</b> {(stats.logs.allTimeTokens ?? 0).toLocaleString()} • <b>By provider:</b> {Object.entries(stats.logs.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}</div>
+        </>
       )}
       {stats?.logs?.byProvider && <div className="card" style={{ fontSize: 12 }}><b>By provider (last 100):</b> {Object.entries(stats.logs.byProvider).map(([k, v]) => `${k}:${v}`).join(" • ") || "—"}</div>}
       <table>
