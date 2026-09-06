@@ -1,3 +1,5 @@
+> **English** | [🇻🇳 Tiếng Việt](../vi/ROADMAP.md) | [Docs Index](../README.md)
+
 # Roadmap
 
 Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.

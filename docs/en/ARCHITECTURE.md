@@ -1,3 +1,5 @@
+> **English** | [🇻🇳 Tiếng Việt](../vi/ARCHITECTURE.md) | [Docs Index](../README.md)
+
 # Kiến trúc (Architecture)
 
 Tài liệu này mô tả kiến trúc chi tiết của `app-auto-llm-free` — gateway thống nhất cho LLM free (30 freellms + 13 alias = 43 ids, 324 models từ freellms.org + alias).

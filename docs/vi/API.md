@@ -1,3 +1,5 @@
+> **Tiếng Việt** | [🇬🇧 English](../en/API.md) | [Docs Index](../README.md)
+
 # API Reference
 
 OpenAI-compatible API của gateway (43 provider ids — 30 freellms + 13 alias, 324 models — 316 freellms + 8 alias/persisted). Dùng trực tiếp với `openai` SDK hoặc `curl`.

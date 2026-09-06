@@ -1,3 +1,5 @@
+> **English** | [🇻🇳 Tiếng Việt](../vi/DEPLOYMENT.md) | [Docs Index](../README.md)
+
 # Triển khai (Deployment)
 
 > Nav **Providers trước Models** (sticky), Dashboard 4 cards + 3 charts + tokens, `lib/paths.ts` fix 7→316 cho `cwd=apps/gateway`.

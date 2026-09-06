@@ -1,3 +1,5 @@
+> **English** | [🇻🇳 Tiếng Việt](../vi/PROVIDERS.md) | [Docs Index](../README.md)
+
 # Providers
 
 > **Nguồn chính: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 ids.**  

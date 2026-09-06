@@ -1,3 +1,5 @@
+> **English** | [🇻🇳 Tiếng Việt](../vi/GETTING_STARTED.md) | [Docs Index](../README.md)
+
 # Bắt đầu cho người mới (5 phút)
 
 > Dành cho bạn lần đầu chạy gateway — không cần biết code, chỉ cần copy lệnh.
