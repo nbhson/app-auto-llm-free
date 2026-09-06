@@ -14,11 +14,11 @@
 |------|----------|
 | **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — dùng trực tiếp với OpenAI SDK |
 | **Provider Hybrid (30)** | **Permanent Free**: NVIDIA NIM (97), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), SambaNova, SiliconFlow, Groq (7), Cerebras (5), Z AI, Agnes, Aion, LLM7, Chutes, Glhf… <br> **Quota**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4) <br> **Scraped**: Pollinations, LLM7.io, Ollama Cloud (3 free) — Nguồn: freellms.org (316 free models) |
-| **Smart Routing** | Round-robin, tiered fallback (4 tiers freellms), alias (`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router` |
-| **Resilience** | Auto fallback khi 429/timeout, circuit breaker, mid-stream SSE error handling, pre-flight TPM/TPD check |
-| **Key Pool** | Nhiều key/provider, AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` với scope model/provider |
-| **Dashboard** | Quản lý keys, usage, logs SSE, health check 1-click, model catalog **316 free** + score/verified/limit |
-| **Observability** | Pino log, OTel GenAI, token estimator, request DB với BRIN index |
+| **Smart Routing** | Tiered 15 (real key → public free), alias (`auto`/`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router`, skip `deprecated`/`quota`/`breaker` |
+| **Resilience** | Auto fallback 15 providers, circuit breaker 5/30s half-open, TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight |
+| **Key Pool** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, `rotate-keys.ts` |
+| **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (sticky, `providers` trước `models`), **Dashboard** 4 cards + 3 charts (byProvider/latency/verify) + tokens, **Providers** `Get Key ↗` + live health, **Models** 316 checkbox + `Check Live` + `Used/Limit`, **Keys** `fgk-...` CRUD + Key Generator (thay openssl) + Quick Test, **Logs** charts + SSE |
+| **Observability** | Pino pretty, OTel GenAI (`gen_ai.*`), token estimator, `request-log` 1000 + `X-Verified`, `PROVIDER_TEST_RESULTS` benchmark |
 
 ## 🏗️ Kiến trúc
 

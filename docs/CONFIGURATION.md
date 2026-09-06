@@ -110,7 +110,7 @@ Gateway `GET /v1/models` đọc `data/freellms-models-free.json:1` (316 rows), `
 | OpenRouter | — | 200 free | — | — |
 | Kilo Code | ~200/hr | — | — | `:free` suffix |
 
-Lưu trong `models.yaml:1` field `limit` và `apps/gateway/src/lib/quota-tracker.ts` (P3 sẽ enforce).
+Lưu trong `models.yaml:1` `limit` + `apps/gateway/src/lib/quota-tracker.ts` enforce. Token usage `allTimeTokens` + `tokensByProvider` từ `lib/request-log.ts:1` hiện Dashboard 4th card + Logs charts (recharts).
 
 Trong `virtual_keys` table:
 

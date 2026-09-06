@@ -1,8 +1,9 @@
 # Providers
 
-> **Nguồn chính: freellms.org (scan 2026-09-06) — 30 providers, 316 free models.**  
-> Chi tiết đầy đủ: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`  
-> Gateway `apps/gateway/src/providers/registry.ts:1` đã tích hợp đủ 30 providers, `models.yaml:1` đã sync 316 free.
+> **Nguồn chính: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 40 ids.**  
+> Dashboard nav **Providers (30) trước Models (316)**. Cột **Get Key ↗** (console trực tiếp + freellms ↗) trong `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs).
+> Chi tiết: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`  
+> Gateway `apps/gateway/src/providers/registry.ts:1` 40 ids (30 slugs + alias), `models.yaml:1` 316 free, `lib/paths.ts:1` fix 7→316 bug.
 
 ## 1. Tổng quan freellms.org
 
@@ -129,8 +130,11 @@ curl http://localhost:8080/v1/chat/completions \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-## 6. Health Check
+## 6. Health Check (live)
 
-`GET /api/providers` — trả `detailed[]` với `free_models`, `keys`, `status` từ freellms + config  
-`GET /api/providers/health` — stub P3 sẽ ping tất cả 30 providers  
-`GET /api/stats` — `providers: 30`, `free_models: 316`
+* `GET /api/providers` — `detailed[]` với `free_models`, `keys`, `status`, **Get Key ↗** (link console) + freellms ↗
+* `GET /api/providers/health` — live ping 40 providers parallel 5s (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
+* `GET /api/models/health?model=pollinations/openai` — probe chat 1 model (`usable` 2457ms, `unusable 410 Gone`)
+* `GET /api/models/health?provider=nvidia-nim&limit=2` — bulk probe, summary `usable/unusable/no-key`
+* `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (từ logs) — biết model nào thực sự usable
+* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:40`, `free_models:316`, `breakers`

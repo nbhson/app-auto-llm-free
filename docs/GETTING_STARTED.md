@@ -50,7 +50,7 @@ docker compose logs -f gateway   # đợi thấy "🚀 Gateway listening on http
 curl http://localhost:8080/v1/health
 ```
 
-Mở Dashboard: **http://localhost:3000** — nhập `MASTER_KEY` vừa tạo vào ô góc phải (lưu vào localStorage).
+Mở Dashboard: **http://localhost:3000** — nhập `MASTER_KEY` vừa tạo vào ô **Master** góc phải header (lưu localStorage). Hoặc dùng Dashboard → **Key Generator** để tạo luôn (không cần `openssl`).
 
 ## 3. Cài đặt không Docker (Node)
 
@@ -148,13 +148,13 @@ Không có key → `auto` vẫn fallback tới `pollinations` (20b) sau ~10s và
 
 Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base URL**).
 
-## 7. Dashboard walkthrough
+## 7. Dashboard walkthrough (nav: Dashboard → Providers → Models → Keys → Logs)
 
-- **`/` Dashboard** — 3 số lớn: Providers 40, Verify 314/316, Requests. Dưới là health + recent logs (5).
-- **`/models`** — 316 free, filter `verified` (xanh verified, đỏ deprecated, vàng no-key), `provider` (vd `nvidia-nim`), limit. Dùng `?verified=free` để chỉ thấy tier thực sự free.
-- **`/providers`** — 30 dòng, `Free` số model, `Keys` (none/1 keys), **Live Health Check** 40 providers 5s, breaker `closed/open`.
-- **`/keys`** — CRUD `fgk-...`, nhập name/scopes/RPM → Create → copy key. Delete. `vk-master` là master.
-- **`/logs`** — Live SSE, `GET /api/logs?limit=100`, stats `byProvider`, `avgLatency`.
+- **`/` Dashboard** — 4 cards: Providers 40, Verify 314/316, Requests, **Tokens** (all-time + last 100 prompt/completion). Dưới là 3 charts: **Requests by Provider**, **Latency**, **Verify Pie** + Recent Logs (5) + **Tokens by Provider** bar. Header có `MASTER_KEY` input + `Key Generator` đã move sang **Keys**.
+- **`/providers`** — 30 dòng, `Free`, `Keys`, **Health** (`online`/`offline`/`no-key` + `breaker`), **Caps**, cột **Get Key ↗** (link thẳng console provider + freellms). Nút **Live Health Check** 40 providers 5s.
+- **`/models`** — 316 free, filter `id/provider` (vd `nvidia-nim`), `verified` (xanh/đỏ/vàng), **checkbox** per row + header chọn tất cả, **1 nút duy nhất** `Check Live (n)` cho các model đã tick (hiện `✅ usable 123ms`/`no-key`/`unusable 410`), cột **Used / Limit** (đếm từ logs vs `Up to 40 RPM`).
+- **`/keys`** — **Key Generator** (thay `openssl`) ở trên cùng (Generate `MASTER_KEY`/`ENCRYPTION_KEY` client-side), dưới là CRUD `fgk-...` (name/scopes/RPM) + **Quick Test** `curl` với `$FGK_KEY` (auto + `x-router: pollinations`).
+- **`/logs`** — 3 charts: **Requests by Provider** + **Tokens by Provider** + **Status Pie**, header `total • allTimeTokens • avg ms/tok`, table logs + Live SSE.
 
 ## 8. Lỗi thường gặp
 

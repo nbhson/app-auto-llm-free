@@ -141,18 +141,21 @@ Không cần auth, trả status gateway + provider pool.
 
 | Method | Path | Mô tả |
 |--------|------|-------|
-| `POST` | `/api/keys` | Tạo virtual key `fgk-...` |
-| `GET` | `/api/keys` | List keys (stub P4) |
+| `POST` | `/api/keys` | Tạo virtual key `fgk-...` (hash SHA256, scopes, RPM) |
+| `GET` | `/api/keys` | List keys + `requestCount` |
 | `DELETE` | `/api/keys/:id` | Xóa key |
-| `GET` | `/api/providers` | List providers + `detailed[]` (free_models, verified_free, keys, status, caps) |
-| `GET` | `/api/providers/health` | Test all keys (stub, P3 sẽ ping 30 providers) |
-| `GET` | `/api/stats` | QPS, latency, `free_models:316`, `providers:40` |
+| `GET` | `/api/providers` | List providers + `detailed[]` (free_models, keys, caps, `Get Key` URL) |
+| `GET` | `/api/providers/health` | Live ping 40 providers parallel 5s (online/offline/no-key, latency, breaker) |
+| `GET` | `/api/models/health?model=` | Probe **1 model** live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
+| `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models của provider (summary usable/unusable) |
+| `GET` | `/api/models/health/:id` | Probe 1 model full id (vd `nvidia-nim/z-ai/glm-5.2`) |
+| `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:40`, `free_models:316`, `breakers` |
 | `GET` | `/api/models/sync` | Freellms sync info (source, last_sync, script) |
-| `GET` | `/api/verify` | Full live verify report `data/verified-models.json` (316 rows, status per model) |
-| `GET` | `/api/verify/summary` | Summary nhanh (`total_verified_free`, `deprecated`, `unverified_no_key`, per-provider) |
-| `POST` | `/api/verify` | Trigger verify ngay `{dryRun:false}` → chạy `verifyFreeModels()` + save |
-| `GET` | `/api/logs` | Paginated logs (P4) |
-| `GET` | `/api/logs/stream` | SSE live logs (P4) |
+| `GET` | `/api/verify` | Full live verify `data/verified-models.json` (316 rows, `verified_free/deprecated`) |
+| `GET` | `/api/verify/summary` | Summary nhanh (per-provider) |
+| `POST` | `/api/verify` | Trigger verify `{dryRun:false}` |
+| `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
+| `GET` | `/api/logs/stream` | SSE live logs |
 
 **Tạo key**:
 

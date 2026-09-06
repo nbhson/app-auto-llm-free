@@ -1,8 +1,10 @@
 # Triển khai (Deployment)
 
+> Nav **Providers trước Models** (sticky), Dashboard 4 cards + 3 charts + tokens, `lib/paths.ts` fix 7→316 cho `cwd=apps/gateway`.
+
 ## 1. Docker Compose (khuyến nghị)
 
-Production-ready, gồm gateway + postgres + redis, kèm 24h verify scheduler.
+Production-ready, gồm gateway + postgres + redis, kèm 24h verify scheduler + `GET /api/models/health` per-model probe.
 
 ```yaml
 # docker-compose.yml

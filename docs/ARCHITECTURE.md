@@ -24,9 +24,10 @@ flowchart LR
 * **Gateway**: Hono app chạy trên Bun/Node/Cloudflare Workers (WinterCG). Multi-runtime, ultrafast RegExpRouter.
 * **Router**: Chọn provider pool dựa trên `model`, alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`), header `x-router`, tier fallback 4-tier freellms.
 * **Adapters**: Mỗi provider implement `Provider` interface. 30 providers freellms (NVIDIA 97, ModelScope 43, Cloudflare 35...) qua `createOpenAICompatibleProvider`, Gemini qua `format-translator`, Pollinations scraped.
-* **Dashboard**: Vite + React, gọi `/api/*`, hiển thị usage/logs/health, model catalog 316 với badge `verified_free`/`deprecated`/`unverified_no_key`.
-* **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify).
-* **Scheduler**: `jobs/scheduler.ts` chạy mỗi 24h (`SYNC_INTERVAL_MS`), so sánh freellms FREE vs live `/models` (xem `docs/OPERATIONS.md`).
+* **Dashboard**: Vite + React (recharts), 5 routes `Dashboard→Providers→Models→Keys→Logs` (sticky nav, `Providers` trước `Models`), `Dashboard` 4 cards + 3 charts (byProvider/latency/verify) + tokens, `Models` checkbox + `Check Live` + `Used/Limit`, `Providers` `Get Key ↗` + health, `Keys` Generator (thay openssl) + CRUD `fgk-...` + Quick Test, `Logs` charts + SSE.
+* **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify 314/316), `data/request-log.json` (1000 logs), `lib/paths.ts` resolve `data/` cho cả `cwd=root` và `cwd=apps/gateway`.
+* **Scheduler**: `jobs/scheduler.ts` 24h (`SYNC_INTERVAL_MS`), so sánh freellms FREE vs live `/models` + `jobs/probe-models.ts` chat probe per-model (`/api/models/health`).
+* **Token**: `lib/token-estimator.ts` char/4, `lib/request-log.ts` aggregation `allTimeTokens` + `tokensByProvider` cho Dashboard/Logs charts.
 
 Tham khảo: `free-llm-gateway` (24+ providers) và `OmniRoute` (271 providers, 90 free).
 
@@ -120,7 +121,7 @@ Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config
 
 Luồng sync: `scripts/sync-freellms.py` (Layer 1) → `jobs/verify-free.ts` probe `provider.models()` mỗi 24h (Layer 2, scheduler + `POST /api/verify`) → `GET /v1/models?verified=free` chỉ trả `verified_free`. Xem `docs/OPERATIONS.md:1`.
 
-## 8. Database
+## 8. Database & Files
 
 Drizzle ORM (`apps/gateway/src/db/schema.ts:1`):
 
@@ -129,10 +130,10 @@ users(id, email, password_hash, role)
 virtual_keys(id, prefix, hash, user_id, scopes JSON, rpm_limit, tpd_limit)
 provider_keys(id, provider, encrypted_key, status, last_checked_at)
 requests(id, virtual_key_id, provider, model, prompt_tokens, completion_tokens, latency, cost, status, created_at)
-providers_cache(provider, models JSON, synced_at) // cache verified
+providers_cache(provider, models JSON, synced_at)
 ```
 
-* SQLite (`better-sqlite3`/`Bun.SQL`) dev, Postgres (`pg`) prod, BRIN index time-ordered.
+* SQLite dev, Postgres prod, BRIN index. Runtime `data/virtual-keys.json` (hash), `data/request-log.json` (1000), `resolveDataPath` cho cả cwd.
 
 ## 9. Cấu trúc thư mục
 
@@ -140,25 +141,41 @@ providers_cache(provider, models JSON, synced_at) // cache verified
 .
 ├── apps/gateway/src/
 │   ├── index.ts              # serve + startScheduler()
-│   ├── app.ts                # Hono + cors + auth + routes
-│   ├── config.ts             # 30 providers keys + 4-tier fallback
-│   ├── providers/registry.ts # 40 ids, providerMeta, aliases
-│   ├── providers/openai-compatible.ts, gemini.ts, pollinations.ts
-│   ├── routes/v1/models.ts   # freellms 316 + verified filter
-│   ├── routes/v1/chat.ts     # tiered fallback + streaming
-│   ├── routes/api.ts         # /providers (detailed), /verify, /stats
-│   ├── jobs/verify-free.ts   # live probe 24h
-│   ├── jobs/scheduler.ts     # setInterval 86400000
-│   └── middleware/logger.ts
-├── apps/web/src/             # Vite React Dashboard
-├── data/*.json               # freellms + verified
+│   ├── app.ts                # Hono + secureHeaders + cors + auth + virtualKeyRateLimit
+│   ├── config.ts             # 30 providers keys + 4-tier fallback + SYNC_INTERVAL_MS
+│   ├── lib/paths.ts          # resolveDataPath (fix 7 vs 316 bug)
+│   ├── lib/key-manager.ts    # AES-GCM + round-robin + markRateLimited
+│   ├── lib/quota-tracker.ts  # FREELLMS_LIMITS RPM/TPM
+│   ├── lib/circuit-breaker.ts# 5/30s half-open
+│   ├── lib/token-estimator.ts# char/4
+│   ├── lib/virtual-keys.ts   # fgk- CRUD + hasScope
+│   ├── lib/request-log.ts    # 1000 logs + tokens aggregation
+│   ├── lib/otel.ts           # GenAI OTel
+│   ├── lib/gemini-stream.ts  # Gemini SSE → OpenAI
+│   ├── providers/registry.ts # 40 ids, providerMeta, auto 15-tier (real key → public)
+│   ├── jobs/verify-free.ts   # freellms vs live /models
+│   ├── jobs/probe-models.ts  # chat probe per-model usable
+│   ├── jobs/scheduler.ts     # 24h
+│   ├── routes/v1/models.ts   # freellms 316 + checkbox + Used/Limit + pollinations fallback
+│   ├── routes/v1/chat.ts     # quota/breaker/verified/log + X-Verified
+│   └── routes/api.ts         # /providers/health live, /models/health, /verify, /keys, /logs/stream, /stats
+├── apps/web/src/
+│   ├── main.tsx              # sticky nav Dashboard→Providers→Models→Keys→Logs
+│   ├── pages/Dashboard.tsx   # 4 cards + 3 charts + tokens
+│   ├── pages/Providers.tsx   # Get Key ↗ + health
+│   ├── pages/Models.tsx      # checkbox + single Check Live + Used/Limit
+│   ├── pages/Keys.tsx        # Key Generator + CRUD + Quick Test
+│   ├── pages/Logs.tsx        # charts + SSE
+│   ├── lib/getKeyUrls.ts     # 30 console URLs
+│   └── index.css             # unified card/button/table (nav style)
+├── data/*.json               # freellms + verified + benchmark
 ├── models.yaml               # 316 free
-├── scripts/sync-freellms.py  # freellms fetcher
+├── scripts/sync-freellms.py, benchmark.ts, rotate-keys.ts
 └── .github/workflows/sync-freellms.yml # daily 02:00 UTC
 ```
 
 ## 10. Observability & Deploy
 
-* `pino` logger, OTel GenAI (Hebo style).
-* `GET /api/stats` — providers 40, free_models 316, uptime; `GET /api/verify/summary` — verified/deprecated.
-* Docker Compose (gateway+postgres+redis) primary; Cloudflare Workers secondary (KV). Xem `docs/DEPLOYMENT.md:1`.
+* `pino` pretty dev / JSON prod, OTel GenAI (`lib/otel.ts`), `secureHeaders`, `bodyLimit` 10MB.
+* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens` + `GET /api/verify/summary` + `GET /api/models/health` chat probe.
+* Docker prod non-root + HEALTHCHECK, Wrangler `wrangler.jsonc` Cloudflare. Xem `docs/DEPLOYMENT.md:1`.

@@ -71,15 +71,18 @@ DISABLE_SCHEDULER=0   # đặt 1 để tắt
 
 | Method | Path | Mô tả |
 |--------|------|-------|
-| `GET` | `/v1/models?verified=free` | Chỉ trả models `verified_free` |
+| `GET` | `/v1/models?verified=free` | Chỉ trả models `verified_free` (316 vs 7 bug fix `lib/paths.ts`) |
 | `GET` | `/v1/models?verified=deprecated` | Chỉ deprecated |
 | `GET` | `/v1/models?verified=unverified` | Chỉ unverified |
-| `GET` | `/v1/models?provider=nvidia-nim` | Filter theo provider |
+| `GET` | `/v1/models?provider=nvidia-nim` | Filter theo provider (đã bỏ ô riêng, dùng filter đầu tiên `Filter id/provider...`) |
+| `GET` | `/api/models/health?model=` | Probe 1 model chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
+| `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
 | `GET` | `/api/verify` | Full report `verified-models.json` |
 | `GET` | `/api/verify/summary` | Summary nhanh |
 | `POST` | `/api/verify` | Trigger verify ngay (body `{dryRun: false}`), cần master key |
-| `GET` | `/api/providers` | `detailed[]` có `free_models`, `verified_free`, `status` |
-| `GET` | `/api/stats` | `free_models`, `providers`, `freellms_providers` |
+| `GET` | `/api/providers` | `detailed[]` có `free_models`, `keys`, `Get Key` URL, `status` |
+| `GET` | `/api/providers/health` | Live ping 40 providers 5s |
+| `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `free_models:316`, `breakers` |
 
 Ví dụ:
 

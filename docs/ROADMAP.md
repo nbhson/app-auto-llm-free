@@ -49,16 +49,15 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 - [x] Dashboard Vite — `main.tsx` masterKey input, 5 routes: `/` Dashboard (providers 40, verify 314/316, requests avg ms, recent logs), `/models` 316 + filter `verified` + badge xanh/đỏ/vàng, `/providers` detailed + live health check, `/keys` CRUD `fgk-...` với scopes, `/logs` live SSE + polling
 - [x] Test e2e: `POST /api/keys` master → `fgk-...`, `GET /api/keys` list 3, `POST /v1/chat/completions` pollinations với virtual key → `gpt-oss-20b`, scope violation `nvidia-nim` → 403, RPM 2 → 429 `Virtual key RPM limit 2 exceeded`, logs SSE, stats `byProvider`
 
-## P5 — Hardening & Deploy (2 ngày) ✅ Done 2026-09-06 (P5.1)
+## P5 — Hardening & Deploy (2 ngày) ✅ Done 2026-09-06 (P5.1) + polish 2026-09-06
 
-- [x] `scripts/rotate-keys.ts` — AES-256-GCM re-encrypt (OLD_KEY/NEW_KEY, `openssl rand -hex 32`), `MASTER_KEY` bootstrap docs
-- [x] `lib/otel.ts` — GenAI OTel semantic conventions (`gen_ai.system/request.model/usage`, `trace_id`, `duration_ms`), `otelEnabled()` check `OTEL_EXPORTER_OTLP_ENDPOINT`, `withTrace` helper, `pino` pretty dev / JSON prod
-- [x] `app.ts` — `secureHeaders()` (Hono), `cors` `maxAge 86400`, `bodyLimit` 10MB (đã có), `virtualKeyRateLimit` + `quota-tracker` + `circuit-breaker` hardening
-- [x] `apps/gateway/Dockerfile` — multi-stage cache deps → build → prod (non-root `app`, `HEALTHCHECK 30s`, `chown`, copy `data` + `models.yaml`)
-- [x] `apps/gateway/wrangler.jsonc` — Cloudflare Workers preset (WinterCG, `nodejs_compat`, `RATE_LIMIT_KV`, `SYNC_INTERVAL_MS`, `crons 0 2 * * *`)
-- [x] `scripts/benchmark.ts` — health 40 + chat pollinations latency + models/verified, `data/benchmark.json` + `PROVIDER_TEST_RESULTS.md` (online 13/offline 25, chat 1539ms, verified 314/316)
-- [x] `SECURITY.md` — encryption at rest, virtual keys hash, master rotate, rate-limit 2-layer, breaker, secureHeaders, CORS, logs, OTel, rotation checklist, hardening checklist prod
-- [x] `PROVIDER_TEST_RESULTS.md` — generated 2026-09-06T08:26 (health summary, chat latency, models, providers table, verified json)
+- [x] `scripts/rotate-keys.ts` — AES re-encrypt (OLD/NEW), `MASTER_KEY` bootstrap
+- [x] `lib/otel.ts` — GenAI OTel, `app.ts` `secureHeaders` + `cors maxAge 86400` + `bodyLimit` 10MB + rate-limit hardening
+- [x] `apps/gateway/Dockerfile` prod non-root + HEALTHCHECK + `lib/paths.ts` fix 7→316 (cwd root vs apps/gateway) + `data/verified-models.json` 320
+- [x] `apps/gateway/wrangler.jsonc` Cloudflare Workers preset
+- [x] `scripts/benchmark.ts` + `PROVIDER_TEST_RESULTS.md` (online 13/offline 25, chat 1539ms, verified 314/316)
+- [x] `SECURITY.md` hardening checklist
+- [x] Web polish: nav sticky Providers→Models (swap), Dashboard Key Generator move to `/keys`, Quick Test move to `/keys`, Models checkbox + single `Check Live` + `Used/Limit`, `index.css` unified card/button/table (nav style), charts + token (Dashboard 4th card + Logs 630kb recharts), `PROVIDER_TEST_RESULTS` + `benchmark`
 
 ## Sau MVP (Backlog)
 
