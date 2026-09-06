@@ -1,0 +1,170 @@
+# app-auto-llm-free
+
+> **Một endpoint duy nhất cho mọi LLM miễn phí.** Tương tự OmniRoute / 9Router / FreeLLMAPI — tự host, OpenAI-compatible, gom toàn bộ provider & model free vào một gateway.
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Stack: Hono + Bun](https://img.shields.io/badge/Stack-Hono%20%2B%20Bun-orange)](https://hono.dev)
+[![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/API.md)
+
+---
+
+## ✨ Tính năng
+
+| Nhóm | Chi tiết |
+|------|----------|
+| **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — dùng trực tiếp với OpenAI SDK |
+| **Provider Hybrid** | **Chính thống free tier**: Groq, Cerebras, Together, Gemini, Mistral, Cohere, Nvidia, Cloudflare, HuggingFace, GitHub Models, SiliconFlow, SambaNova, Chutes, Novita... <br> **Scraped/unlimited**: Pollinations, Puter, LLM7, Ollama Cloud... |
+| **Smart Routing** | Round-robin, tiered fallback, latency-aware, alias (`gpt-4` → best free), header `x-router` để pin provider |
+| **Resilience** | Auto fallback khi 429/timeout, circuit breaker, mid-stream SSE error handling, pre-flight TPM/TPD check |
+| **Key Pool** | Nhiều key/provider, AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` với scope model/provider |
+| **Dashboard** | Quản lý keys, usage, logs SSE, health check 1-click, model catalog 260+ models |
+| **Observability** | Pino log, OTel GenAI, token estimator, request DB với BRIN index |
+
+## 🏗️ Kiến trúc
+
+```
+Client (OpenAI SDK / Vercel AI SDK) 
+  → Hono Gateway (Bun/Node/Cloudflare Workers)
+    → Middleware: auth, rate-limit, body-limit, logger
+    → Smart Router (model → provider pool)
+    → Provider Adapters (OpenAI/Gemini/Anthropic/Scraped) + format-translator
+    → Fallback + Retry + Circuit Breaker
+    → Normalizer → OpenAI SSE/JSON
+  → Dashboard (Vite + React) → /api/* → Drizzle ORM → SQLite/Postgres + Redis
+```
+
+Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+## 🚀 Quick Start
+
+### Yêu cầu
+- Bun >= 1.1 hoặc Node >= 20
+- Docker (khuyến nghị) hoặc Redis + Postgres/SQLite
+
+### 1. Clone & cài đặt
+
+```bash
+git clone https://github.com/nbhson/app-auto-llm-free.git
+cd app-auto-llm-free
+cp .env.example .env
+# điền API keys free tier của bạn vào .env
+```
+
+### 2. Chạy với Docker (khuyến nghị)
+
+```bash
+docker compose up -d
+# Gateway: http://localhost:8080
+# Dashboard: http://localhost:3000
+# Docs: http://localhost:8080/docs
+```
+
+### 3. Chạy dev local
+
+```bash
+bun install
+bun run dev:gateway   # Hono @ http://localhost:8080
+bun run dev:web       # Vite @ http://localhost:5173
+```
+
+### 4. Gọi API (OpenAI SDK)
+
+```ts
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "http://localhost:8080/v1",
+  apiKey: "fgk-your-virtual-key", // tạo trong Dashboard /api/keys
+});
+
+const res = await client.chat.completions.create({
+  model: "auto", // hoặc "gpt-4", "gemini-1.5-flash", "llama-3.3-70b"
+  messages: [{ role: "user", content: "Hello free gateway!" }],
+  stream: false,
+});
+console.log(res.choices[0].message.content);
+
+// Streaming
+const stream = await client.chat.completions.create({
+  model: "auto",
+  messages: [{ role: "user", content: "Write a poem" }],
+  stream: true,
+});
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+Hoặc `curl`:
+
+```bash
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer fgk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":false}'
+
+curl http://localhost:8080/v1/models \
+  -H "Authorization: Bearer fgk-xxx"
+```
+
+## ⚙️ Cấu hình
+
+Xem [.env.example](.env.example) và [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+```env
+# Gateway
+PORT=8080
+DATABASE_URL=file:./data.db          # hoặc postgres://...
+REDIS_URL=redis://localhost:6379
+MASTER_KEY=fgk-master-xxx
+ENCRYPTION_KEY=32bytes-hex...
+
+# Provider keys (pool, phân tách bằng dấu phẩy để round-robin)
+GROQ_API_KEYS=gsk_xxx,gsk_yyy
+GEMINI_API_KEYS=AIza_xxx,AIza_yyy
+CEREBRAS_API_KEYS=csk_xxx
+# ... xem .env.example đầy đủ
+```
+
+Tạo virtual key:
+
+```bash
+curl -X POST http://localhost:8080/api/keys \
+  -H "Authorization: Bearer fgk-master-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
+```
+
+## 📚 Tài liệu
+
+| Tài liệu | Mô tả |
+|----------|-------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Chi tiết kiến trúc, luồng request, provider interface |
+| [PROVIDERS.md](docs/PROVIDERS.md) | Danh sách 24+ providers, free tier limits, cách thêm provider mới |
+| [API.md](docs/API.md) | Đặc tả OpenAI-compatible endpoints, alias, streaming, error codes |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Biến môi trường, models.yaml, rate limit |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker, Cloudflare Workers, Vercel, bare metal |
+| [ROADMAP.md](docs/ROADMAP.md) | Lộ trình P1→P5, milestones |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Quy trình đóng góp |
+
+## 🗺️ Roadmap
+
+- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker
+- [ ] **P2 Gateway Core** — 4 adapters đầu + chat/completions streaming
+- [ ] **P3 Resilience** — key-manager, quota-tracker, fallback, circuit breaker
+- [ ] **P4 Auth + Dashboard** — virtual keys, logs, health check
+- [ ] **P5 Hardening** — AES rotation, OTel, deploy presets, benchmark
+
+Chi tiết [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## 🤝 Đóng góp
+
+PRs welcome! Xem [CONTRIBUTING.md](CONTRIBUTING.md). Vui lòng chạy `bun run lint` + `bun run test` trước khi push.
+
+## 📜 License
+
+Apache-2.0 — xem [LICENSE](LICENSE).
+
+---
+
+**Tham khảo**: [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (271 providers), [9Router](https://github.com/decolua/9router), [Free LLM Gateway](https://github.com/MrFadiAi/free-llm-gateway) (24+ providers), [LiteLLM](https://github.com/BerriAI/litellm), [Hebo Gateway](https://github.com/8monkey-ai/hebo-gateway).

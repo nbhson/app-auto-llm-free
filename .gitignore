@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build
+dist/
+build/
+.next/
+out/
+.drizzle/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+data.db
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+bun.lockb
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache
+.turbo/
+.cache/
+coverage/
+.nyc_output/
+
+# Wrangler
+.wrangler/
+.dev.vars
+
+# Docker
+pgdata/
+redisdata/
