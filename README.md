@@ -157,8 +157,8 @@ curl -X POST http://localhost:8080/api/keys \
 
 - [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (30 providers, 316 models registry)
 - [x] **Freellms Sync** — Scan freellms.org, `data/*.json` + `models.yaml` (316 free) + `scripts/sync-freellms.py`
-- [x] **P2 Gateway Core** ✅ Done 2026-09-06 — 30 adapters, streaming SSE (Gemini `alt=sse` → OpenAI), tool calling, `auto` 15-tier fallback → pollinations live, `x-router` pin
-- [ ] **P3 Resilience** — key-manager, quota-tracker (15 RPM Gemini / 40 RPM NVIDIA v.v.), circuit breaker, health live 30
+- [x] **P2 Gateway Core** ✅ Done 2026-09-06 — 30 adapters, streaming SSE (Gemini `alt=sse` → OpenAI), tool calling, `auto` 15-tier → pollinations live, `x-router` pin
+- [x] **P3 Resilience** ✅ Done 2026-09-06 — key-manager AES-GCM, quota RPM/TPM (NVIDIA 40/Groq 30/Cerebras 15/1M), breaker 5/30s, `GET /api/providers/health` live 40, `X-Verified` + deprecated skip
 - [ ] **P4 Auth + Dashboard** — virtual keys, logs, model catalog 316 với filter verified
 - [ ] **P5 Hardening** — AES rotation, OTel, deploy presets, benchmark
 

@@ -12,18 +12,20 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 - **Scheduler**: `jobs/scheduler.ts` `SYNC_INTERVAL_MS=86400000` (24h), auto verify sau 5s nếu stale, `DISABLE_SCHEDULER` flag, `src/index.ts` startScheduler
 - **GitHub Actions**: `.github/workflows/sync-freellms.yml` daily 02:00 UTC — sync + verify + auto-commit
 - **Docs**: `ARCHITECTURE.md` (30 providers, 316, scheduler), `API.md` (verified filters, /api/verify), `PROVIDERS.md` (30 bảng baseUrls), `FREELLMS_FREE_TIER.md` (ranking, 316), `OPERATIONS.md` (2-layer sync), `CONFIGURATION.md` (30 envs + tiers + rate limits), `DEPLOYMENT.md` (scheduler + cron), `ROADMAP.md` (P1 done + verify)
-- **Gateway**: `models` route freellms + verified annotate, `api` route detailed + stats, `openai-compatible` allow no-key cho public providers
+- **Gateway**: `models` route freellms + verified annotate, `api` route detailed + stats, `openai-compatible` allow no-key
+- **P2 Gateway Core**: 30 adapters, streaming SSE (Gemini `alt=sse` → OpenAI), tool calling, `auto` 15-tier fallback → pollinations live (10.3s), `x-router` pin, `models` pollinations fallback, e2e pollinations (gpt-oss-20b) non-stream/stream
+- **P3 Resilience**: `key-manager.ts` AES-256-GCM + round-robin + `markRateLimited`, `token-estimator.ts` char/4, `quota-tracker.ts` FREELLMS_LIMITS RPM/TPM + `checkQuota/recordUsage`, `circuit-breaker.ts` 5/30s half-open, chat integration (quota pre-check, breaker skip, deprecated skip, `X-Verified`), `GET /api/providers/health` live parallel 5s (online 13/offline 25)
 
 ### Changed
 - `config.ts` hỗ trợ 30 providers keys + 4-tier default
-- `openai-compatible.ts` cho phép fetch không cần key cho public providers (llm7, huggingface)
-- `README.md` cập nhật 30 providers / 316 models / docs links / roadmap
+- `openai-compatible.ts` resolve `{account_id}`, model after first slash, allow no-key, forward full fields
+- `gemini.ts` sanitize + `alt=sse` + `gemini-stream.ts`
+- `router.ts` `ALLOW_NO_KEY`, `auto` 15-tier, `isPublicProvider`
+- `README.md` cập nhật 30 providers / 316 models / P2+P3 done
 
 ### Planned
-- P2 Gateway Core: streaming thực + tool calling (adapters đã có stub)
-- P3 Resilience: key-manager quota-tracker skip deprecated, health live 30
-- P4 Dashboard: model catalog 316 với badge verified/deprecated
-- P5 Hardening: benchmark verified
+- P4 Dashboard: model catalog 316 với badge verified/deprecated, virtual keys `fgk-...`
+- P5 Hardening: benchmark verified, OTel, Cloudflare deploy
 
 ## [0.2.0] - 2026-09-06
 

@@ -49,13 +49,64 @@ apiRoute.get("/providers", (c) => {
 });
 
 apiRoute.get("/providers/health", async (c) => {
-  return c.json({
-    status: "stub",
-    message: "Health check will ping each provider in P3 — now shows registry from freellms scan",
-    providers: providerIds.map((id) => {
+  const { providers } = await import("../providers/registry.js");
+  const { getAllStates } = await import("../lib/circuit-breaker.js");
+  const breakers = getAllStates() as Record<string, any>;
+  const results: any[] = [];
+  const timeoutMs = 5000;
+
+  await Promise.all(
+    providerIds.map(async (id) => {
       const keys = config.providerKeys[id] || [];
-      return { id, status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key", keys: keys.length };
-    }),
+      const hasKey = keys.length > 0;
+      const isPublic = ["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat"].includes(id);
+      if (!hasKey && !isPublic) {
+        results.push({ id, status: "no-key", keys: 0, latency_ms: 0, breaker: breakers[id]?.state || "closed" });
+        return;
+      }
+      const key = keys[0] || "";
+      const provider = (providers as any)[id];
+      if (!provider) {
+        results.push({ id, status: "unknown", error: "no provider" });
+        return;
+      }
+      const start = Date.now();
+      try {
+        const ok = await Promise.race([
+          provider.health(key),
+          new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
+        ]);
+        const latency = Date.now() - start;
+        results.push({
+          id,
+          status: ok ? "online" : "offline",
+          keys: keys.length,
+          latency_ms: latency,
+          breaker: breakers[id]?.state || "closed",
+          failures: breakers[id]?.failures || 0,
+        });
+      } catch (e: any) {
+        results.push({ id, status: "error", keys: keys.length, latency_ms: Date.now() - start, error: e.message, breaker: breakers[id]?.state || "closed" });
+      }
+    })
+  );
+
+  // Sort by status
+  results.sort((a, b) => a.id.localeCompare(b.id));
+
+  const summary = {
+    total: results.length,
+    online: results.filter((r) => r.status === "online").length,
+    offline: results.filter((r) => r.status === "offline").length,
+    no_key: results.filter((r) => r.status === "no-key").length,
+    open_breaker: results.filter((r) => r.breaker === "open").length,
+  };
+
+  return c.json({
+    status: "live",
+    generated_at: new Date().toISOString(),
+    summary,
+    providers: results,
   });
 });
 

@@ -29,15 +29,16 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 - [x] Test e2e live: `pollinations/openai` non-stream (Hello → gpt-oss-20b), streaming (haiku SSE), `auto` fallback 15 tiers → pollinations (10.3s, mock removed), `x-router` pin, tool calling (pollinations 402 expected, non-tool 200)
 - [x] `npm run build` ok, `tsc` ok
 
-## P3 — Resilience (2-3 ngày)
+## P3 — Resilience (2-3 ngày) ✅ Done 2026-09-06 (P3.1)
 
-- [ ] `key-manager.ts` (round-robin, AES-256-GCM, skip rate-limited, `Retry-After`)
-- [ ] `quota-tracker.ts` + `rate-tracker.ts` (RPM/RPD/TPM/TPD rolling window, Redis) — dùng `limit` từ `models.yaml:1` (NVIDIA 40 RPM, Groq 30/14.4K, Cerebras 15/1M TPD v.v.)
-- [ ] `smart-router.ts` + `router.ts` (round-robin, tiered 4-tier, alias 12 keys) — đã có cơ bản, cần gắn verified filter
-- [ ] `token-estimator.ts` (js-tiktoken pre-flight)
-- [ ] Circuit breaker (5 fails/30s) + tiered fallback đã có stub, cần test với 30 providers
-- [ ] `GET /api/providers/health` live ping 30 providers (hiện stub) + cron scheduler đã có
-- [ ] `verify-free` gắn vào `quota-tracker` để skip `deprecated` trong routing
+- [x] `lib/key-manager.ts` — AES-256-GCM `encrypt/decrypt` (iv:tag:ciphertext), round-robin + `getNextKeyManaged`, `markRateLimited` (Retry-After), `markSuccess`, `getKeyStats`, `ALLOW_NO_KEY` public (pollinations/llm7/huggingface)
+- [x] `lib/token-estimator.ts` — char/4 heuristic, `estimateMessagesTokens`, `estimateChatTokens` (prompt/completion)
+- [x] `lib/quota-tracker.ts` — `FREELLMS_LIMITS` (NVIDIA 40, Groq 30/14.4K, Cerebras 15/1M TPD, Gemini 15/1.5K, OVH 2 anon, Agnes 30, OpenRouter 200, Kilo ~200/hr, pollinations 60), RPM/TPM 60s window, `checkQuota` + `recordUsage`
+- [x] `lib/circuit-breaker.ts` — `recordSuccess/Failure`, `isOpen` (threshold 5, cooldown 30s), half-open trial, `getAllStates`
+- [x] `lib/router.ts` — `getProvidersForRequest` tiered 15 + `isPublicProvider`, verified filter (skip `deprecated` per `verified-models.json`)
+- [x] `routes/v1/chat.ts` — quota pre-check (`estimateChatTokens` → `checkQuota`), circuit `isOpen` skip, `markRateLimited` on 429, `recordSuccess/Failure`, `recordUsage`, `X-Verified` header, mock fallback dev
+- [x] `routes/api.ts` — `GET /api/providers/health` live ping 40 providers parallel 5s timeout, latency, breaker state, summary (online/offline/no_key/open_breaker)
+- [x] Test: `GET /api/providers/health` live (online 13, offline 25), `POST /v1/chat/completions` auto → pollinations vẫn succeed với quota/breaker, `X-Verified` header
 
 ## P4 — Auth + Dashboard (3-4 ngày)
 
@@ -71,8 +72,8 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 | Milestone | Date | Deliverable |
 |-----------|------|-------------|
 | M1 | 2026-09-06 | P1 done: Gateway 40 providers, 316 models, `/v1/models?verified=free`, scheduler 24h |
-| M2 | P2 | Chat completions streaming live với 30 providers (cần keys) |
-| M3 | P3 | Fallback + quota-tracker + skip deprecated, health live 30 |
+| M2 | 2026-09-06 | P2 done: 30 adapters, streaming Gemini SSE, `auto` 15-tier → pollinations live, `x-router` pin |
+| M3 | 2026-09-06 | P3 done: key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health live 40 (online 13) |
 | M4 | P4 | Dashboard 316 models + verify badges, virtual keys |
 | M5 | P5 | Docker prod + Cloudflare + benchmark verified |
 

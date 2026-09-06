@@ -2,9 +2,15 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
-import { getProvidersForRequest, getNextKey, isPublicProvider } from "../../lib/router.js";
+import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
 import { logger } from "../../middleware/logger.js";
+import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
+import { estimateChatTokens } from "../../lib/token-estimator.js";
+import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
+import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import fs from "node:fs";
+import path from "node:path";
 
 const chatSchema = z.object({
   model: z.string().min(1),
@@ -31,6 +37,19 @@ const chatSchema = z.object({
   user: z.string().optional(),
 });
 
+function loadVerifiedMap(): Map<string, string> {
+  try {
+    const p = path.resolve("data/verified-models.json");
+    if (!fs.existsSync(p)) return new Map();
+    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    const m = new Map<string, string>();
+    for (const row of data.models || []) m.set(row.id, row.status);
+    return m;
+  } catch {
+    return new Map();
+  }
+}
+
 export const chatRoute = new Hono();
 
 chatRoute.post(
@@ -40,7 +59,7 @@ chatRoute.post(
     const body = c.req.valid("json");
     const model = body.model || config.defaultModel;
 
-    // x-router header to pin provider (e.g. x-router: nvidia-nim)
+    // x-router header to pin provider
     const pinned = c.req.header("x-router")?.trim();
     let providerOrder: string[];
     if (pinned && providers[pinned]) {
@@ -50,21 +69,54 @@ chatRoute.post(
       providerOrder = getProvidersForRequest(model, "tiered");
     }
 
+    // Filter deprecated models if verified data exists and model is provider/model specific
+    const verifiedMap = loadVerifiedMap();
+    if (model.includes("/") && verifiedMap.get(model) === "deprecated") {
+      logger.warn({ model }, "requested model is deprecated, will fallback to next tier");
+      // Remove the deprecated provider from order and try next
+      const prefix = model.split("/")[0];
+      providerOrder = providerOrder.filter((p) => p !== prefix);
+    }
+
+    const estimated = estimateChatTokens({ messages: body.messages as any, max_tokens: body.max_tokens });
     const errors: any[] = [];
+
     for (const pid of providerOrder) {
       const provider = providers[pid];
       if (!provider) continue;
-      const key = getNextKey(pid);
+
+      // Circuit breaker
+      if (isOpen(pid)) {
+        errors.push({ provider: pid, error: "circuit open (cooldown)" });
+        continue;
+      }
+
+      const key = getNextKeyManaged(pid);
       if (key === null) {
         errors.push({ provider: pid, error: "no key configured (set " + pid.toUpperCase().replace(/-/g, "_") + "_API_KEYS)" });
         continue;
       }
+      if (!key && !isPublicProvider(pid)) {
+        errors.push({ provider: pid, error: "missing key" });
+        continue;
+      }
+
+      // Quota pre-check (RPM/TPM)
+      const quota = checkQuota(pid, key, estimated.total);
+      if (!quota.allowed) {
+        errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
+        if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
+        continue;
+      }
+
+      // Skip deprecated model for this provider if verified
+      const fullId = model.includes("/") ? model : `${pid}/${model}`;
+      if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
+        errors.push({ provider: pid, error: "model deprecated per verified-models.json" });
+        continue;
+      }
+
       try {
-        // Allow public providers without key (pollinations, llm7-io, hugging-face)
-        if (!key && !isPublicProvider(pid)) {
-          errors.push({ provider: pid, error: "missing key" });
-          continue;
-        }
         const res = await provider.chat(
           {
             model,
@@ -85,16 +137,26 @@ chatRoute.post(
           key
         );
 
-        // If provider returned error, fallback to next tier
         if (!res.ok) {
           const text = await res.text().catch(() => "");
-          errors.push({ provider: pid, status: res.status, error: text.slice(0, 500) });
+          errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
+          recordFailure(pid);
+          // 429 -> mark rate limited with Retry-After
+          if (res.status === 429) {
+            const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
+            markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
+          }
           continue;
         }
 
-        // Streaming: passthrough SSE
+        // Success: record
+        recordSuccess(pid);
+        markSuccess(pid, key);
+        recordUsage(pid, key, estimated.total);
+
         if (body.stream) {
           const contentType = res.headers.get("content-type") || "text/event-stream";
+          // Wrap stream to handle mid-stream errors and record fallback
           return new Response(res.body, {
             status: 200,
             headers: {
@@ -103,55 +165,59 @@ chatRoute.post(
               Connection: "keep-alive",
               "X-Provider": pid,
               "X-Model": model,
+              "X-Verified": verifiedMap.get(fullId) || "unknown",
             },
           });
         }
 
-        // Non-stream: if provider already returns OpenAI shape (most), passthrough; Gemini already normalized
         const data: any = await res.json().catch(async () => ({ text: await res.text() }));
-        // Ensure we have OpenAI shape fallback
         if (data.choices) {
           c.header("X-Provider", pid);
+          c.header("X-Verified", verifiedMap.get(fullId) || "unknown");
+          // Record actual usage if provider returns it
+          const usage = data.usage;
+          if (usage?.total_tokens) recordUsage(pid, key, usage.total_tokens);
           return c.json(data);
         }
-        // Raw text fallback to OpenAI shape
         return c.json({
           id: `chatcmpl-${Date.now()}`,
           object: "chat.completion",
           created: Math.floor(Date.now() / 1000),
           model: `${pid}/${model}`,
           choices: [{ index: 0, message: { role: "assistant", content: typeof data === "string" ? data : JSON.stringify(data) }, finish_reason: "stop" }],
-          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          usage: { prompt_tokens: estimated.prompt, completion_tokens: 0, total_tokens: estimated.total },
         });
       } catch (e: any) {
         logger.warn({ provider: pid, err: e.message }, "provider failed, trying next");
         errors.push({ provider: pid, error: e.message });
+        recordFailure(pid);
         continue;
       }
     }
 
-    // All failed — return mock for dev so SDK doesn't break (remove in production strict mode)
     if (config.nodeEnv === "development" && errors.length > 0) {
-      // Return a deterministic mock so frontend dev continues
-      return c.json({
-        id: `chatcmpl-mock-${Date.now()}`,
-        object: "chat.completion",
-        created: Math.floor(Date.now() / 1000),
-        model,
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: "assistant",
-              content: `[mock] All providers failed, returning mock. Errors: ${JSON.stringify(errors).slice(0, 800)} — configure API keys in .env to get real responses. You asked: "${body.messages.at(-1)?.content}"`,
+      return c.json(
+        {
+          id: `chatcmpl-mock-${Date.now()}`,
+          object: "chat.completion",
+          created: Math.floor(Date.now() / 1000),
+          model,
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: `[mock] All providers failed, returning mock. Errors: ${JSON.stringify(errors).slice(0, 900)} — configure API keys in .env to get real responses. You asked: "${(body.messages.at(-1)?.content as any)?.toString?.().slice(0, 100) || ""}"`,
+              },
+              finish_reason: "stop",
             },
-            finish_reason: "stop",
-          },
-        ],
-        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-        _mock: true,
-        _errors: errors,
-      });
+          ],
+          usage: { prompt_tokens: estimated.prompt, completion_tokens: 20, total_tokens: estimated.total },
+          _mock: true,
+          _errors: errors,
+        },
+        200
+      );
     }
 
     return c.json({ error: { message: "All providers failed", type: "provider_error", provider_errors: errors } }, 502);
