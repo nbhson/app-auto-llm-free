@@ -35,7 +35,7 @@ Client (OpenAI SDK / Vercel AI SDK)
 
 Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-## 🚀 Quick Start
+## 🚀 Quick Start — người mới xem **[GETTING_STARTED.md](docs/GETTING_STARTED.md) 5 phút** (từ 0 tới gọi API đầu tiên)
 
 ### Yêu cầu
 - Bun >= 1.1 hoặc Node >= 20
@@ -47,7 +47,8 @@ Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 cp .env.example .env
-# điền API keys free tier của bạn vào .env
+# Điền MASTER_KEY/ENCRYPTION_KEY: mở http://localhost:3000 → Key Generator (thay openssl) hoặc openssl rand -hex
+# Provider keys (GROQ_API_KEYS...) để trống vẫn chạy pollinations
 ```
 
 ### 2. Chạy với Docker (khuyến nghị)
