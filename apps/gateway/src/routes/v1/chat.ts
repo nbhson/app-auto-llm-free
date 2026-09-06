@@ -46,6 +46,17 @@ function loadVerifiedMap(): Map<string, string> {
     const data = JSON.parse(fs.readFileSync(p, "utf-8"));
     const m = new Map<string, string>();
     for (const row of data.models || []) m.set(row.id, row.status);
+    // merge persisted 404/410 from model-health.json as deprecated
+    try {
+      const hp = path.resolve("data/model-health.json");
+      if (fs.existsSync(hp)) {
+        const hdata = JSON.parse(fs.readFileSync(hp, "utf-8"));
+        for (const [id, v] of Object.entries(hdata as any)) {
+          const hv = v as any;
+          if (hv.http_status === 404 || hv.http_status === 410) m.set(id, "deprecated");
+        }
+      }
+    } catch {}
     return m;
   } catch {
     return new Map();

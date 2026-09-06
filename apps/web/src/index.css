@@ -97,3 +97,13 @@ pre { margin: 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 
 .pill-yellow { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
 .pill-blue { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
 .pill-gray { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+
+/* Topbar responsive - keep left/right balanced, hide badge on narrow */
+@media (max-width: 900px) {
+  .topbar { gap: 10px !important; }
+  .hide-sm { display: none !important; }
+}
+@media (max-width: 700px) {
+  .topbar { flex-direction: column; align-items: stretch !important; }
+  .topbar nav { margin: 0 !important; justify-content: center; overflow-x: auto; }
+}

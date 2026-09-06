@@ -4,7 +4,9 @@ import { config } from "../config.js";
 import { listVirtualKeys, createVirtualKey, deleteVirtualKey } from "../lib/virtual-keys.js";
 import { getLogs, getStats, onLog } from "../lib/request-log.js";
 import { getAllStates } from "../lib/circuit-breaker.js";
-import { readDataJson } from "../lib/paths.js";
+import { readDataJson, resolveDataPath } from "../lib/paths.js";
+import fs from "node:fs";
+import path from "node:path";
 
 function loadProvidersJson() {
   return readDataJson<any[]>("freellms-providers.json", []);
@@ -14,7 +16,11 @@ export const apiRoute = new Hono();
 
 apiRoute.get("/providers", (c) => {
   const freellms = loadProvidersJson();
-  const detailed = providerIds.map((id) => {
+  const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
+  const rawLimit = parseInt(c.req.query("limit") || c.req.query("per_page") || "25", 10);
+  const limit = [25, 50].includes(rawLimit) ? rawLimit : 25;
+  const q = (c.req.query("q") || "").toLowerCase();
+  let detailed = providerIds.map((id) => {
     const meta = providerMeta[id] || { name: id, tier: "", tier_type: "", caps: [], noCard: true };
     const fre = freellms.find((x: any) => x.slug === id);
     const keys = config.providerKeys[id] || [];
@@ -32,6 +38,12 @@ apiRoute.get("/providers", (c) => {
       status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key",
     };
   });
+  if (q) detailed = detailed.filter((p) => p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  const total = detailed.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const curPage = Math.min(page, totalPages);
+  const offset = (curPage - 1) * limit;
+  const paginated = detailed.slice(offset, offset + limit);
 
   return c.json({
     providers: providerIds,
@@ -42,7 +54,9 @@ apiRoute.get("/providers", (c) => {
       Object.entries(config.providerKeys).map(([k, v]) => [k, v.length > 0 ? `${v.length} keys` : "none"])
     ),
     defaultModel: config.defaultModel,
-    detailed,
+    detailed: paginated,
+    pagination: { page: curPage, limit, total, total_pages: totalPages, has_next: curPage < totalPages, has_prev: curPage > 1 },
+    filters: { q: q || null },
   });
 });
 
@@ -165,6 +179,52 @@ apiRoute.get("/models/health", async (c) => {
     error: results.filter((r) => r.status === "error" || r.status === "timeout").length,
   };
   return c.json({ provider: provider || "all", limit, summary, models: results });
+});
+
+// Persisted 404/410 health: stored in data/model-health.json so reload keeps strikethrough
+// MUST be before /:id route to avoid shadowing
+function readModelHealth(): Record<string, any> {
+  return readDataJson<Record<string, any>>("model-health.json", {});
+}
+function writeModelHealth(map: Record<string, any>) {
+  const p = resolveDataPath("model-health.json");
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(map, null, 2));
+}
+apiRoute.get("/models/health/persisted", (c) => {
+  const map = readModelHealth();
+  const list = Object.entries(map).map(([id, v]: any) => ({ id, ...v }));
+  return c.json({ object: "list", total: list.length, data: list });
+});
+apiRoute.post("/models/health/mark", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const ids: string[] = body.ids || (body.id ? [body.id] : []);
+  const status = body.status || "unusable";
+  const http_status = body.http_status || 404;
+  const error = body.error || "model_not_found";
+  if (ids.length === 0) return c.json({ error: "ids required" }, 400);
+  const map = readModelHealth();
+  const now = new Date().toISOString();
+  for (const id of ids) {
+    // only persist 404/410 unusable
+    if (http_status === 404 || http_status === 410 || /model_not_found|Gone/i.test(error)) {
+      map[id] = { status, http_status, error: String(error).slice(0, 500), updated_at: now, provider: id.split("/")[0] };
+    }
+  }
+  writeModelHealth(map);
+  return c.json({ saved: ids.length, total: Object.keys(map).length });
+});
+apiRoute.delete("/models/health/persisted", (c) => {
+  const p = resolveDataPath("model-health.json");
+  try { fs.unlinkSync(p); } catch {}
+  return c.json({ deleted: true });
+});
+apiRoute.delete("/models/health/persisted/:id", async (c) => {
+  const full = c.req.url.split("/api/models/health/persisted/")[1]?.split("?")[0];
+  const id = full ? decodeURIComponent(full) : c.req.param("id");
+  const map = readModelHealth();
+  if (map[id]) { delete map[id]; writeModelHealth(map); return c.json({ deleted: true, id }); }
+  return c.json({ error: "not found" }, 404);
 });
 
 apiRoute.get("/models/health/:id", async (c) => {

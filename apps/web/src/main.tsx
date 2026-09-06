@@ -28,13 +28,25 @@ function Layout({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", maxWidth: 1100, margin: "0 auto", padding: "0 24px 24px" }}>
-      <header style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(250,250,250,0.9)", backdropFilter: "blur(8px)", borderBottom: "1px solid #e2e8f0", margin: "0 -24px 24px", padding: "12px 24px", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.5 }}>⚡ Free LLM Gateway</span>
-          <span style={{ fontSize: 11, background: health === "ok" ? "#dcfce7" : health === "down" ? "#fee2e2" : "#f1f5f9", color: health === "ok" ? "#166534" : "#991b1b", padding: "2px 8px", borderRadius: 10, border: "1px solid #e2e8f0" }}>{health === "ok" ? "● online" : health === "down" ? "● offline" : "○ loading"}</span>
-          <span style={{ fontSize: 11, color: "#64748b", background: "white", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 10 }}>30 providers • 316 free</span>
+      <header className="topbar" style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(250,250,250,0.9)", backdropFilter: "blur(8px)", borderBottom: "1px solid #e2e8f0", margin: "0 -24px 24px", padding: "12px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", width: "100%" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flex: "0 1 auto", minWidth: 0 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.5, whiteSpace: "nowrap" }}>⚡ Free LLM Gateway</span>
+            <span style={{ fontSize: 11, background: health === "ok" ? "#dcfce7" : health === "down" ? "#fee2e2" : "#f1f5f9", color: health === "ok" ? "#166534" : "#991b1b", padding: "2px 8px", borderRadius: 10, border: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{health === "ok" ? "● online" : health === "down" ? "● offline" : "○ loading"}</span>
+            <span style={{ fontSize: 11, color: "#64748b", background: "white", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>30 providers • 316 free</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flex: "0 0 auto", marginLeft: "auto" }}>
+            <span style={{ fontSize: 11, color: "#64748b" }}>Master</span>
+            <input
+              value={masterKey}
+              onChange={(e) => { setMasterKey(e.target.value); localStorage.setItem("masterKey", e.target.value); }}
+              placeholder="fgk-master-..."
+              style={{ fontSize: 12, padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 8, width: 220, background: "white" }}
+              title="Master key for /api (admin)"
+            />
+          </div>
         </div>
-        <nav style={{ display: "flex", gap: 6, background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: 4 }}>
+        <nav style={{ display: "flex", gap: 6, background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: 4, alignSelf: "center" }}>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -57,16 +69,6 @@ function Layout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: "#64748b" }}>Master</span>
-          <input
-            value={masterKey}
-            onChange={(e) => { setMasterKey(e.target.value); localStorage.setItem("masterKey", e.target.value); }}
-            placeholder="fgk-master-..."
-            style={{ fontSize: 12, padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 8, width: 200, background: "white" }}
-            title="Master key for /api (admin)"
-          />
-        </div>
       </header>
       {children}
     </div>

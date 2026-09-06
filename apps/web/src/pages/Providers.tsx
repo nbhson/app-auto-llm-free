@@ -8,29 +8,39 @@ export default function Providers() {
   const [health, setHealth] = useState<any>(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "free", dir: "desc" });
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const [q, setQ] = useState("");
 
   const load = () => {
-    fetch("/api/providers", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setData).catch(() => {});
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (q) params.set("q", q);
+    fetch(`/api/providers?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setData).catch(() => {});
   };
   const checkHealth = () => {
     setLoadingHealth(true);
     fetch("/api/providers/health", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setHealth).finally(() => setLoadingHealth(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [page, limit, q]);
+  useEffect(() => { setPage(1); }, [q, limit]);
 
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "provider" ? "asc" : "desc" }));
   const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
 
   return (
     <div>
-      <h2>Providers ({data?.count ?? 40})</h2>
+      <h2>Providers ({data?.pagination?.total ?? data?.count ?? 40})</h2>
       {!data ? <p>Loading...</p> : (
         <>
           <div className="card">
             <h3>Tiers (FALLBACK_TIERS)</h3>
             <pre style={{ fontSize: 11 }}>{JSON.stringify(data.tiers, null, 2)}</pre>
-            <button onClick={checkHealth} disabled={loadingHealth}>{loadingHealth ? "Checking..." : "Live Health Check (40 providers, 5s)"}</button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input placeholder="Filter provider..." value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: 6, width: 220, border: "1px solid #ddd", borderRadius: 6 }} />
+              <label style={{ fontSize: 12 }}>LOV <select value={limit} onChange={(e) => setLimit(parseInt(e.target.value))} style={{ padding: 6, border: "1px solid #ddd", borderRadius: 6 }}><option value={25}>25</option><option value={50}>50</option></select></label>
+              <button onClick={checkHealth} disabled={loadingHealth}>{loadingHealth ? "Checking..." : "Live Health Check (40 providers, 5s)"}</button>
+            </div>
             {health && <pre style={{ fontSize: 11, maxHeight: 200, overflow: "auto", marginTop: 8 }}>{JSON.stringify(health.summary || health, null, 2)}</pre>}
           </div>
           <div style={{ overflowX: "auto" }}>
@@ -75,6 +85,12 @@ export default function Providers() {
               })}
             </tbody>
           </table>
+          </div>
+          <div style={{ position: "sticky", bottom: 0, background: "white", borderTop: "1px solid #e5e7eb", padding: "10px 0", display: "flex", gap: 8, alignItems: "center", zIndex: 10, boxShadow: "0 -2px 8px rgba(0,0,0,0.04)" }}>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={!data?.pagination?.has_prev}>‹ Prev</button>
+            <span style={{ fontSize: 12 }}>Page {data?.pagination?.page ?? 1} / {data?.pagination?.total_pages ?? 1} • {data?.pagination?.total ?? data?.count ?? 0} providers</span>
+            <button onClick={() => setPage((p) => Math.min(data?.pagination?.total_pages ?? 1, p + 1))} disabled={!data?.pagination?.has_next}>Next ›</button>
+            <span style={{ fontSize: 11, color: "#888" }}>LOV {limit}/page</span>
           </div>
         </>
       )}

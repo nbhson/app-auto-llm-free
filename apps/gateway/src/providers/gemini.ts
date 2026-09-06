@@ -6,16 +6,19 @@ function sanitizeGeminiModel(raw: string): string {
   // raw like "gemini/gemini 3.6 flash" or "gemini-2.0-flash" or "auto"
   const base = raw.includes("/") ? raw.split("/").pop()! : raw;
   const cleaned = base.trim().toLowerCase();
-  // Map freellms names with spaces to real Gemini ids
-  if (cleaned.includes("3.6")) return "gemini-2.0-flash";
-  if (cleaned.includes("3.5") && cleaned.includes("lite")) return "gemini-2.0-flash-lite";
-  if (cleaned.includes("3.5")) return "gemini-2.0-flash";
-  if (cleaned.includes("2.0")) return "gemini-2.0-flash";
+  // Map freellms names with spaces to real Gemini ids (2026-09: 2.0 gone, use 3.6)
+  if (cleaned.includes("3.6")) return "gemini-3.6-flash";
+  if (cleaned.includes("3.5") && cleaned.includes("lite")) return "gemini-3.5-flash-lite";
+  if (cleaned.includes("3.5")) return "gemini-3.6-flash";
+  if (cleaned.includes("3.1") && cleaned.includes("lite")) return "gemini-3.6-flash";
+  if (cleaned.includes("3.1")) return "gemini-3.6-flash";
+  if (cleaned.includes("2.5")) return "gemini-2.5-flash";
+  if (cleaned.includes("2.0")) return "gemini-3.6-flash";
   if (cleaned.includes("1.5")) return "gemini-1.5-flash";
-  if (cleaned === "auto" || cleaned === "gemini" || cleaned === "gemini-flash") return "gemini-2.0-flash";
+  if (cleaned === "auto" || cleaned === "gemini" || cleaned === "gemini-flash" || cleaned === "gemini flash latest") return "gemini-3.6-flash";
   // Keep dash form if looks like gemini-*
   if (cleaned.startsWith("gemini-")) return cleaned.replace(/\s+/g, "-");
-  return "gemini-2.0-flash";
+  return "gemini-3.6-flash";
 }
 
 export const geminiProvider: Provider = {
@@ -65,10 +68,10 @@ export const geminiProvider: Provider = {
     });
   },
   async models(apiKey?: string): Promise<ModelInfo[]> {
-    if (!apiKey) return [{ id: "gemini/gemini-2.0-flash", provider: "gemini", contextLength: 1_000_000 }];
+    if (!apiKey) return [{ id: "gemini/gemini-3.6-flash", provider: "gemini", contextLength: 1_000_000 }];
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      if (!res.ok) return [{ id: "gemini/gemini-2.0-flash", provider: "gemini" }];
+      if (!res.ok) return [{ id: "gemini/gemini-3.6-flash", provider: "gemini" }];
       const data: any = await res.json();
       return (data.models || []).map((m: any) => ({
         id: `gemini/${m.name.replace("models/", "")}`,
@@ -76,7 +79,7 @@ export const geminiProvider: Provider = {
         displayName: m.displayName,
       }));
     } catch {
-      return [{ id: "gemini/gemini-2.0-flash", provider: "gemini" }];
+      return [{ id: "gemini/gemini-3.6-flash", provider: "gemini" }];
     }
   },
   async health(apiKey: string): Promise<boolean> {
