@@ -1,5 +1,30 @@
 import * as dotenv from "dotenv";
-dotenv.config();
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+
+// Load .env from repo root regardless of cwd (npm run dev -w apps/gateway sets cwd to apps/gateway)
+try {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const candidates = [
+    path.resolve(".env"),
+    path.resolve(path.join(process.cwd(), ".env")),
+    path.resolve(path.join(__dirname, "../../../.env")),
+    path.resolve(path.join(__dirname, "../../.env")),
+    path.resolve("/app/.env"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      dotenv.config({ path: p });
+      break;
+    }
+  }
+  // Fallback to default dotenv (cwd)
+  if (!process.env.MASTER_KEY) dotenv.config();
+} catch {
+  dotenv.config();
+}
 
 function parseTiers(): string[][] {
   try {
