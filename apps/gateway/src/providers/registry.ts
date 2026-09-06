@@ -99,6 +99,7 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
 };
 
 // Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback
+// Opencode custom models from user's opencode.json (2026-09-06) — many are :free variants not in freellms
 export const modelAliases: Record<string, string[]> = {
   auto: [
     "nvidia-nim",
@@ -120,6 +121,51 @@ export const modelAliases: Record<string, string[]> = {
     "freeai",
     "cline",
   ],
+  // Opencode custom — agnes
+  "agnes-2.5-flash": ["agnes-ai"],
+  // Opencode custom — openrouter free tier
+  "openrouter/free": ["openrouter"],
+  "z-ai/glm-5.2:free": ["openrouter", "z-ai-zhipu-ai", "nvidia-nim"],
+  "nvidia/nemotron-3-ultra-550b-a55b:free": ["openrouter", "nvidia-nim", "kilo-code"],
+  "minimax/minimax-m3:free": ["openrouter", "nvidia-nim"],
+  "inclusionai/ling-3.0-flash-fin:free": ["openrouter", "kilo-code", "opencode"],
+  "minimax/minimax-m2.7:free": ["openrouter", "sambanova"],
+  "nvidia/nemotron-3.5-lightning:free": ["openrouter", "nvidia-nim"],
+  "anthropic/claude-fable-5.1": ["openrouter", "cohere"],
+  // Ollama cloud
+  "gemma4:31b-cloud": ["ollama-cloud"],
+  "gpt-oss:120b": ["ollama-cloud", "openrouter"],
+  "nemotron-3-super:cloud": ["ollama-cloud", "nvidia-nim"],
+  // Kilo auto
+  "kilo-auto/free": ["kilo-code"],
+  "stepfun/step-3.7-flash:free": ["kilo-code", "openrouter"],
+  "poolside/laguna-s-2.1:free": ["kilo-code", "openrouter"],
+  // Nvidia custom
+  "nvidia/nemotron-3-ultra-550b-a55b": ["nvidia-nim", "kilo-code"],
+  "deepseek-ai/deepseek-v4-flash-0731": ["nvidia-nim", "modelscope", "chutes-ai"],
+  "deepseek-ai/deepseek-v4-pro-0813": ["nvidia-nim", "modelscope"],
+  "moonshotai/kimi-k3": ["nvidia-nim", "ollama-cloud", "groq"],
+  // OrcaRouter
+  "deepseek/deepseek-v4-flash-free": ["orcarouter", "deepseek"],
+  "qwen/qwen3.8-27b-free": ["orcarouter", "modelscope", "siliconflow"],
+  // Cline / OpenCode Zen
+  "nemotron-3.5-lightning-free": ["opencode", "nvidia-nim"],
+  "nemotron-3-ultra-free": ["opencode", "nvidia-nim"],
+  "mimo-v2.5-free": ["opencode"],
+  "ling-3.0-flash-fin-free": ["opencode", "kilo-code"],
+  "deepseek-v4-flash": ["cline", "deepseek", "nvidia-nim"],
+  "glm-5.3-flash": ["cline", "z-ai-zhipu-ai"],
+  // Google custom gemini
+  "gemini-3.5-flash-lite": ["google-gemini"],
+  "gemini-3.1-flash-lite-preview": ["google-gemini", "llm7-io"],
+  "gemini-3.7-flash": ["google-gemini"],
+  "gemini-3.6-flash": ["google-gemini"],
+  "gemini-3.1-flash-lite": ["google-gemini", "llm7-io"],
+  "qwen3-8b": ["freeai", "modelscope"],
+  "auto/coding": ["kilo-code", "opencode", "cohere"],
+  "ag/gemini-3.7-flash-high": ["openrouter", "google-gemini"],
+  "kc/minimax/minimax-m3:free": ["openrouter", "kilo-code"],
+  "kr/claude-haiku-4.5": ["openrouter", "cohere"],
   "gpt-4": ["groq", "cerebras", "google-gemini", "openrouter", "nvidia-nim"],
   "gpt-3.5": ["groq", "pollinations", "ovhcloud-ai-endpoints", "modelscope"],
   "claude-3": ["cohere", "hugging-face", "openrouter", "mistral-ai"],
