@@ -116,6 +116,36 @@ export function createOpenAICompatibleProvider(opts: {
         body: JSON.stringify(body),
       });
     },
+    async embeddings(req, apiKey: string): Promise<Response> {
+      const base = resolveBase();
+      const url = `${base}/embeddings`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      let model = req.model;
+      if (model.includes("/")) model = model.split("/").slice(1).join("/");
+      const body: Record<string, unknown> = { model, input: req.input };
+      if (req.encoding_format) body.encoding_format = req.encoding_format;
+      if (req.dimensions) body.dimensions = req.dimensions;
+      if (req.user) body.user = req.user;
+      return fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    },
+    async images(req, apiKey: string): Promise<Response> {
+      const base = resolveBase();
+      const url = `${base}/images/generations`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const body: Record<string, unknown> = { prompt: req.prompt };
+      if (req.model) {
+        let m = req.model;
+        if (m.includes("/")) m = m.split("/").slice(1).join("/");
+        body.model = m;
+      }
+      if (req.n) body.n = req.n;
+      if (req.size) body.size = req.size;
+      if (req.response_format) body.response_format = req.response_format;
+      if (req.user) body.user = req.user;
+      return fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    },
     async models(apiKey?: string): Promise<ModelInfo[]> {
       const base = resolveBase();
       const url = `${base}${modelsPath}`;

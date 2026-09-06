@@ -5,8 +5,33 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stack: Hono + Bun](https://img.shields.io/badge/Stack-Hono%20%2B%20Bun-orange)](https://hono.dev)
 [![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/en/API.md)
+[![FREE](https://img.shields.io/badge/FREE-43_Providers-00c853?style=flat-square)](docs/en/PROVIDERS.md)
+[![FREE](https://img.shields.io/badge/FREE-324_Models-00c853?style=flat-square)](models.yaml)
+[![No Card](https://img.shields.io/badge/No_Card-29%2F30-3b82f6?style=flat-square)](docs/en/FREELLMS_FREE_TIER.md)
+
+> ### 🆓 **100% FREE — No Credit Card • No Trial • Forever**
+> **43 Providers • 324 Models (316 freellms free + 8 aliases) • One OpenAI-Compatible Endpoint** — Self-hosted, BYOK, costs you `$0`.
+>
+> | Tier | Providers | Models | No Card |
+> |------|-----------|--------|---------|
+> | **Permanent Free** | 26 — NVIDIA NIM **97**, ModelScope **43**, Cloudflare **35**, Gemini **15**, OVH **10**, Cohere **10**, OpenRouter **17**, SambaNova, Groq, Cerebras, Z AI, Agnes, Aion, LLM7… | 260+ | ✅ 29/30 |
+> | **Quota Free** | 4 — GitHub Models **13**, Mistral **9**, Kilo Code **8**, HuggingFace **4** | 30+ | ✅ |
+> | **Scraped / Unlimited** | 3 — Pollinations, LLM7.io, Ollama Cloud | 6 | ✅ |
+> | **Custom Free** | 3 — OrcaRouter, FreeAI, Cline | 3 | ✅ |
+>
+> Smart routing `auto` → best free with fallback + `x-router` pin + 24h live verify. **If it's free out there, it's here.** → `POST /v1/chat/completions` with any OpenAI SDK. Full list: [docs/en/PROVIDERS.md](docs/en/PROVIDERS.md) • live probe: `POST /api/verify`
 
 **Languages:** 🇬🇧 [English](README.md) | 🇻🇳 [Tiếng Việt](README.vi.md) | [Docs Index](docs/README.md) — Docs: [🇬🇧 EN](docs/en/GETTING_STARTED.md) | [🇻🇳 VI](docs/vi/GETTING_STARTED.md)
+
+---
+
+## 📸 Screenshots — Live Dashboard (30 providers • 316 free verified 24h)
+
+| Providers — 43 IDs, tier, live health, `Get Key ↗` | Models — 324 (316 free + 8 aliases), live probe `Check Live`, `Hide 404` |
+|:---:|:---:|
+| ![Providers — 43 live, health 5s](docs/images/providers.png) | ![Models — 324 live verify](docs/images/models.png) |
+
+> **Dashboard** 5 routes `Dashboard → Providers → Models → Keys → Logs` — Pagination 25/50 sticky, `hasKey` filter, `Sync Live Now` 24h probe, `Check Live (8s)` per-model, `Only with keys`, `Hide 404` persisted strikethrough.
 
 ---
 

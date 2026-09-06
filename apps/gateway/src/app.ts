@@ -9,6 +9,7 @@ import { healthRoute } from "./routes/v1/health.js";
 import { modelsRoute } from "./routes/v1/models.js";
 import { chatRoute } from "./routes/v1/chat.js";
 import { embeddingsRoute } from "./routes/v1/embeddings.js";
+import { imagesRoute } from "./routes/v1/images.js";
 import { apiRoute } from "./routes/api.js";
 import { extractBearer } from "./lib/auth.js";
 import { isValidVirtualKeyLive } from "./lib/virtual-keys.js";
@@ -25,7 +26,7 @@ export function createApp() {
   // Public
   app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.1.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
-  app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nGET /v1/health</pre></body></html>`));
+  app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nGET /v1/health</pre></body></html>`));
 
   // Auth middleware for /v1/* (except health) — uses virtual-keys + master
   app.use("/v1/*", async (c, next) => {
@@ -54,6 +55,7 @@ export function createApp() {
   app.route("/v1/models", modelsRoute);
   app.route("/v1/chat", chatRoute);
   app.route("/v1/embeddings", embeddingsRoute);
+  app.route("/v1/images", imagesRoute);
 
   // Legacy compat: /v1/chat/completions is at /v1/chat/completions via chatRoute
   // Also support /v1/completions stub

@@ -30,10 +30,29 @@ export interface ModelInfo {
   ownedBy?: string;
 }
 
+export interface EmbeddingsRequest {
+  model: string;
+  input: string | string[];
+  encoding_format?: string;
+  dimensions?: number;
+  user?: string;
+}
+
+export interface ImagesRequest {
+  model?: string;
+  prompt: string;
+  n?: number;
+  size?: string;
+  response_format?: string;
+  user?: string;
+}
+
 export interface Provider {
   id: string;
   type: "openai-compatible" | "gemini" | "anthropic" | "scraped";
   chat(req: ChatRequest, apiKey: string): Promise<Response>;
+  embeddings?(req: EmbeddingsRequest, apiKey: string): Promise<Response>;
+  images?(req: ImagesRequest, apiKey: string): Promise<Response>;
   models(apiKey?: string): Promise<ModelInfo[]>;
   health(apiKey: string): Promise<boolean>;
 }

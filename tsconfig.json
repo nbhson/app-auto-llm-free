@@ -15,6 +15,6 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["apps/**/*", "packages/**/*"],
-  "exclude": ["node_modules", "dist", "apps/web/dist"]
+  "include": ["apps/gateway/**/*", "packages/**/*"],
+  "exclude": ["node_modules", "dist", "apps/web", "apps/web/dist"]
 }

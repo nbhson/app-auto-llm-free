@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { pgTable, varchar, timestamp, jsonb, text as pgText } from "drizzle-orm/pg-core";
+import { pgTable, varchar, timestamp } from "drizzle-orm/pg-core";
 
 // Shared shape — actual dialect chosen at runtime via drizzle.config
 export const users = sqliteTable("users", {
