@@ -13,11 +13,11 @@
 | Nhóm | Chi tiết |
 |------|----------|
 | **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — dùng trực tiếp với OpenAI SDK |
-| **Provider Hybrid** | **Chính thống free tier**: Groq, Cerebras, Together, Gemini, Mistral, Cohere, Nvidia, Cloudflare, HuggingFace, GitHub Models, SiliconFlow, SambaNova, Chutes, Novita... <br> **Scraped/unlimited**: Pollinations, Puter, LLM7, Ollama Cloud... |
-| **Smart Routing** | Round-robin, tiered fallback, latency-aware, alias (`gpt-4` → best free), header `x-router` để pin provider |
+| **Provider Hybrid (30)** | **Permanent Free**: NVIDIA NIM (97), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), SambaNova, SiliconFlow, Groq (7), Cerebras (5), Z AI, Agnes, Aion, LLM7, Chutes, Glhf… <br> **Quota**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4) <br> **Scraped**: Pollinations, LLM7.io, Ollama Cloud (3 free) — Nguồn: freellms.org (316 free models) |
+| **Smart Routing** | Round-robin, tiered fallback (4 tiers freellms), alias (`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router` |
 | **Resilience** | Auto fallback khi 429/timeout, circuit breaker, mid-stream SSE error handling, pre-flight TPM/TPD check |
 | **Key Pool** | Nhiều key/provider, AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` với scope model/provider |
-| **Dashboard** | Quản lý keys, usage, logs SSE, health check 1-click, model catalog 260+ models |
+| **Dashboard** | Quản lý keys, usage, logs SSE, health check 1-click, model catalog **316 free** + score/verified/limit |
 | **Observability** | Pino log, OTel GenAI, token estimator, request DB với BRIN index |
 
 ## 🏗️ Kiến trúc
@@ -140,19 +140,21 @@ curl -X POST http://localhost:8080/api/keys \
 | Tài liệu | Mô tả |
 |----------|-------|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Chi tiết kiến trúc, luồng request, provider interface |
-| [PROVIDERS.md](docs/PROVIDERS.md) | Danh sách 24+ providers, free tier limits, cách thêm provider mới |
+| [PROVIDERS.md](docs/PROVIDERS.md) | Danh sách **30 providers (freellms)**, free tier limits, base URLs, cách thêm provider |
+| [FREELLMS_FREE_TIER.md](docs/FREELLMS_FREE_TIER.md) | Scan freellms.org 2026-09-06 — 316 free models, ranking, rate limits |
 | [API.md](docs/API.md) | Đặc tả OpenAI-compatible endpoints, alias, streaming, error codes |
-| [CONFIGURATION.md](docs/CONFIGURATION.md) | Biến môi trường, models.yaml, rate limit |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Biến môi trường (30 providers), models.yaml, rate limit |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker, Cloudflare Workers, Vercel, bare metal |
 | [ROADMAP.md](docs/ROADMAP.md) | Lộ trình P1→P5, milestones |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Quy trình đóng góp |
 
 ## 🗺️ Roadmap
 
-- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker
-- [ ] **P2 Gateway Core** — 4 adapters đầu + chat/completions streaming
-- [ ] **P3 Resilience** — key-manager, quota-tracker, fallback, circuit breaker
-- [ ] **P4 Auth + Dashboard** — virtual keys, logs, health check
+- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (30 providers, 316 models registry)
+- [x] **Freellms Sync** — Scan freellms.org, `data/*.json` + `models.yaml` (316 free) + `scripts/sync-freellms.py`
+- [ ] **P2 Gateway Core** — streaming thực + provider health check cho 30 providers
+- [ ] **P3 Resilience** — key-manager, quota-tracker (15 RPM Gemini / 40 RPM NVIDIA v.v.), circuit breaker
+- [ ] **P4 Auth + Dashboard** — virtual keys, logs, model catalog 316 với filter free/verified
 - [ ] **P5 Hardening** — AES rotation, OTel, deploy presets, benchmark
 
 Chi tiết [docs/ROADMAP.md](docs/ROADMAP.md).

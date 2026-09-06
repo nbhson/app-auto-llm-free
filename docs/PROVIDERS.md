@@ -1,124 +1,125 @@
 # Providers
 
-Danh sách provider free được hỗ trợ và cách thêm provider mới.
+> **Nguồn chính: freellms.org (scan 2026-09-06) — 30 providers, 316 free models.**  
+> Chi tiết đầy đủ: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`  
+> Gateway `apps/gateway/src/providers/registry.ts:1` đã tích hợp đủ 30 providers, `models.yaml:1` đã sync 316 free.
 
-## 1. Phân loại
+## 1. Tổng quan freellms.org
 
-### A. Chính thống free tier (cần API key, có rate limit rõ ràng)
+| Chỉ số | Giá trị |
+|--------|---------|
+| Providers | **30** (26 Permanent Free, 4 Quota) |
+| Models | **365** (316 FREE `data-free=1`, 49 paid) |
+| No Card | 29/30 (chỉ Grok xAI yêu cầu) |
+| OpenAI Compatible | 30/30 |
+| Scan date | 2026-09-06, script `scripts/sync-freellms.py` |
 
-| Provider | Base URL | Free tier (2026) | Model tiêu biểu | Adapter |
-|----------|----------|------------------|-----------------|---------|
-| **Groq** | `https://api.groq.com/openai/v1` | 30 RPM, 14.4K RPD | `llama-3.3-70b`, `mixtral-8x7b` | `openai-compatible` |
-| **Cerebras** | `https://api.cerebras.ai/v1` | 30 RPM, 1K RPD | `llama3.1-8b`, `llama3.1-70b` | `openai-compatible` |
-| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta` | 60 RPM, 1.5K RPD | `gemini-2.0-flash`, `gemini-1.5-flash` | `gemini` |
-| **Together AI** | `https://api.together.xyz/v1` | $25 credit free | `llama-3.3-70b`, `qwen2-72b` | `openai-compatible` |
-| **Mistral** | `https://api.mistral.ai/v1` | 5 RPS free | `mistral-small`, `mistral-nemo` | `openai-compatible` |
-| **Cohere** | `https://api.cohere.ai/compatibility/v1` | Trial free | `command-r`, `command-r-plus` | `openai-compatible` |
-| **HuggingFace** | `https://api-inference.huggingface.co/v1` | Rate limit IP | `llama-3.2-3b`, `qwen2.5-*` | `openai-compatible` |
-| **GitHub Models** | `https://models.inference.ai.azure.com` | Free với GitHub PAT | `gpt-4o-mini`, `llama-3.3` | `openai-compatible` |
-| **Cloudflare Workers AI** | `https://api.cloudflare.com/client/v4/accounts/.../ai/v1` | 10K req/ngày | `llama-3.1-8b` | `openai-compatible` |
-| **Nvidia NIM** | `https://integrate.api.nvidia.com/v1` | Free tier | `llama-3.1-405b` | `openai-compatible` |
-| **SiliconFlow** | `https://api.siliconflow.cn/v1` | Free credit | `deepseek-v3`, `qwen2.5` | `openai-compatible` |
-| **SambaNova** | `https://api.sambanova.ai/v1` | Free tier | `llama-3.1-405b` | `openai-compatible` |
-| **Chutes** | `https://llm.chutes.ai/v1` | Free | `deepseek-v3` | `openai-compatible` |
-| **Fireworks** | `https://api.fireworks.ai/inference/v1` | $1 free | `llama-3.3-70b` | `openai-compatible` |
-| **DeepSeek** | `https://api.deepseek.com/v1` | Free trial | `deepseek-chat`, `deepseek-reasoner` | `openai-compatible` |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | 28+ free models | `auto` free | `openai-compatible` |
+## 2. Danh sách 30 providers (từ freellms.org)
 
-> Nguồn tham khảo: `free-llm-gateway` (24+ providers) và OmniRoute (90 free, 40 forever free). Giá trị free tier sẽ sync định kỳ từ LiteLLM pricing dataset.
+### Permanent Free — No Card (ưu tiên P0)
 
-### B. Scraped / Unlimited (không cần key hoặc key cộng đồng, dễ vỡ)
+| Provider | Slug | Base URL | Free Models | Limit | Caps | Env Key |
+|----------|------|----------|-------------|-------|------|---------|
+| **NVIDIA NIM** | `nvidia-nim` | `https://integrate.api.nvidia.com/v1` | 97 | Up to 40 RPM, 8K–1M | text,reasoning,image,video,embedding | `NVIDIA_API_KEYS` |
+| **ModelScope** | `modelscope` | `https://api-inference.modelscope.cn/v1` | 43 | 2K RPD total, ≤500/model | text,image,video,audio | `MODELSCOPE_API_KEYS` |
+| **Cloudflare Workers AI** | `cloudflare-workers-ai` | `https://api.cloudflare.com/client/v4/accounts/{id}/ai/run` | 35 | 10K neurons/day | text,image,reasoning,code | `CLOUDFLARE_API_TOKEN` + `ACCOUNT_ID` |
+| **Google Gemini** | `google-gemini` / `gemini` | `https://generativelanguage.googleapis.com/v1beta` | 15 | 15 RPM/1.5K RPD (Flash), 30 RPM Lite | text,image,video,audio | `GEMINI_API_KEYS` |
+| **OVHcloud AI Endpoints** | `ovhcloud-ai-endpoints` | `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1` | 10 | 2 RPM anon | text,image,video | `OVHCLOUD_API_KEYS` |
+| **Cohere** | `cohere` | `https://api.cohere.com/v2` | 10 | — | text,reasoning,embedding,rerank | `COHERE_API_KEYS` |
+| **SambaNova** | `sambanova` | `https://api.sambanova.ai/v1` | 4 | — | text,reasoning | `SAMBANOVA_API_KEYS` |
+| **SiliconFlow** | `siliconflow` | `https://api.siliconflow.cn/v1` | 2 | — | text,reasoning | `SILICONFLOW_API_KEYS` |
+| **Chutes.ai** | `chutes-ai` / `chutes` | `https://api.chutes.ai/v1` | 2 | — | text,reasoning | `CHUTES_API_KEYS` |
+| **Glhf.chat** | `glhf-chat` / `glhf` | `https://glhf.chat/api/openai/v1` | 2 | — | text | `GLHF_API_KEYS` |
+| **Z AI (Zhipu)** | `z-ai-zhipu-ai` | `https://open.bigmodel.cn/api/paas/v4` | 4 | — | text,reasoning | `Z_AI_API_KEYS` |
+| **Agnes AI** | `agnes-ai` | `https://apihub.agnes-ai.com/v1` | 5 | 30 RPM | text,vision | `AGNES_API_KEYS` |
+| **Aion Labs** | `aion-labs` | `https://api.aionlabs.ai/v1` | 5 | — | text | `AION_API_KEYS` |
+| **LLM7.io** | `llm7-io` | `https://api.llm7.io/v1` | 6 | — | text,reasoning | `LLM7_API_KEYS` |
+| **Cerebras** | `cerebras` | `https://api.cerebras.ai/v1` | 5 | 15 RPM/30K TPM/1M TPD, 128K ctx | text,reasoning | `CEREBRAS_API_KEYS` |
+| **Groq** | `groq` | `https://api.groq.com/openai/v1` | 7 / 23 total | 30 RPM/250 RPD primary, 14.4K RPD large | text,reasoning | `GROQ_API_KEYS` |
+| **Hugging Face** (quota) | `hugging-face` | `https://router.huggingface.co/v1` | 4 | IP limit | text,code | `HUGGINGFACE_API_KEYS` |
+| **OpenCode Zen** | `opencode` | `https://opencode.ai/zen/v1` | 8 | — | reasoning,vision | `OPENCODE_API_KEYS` |
+| **Ollama Cloud** | `ollama-cloud` | `https://api.ollama.com` | 3 / 8 total | Session/weekly limits | text,reasoning | `OLLAMA_CLOUD_API_KEYS` |
+| **Groq xAI** | `grok-xai` / `xai` | `https://api.x.ai/v1` | 2 | — | text | `GROK_API_KEYS` / `XAI_API_KEYS` |
 
-| Provider | Endpoint | Đặc điểm | Adapter |
-|----------|----------|----------|---------|
-| **Pollinations** | `https://text.pollinations.ai/openai` | OpenAI-compatible, không cần key | `scraped` |
-| **Puter** | `https://api.puter.com/drivers/call` | Unlimited, cần `puter` auth trick | `scraped` |
-| **LLM7** | `https://api.llm7.io/v1` | Free, OpenAI-compatible | `scraped` |
-| **Ollama Cloud** | `https://ollama.com/v1` | Free tier | `openai-compatible` |
-| **Kilo / Z AI / ModelScope** | — | Free | `openai-compatible` |
+### Quota / Trial (P1 — dùng sau Permanent)
 
-> Cảnh báo: nhóm này không ổn định, cần `health` cron và auto-disable.
+| Provider | Slug | Free | Limit | Env Key |
+|----------|------|------|-------|---------|
+| **GitHub Models** | `github-models` | 13 | PAT, quota | `GITHUB_TOKENS` |
+| **Mistral AI** | `mistral-ai` / `mistral` | 9 | 5 RPS free | `MISTRAL_API_KEYS` |
+| **Kilo Code** | `kilo-code` | 8 | ~200 req/hr, `:free` suffix | `KILO_CODE_API_KEYS` |
+| **Hugging Face** | `hugging-face` | 4 | — | `HUGGINGFACE_API_KEYS` |
 
-## 2. Model Catalog
+### Legacy / extra (vẫn hỗ trợ)
 
-`models.yaml` auto-discovery (port từ `sync_providers.py`):
+| Provider | Base URL | Env |
+|----------|----------|-----|
+| Together AI | `https://api.together.xyz/v1` | `TOGETHER_API_KEYS` |
+| Fireworks | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEYS` |
+| Novita | `https://api.novita.ai/v3/openai` | `NOVITA_API_KEYS` |
+| DeepSeek | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEYS` |
+| Pollinations | `https://text.pollinations.ai/openai` | `POLLINATIONS_API_KEY` (không cần) |
+
+> Cảnh báo scraped: Pollinations/LLM7 không ổn định, cần health cron và auto-disable trong P3.
+
+## 3. Model Catalog — 316 free models
+
+`models.yaml:1` đã được sync từ freellms:
+
+```bash
+python scripts/sync-freellms.py   # fetch freellms.org -> data/*.json + models.yaml
+# hoặc
+npm run sync:freellms -w apps-gateway
+```
+
+Mỗi entry:
 
 ```yaml
-- id: groq/llama-3.3-70b-versatile
-  provider: groq
-  context_length: 131072
-  free_tier: { rpm: 30, rpd: 14400 }
-  aliases: [llama-3.3-70b, auto]
-- id: gemini/gemini-2.0-flash
-  provider: gemini
-  context_length: 1000000
-  aliases: [gemini-flash, gemini]
+- id: nvidia-nim/z-ai/glm-5.2
+  provider: nvidia-nim
+  context_length: 1048576
+  score: 94
+  tier: permanent
+  verified: true
+  capabilities: [text, reasoning]
+  limit: "Up to 40 RPM"
 ```
 
-Dashboard `/models` hiển thị 260+ models, filter `free forever`.
-
-**Alias thông minh** (`smart_default`):
+Dashboard `/models` (Vite) và `GET /v1/models?provider=nvidia-nim` phục vụ từ `data/freellms-models-free.json:1` (316 rows, có `score`, `verified`, `limit`). Alias vẫn hỗ trợ:
 
 ```
-auto           -> provider rẻ nhất còn quota
-gpt-4 / gpt4   -> groq/llama-3.3-70b hoặc gemini-2.0-flash
-claude-3       -> cohere/command-r-plus hoặc huggingface fallback
-gemini-flash   -> gemini/gemini-2.0-flash
-llama          -> groq/llama-3.3-70b
+auto           -> nvidia-nim, groq, cerebras, google-gemini, cloudflare
+gpt-4 / gpt4   -> groq, cerebras, google-gemini, openrouter, nvidia-nim
+claude-3       -> cohere, hugging-face, openrouter, mistral-ai
+gemini-flash   -> google-gemini
+llama          -> groq, cerebras, nvidia-nim, sambanova, ovhcloud
+qwen           -> modelscope, ovhcloud, siliconflow, alibaba
+glm            -> z-ai-zhipu-ai, nvidia-nim, modelscope
+code           -> kilo-code, opencode, cohere, mistral-ai
 ```
 
-## 3. Thêm provider mới
+Chi tiết top 30 theo score: xem `docs/FREELLMS_FREE_TIER.md:1`.
 
-1. Tạo `apps/gateway/src/providers/<id>.ts` implement `Provider`:
-
-```ts
-import type { Provider, ChatRequest } from "./base.js";
-
-export const myProvider: Provider = {
-  id: "my-provider",
-  type: "openai-compatible",
-  async chat(req: ChatRequest, apiKey: string) {
-    return fetch("https://api.myprovider.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: req.model,
-        messages: req.messages,
-        stream: req.stream,
-        temperature: req.temperature,
-      }),
-    });
-  },
-  async models() {
-    return [{ id: "my-model", provider: "my-provider", context_length: 8192 }];
-  },
-  async health(apiKey: string) {
-    const res = await fetch("https://api.myprovider.com/v1/models", {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return res.ok;
-  },
-};
-```
-
-2. Đăng ký trong `apps/gateway/src/providers/registry.ts`:
-
-```ts
-import { myProvider } from "./my-provider.js";
-export const providers = { groq, gemini, cerebras, myProvider };
-```
-
-3. Thêm env vào `.env.example`:
+## 4. Fallback Tiers (đã cập nhật trong .env.example & config.ts)
 
 ```env
-MY_PROVIDER_API_KEYS=sk_xxx,sk_yyy
+FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]
 ```
 
-4. Thêm vào `models.yaml` và chạy `bun run sync:providers`.
+Router `apps/gateway/src/lib/router.ts:1` dùng tier này + `providerMeta` để fallback khi 429/timeout.
 
+## 5. Thêm provider mới
+
+1. Thêm env vào `.env.example` (theo bảng trên)
+2. Thêm vào `apps/gateway/src/config.ts:19` `providerKeys`
+3. Đăng ký trong `apps/gateway/src/providers/registry.ts:1`:
+
+```ts
+export const myProvider = createOpenAICompatibleProvider({ id: "my-provider", baseUrl: "https://api.myprovider.com/v1" });
+export const providers = { ..., myProvider };
+```
+
+4. Chạy `python scripts/sync-freellms.py` để cập nhật `models.yaml` nếu provider có trên freellms
 5. Test:
 
 ```bash
@@ -128,17 +129,8 @@ curl http://localhost:8080/v1/chat/completions \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-Với `gemini`/`anthropic` type, cần thêm `format-translator` (tham khảo `apps/gateway/src/lib/format-translator.ts`).
+## 6. Health Check
 
-## 4. Health Check
-
-`GET /api/providers/health` — 1-click test all keys (như `free-llm-gateway`):
-
-```json
-{
-  "groq": { "ok": true, "latencyMs": 123, "models": 8 },
-  "gemini": { "ok": false, "error": "429 rate limit" }
-}
-```
-
-Cron mỗi 5 phút tự disable provider fail.
+`GET /api/providers` — trả `detailed[]` với `free_models`, `keys`, `status` từ freellms + config  
+`GET /api/providers/health` — stub P3 sẽ ping tất cả 30 providers  
+`GET /api/stats` — `providers: 30`, `free_models: 316`
