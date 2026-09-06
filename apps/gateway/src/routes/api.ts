@@ -137,6 +137,47 @@ apiRoute.post("/verify", async (c) => {
   return c.json(report);
 });
 
+apiRoute.get("/models/health", async (c) => {
+  const provider = c.req.query("provider");
+  const model = c.req.query("model");
+  const limit = Math.min(parseInt(c.req.query("limit") || "10", 10), 50);
+  const { probeModel, probeModels } = await import("../jobs/probe-models.js");
+  const { readDataJson } = await import("../lib/paths.js");
+
+  if (model) {
+    // Single model probe: ?model=nvidia-nim/z-ai/glm-5.2
+    const result = await probeModel(model.split("/")[0], model);
+    return c.json(result);
+  }
+
+  // Bulk probe: provider filter or top models
+  const all = readDataJson<any[]>("freellms-models-free.json", []);
+  let ids: string[] = all.map((m: any) => `${m.slug}/${m.name}`);
+  if (provider) ids = ids.filter((id) => id.startsWith(provider + "/"));
+  ids = ids.slice(0, limit);
+  if (ids.length === 0) return c.json({ error: "no models found", provider, limit }, 400);
+  const results = await probeModels(ids, { concurrency: 3 });
+  const summary = {
+    total: results.length,
+    usable: results.filter((r) => r.status === "usable").length,
+    unusable: results.filter((r) => r.status === "unusable").length,
+    no_key: results.filter((r) => r.status === "no-key").length,
+    error: results.filter((r) => r.status === "error" || r.status === "timeout").length,
+  };
+  return c.json({ provider: provider || "all", limit, summary, models: results });
+});
+
+apiRoute.get("/models/health/:id", async (c) => {
+  const id = c.req.param("id");
+  // Hono param stops at /, so we also try to get full path after /models/health/
+  const full = c.req.url.split("/api/models/health/")[1]?.split("?")[0];
+  const modelId = full ? decodeURIComponent(full) : id;
+  const { probeModel } = await import("../jobs/probe-models.js");
+  const providerId = modelId.split("/")[0];
+  const result = await probeModel(providerId, modelId);
+  return c.json(result);
+});
+
 apiRoute.get("/keys", (c) => {
   const keys = listVirtualKeys();
   return c.json({ object: "list", data: keys, total: keys.length });
