@@ -124,7 +124,7 @@ const dict: Record<Lang, Record<string, string>> = {
 const LangContext = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: string) => string }>({ lang: "vi", setLang: () => {}, t: (k) => k });
 
 export function LangProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("lang") as Lang) || "vi");
+  const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("lang") as Lang) || "en");
   useEffect(() => { localStorage.setItem("lang", lang); }, [lang]);
   const setLang = (l: Lang) => setLangState(l);
   const t = (k: string) => dict[lang][k] || dict["en"][k] || k;
