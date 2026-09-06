@@ -28,13 +28,16 @@ export default function Dashboard() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-        <div className="card">
+        <div className="card" style={{ minWidth: 0, overflow: "hidden" }}>
           <h3>Gateway Health</h3>
-          <pre style={{ fontSize: 11, overflow: "auto", maxHeight: 220 }}>{JSON.stringify(health, null, 2) || "loading..."}</pre>
+          <pre style={{ fontSize: 11, maxHeight: 220, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere", margin: 0 }}>{JSON.stringify(health, null, 2) || "loading..."}</pre>
         </div>
-        <div className="card">
-          <h3>Stats Detail</h3>
-          <pre style={{ fontSize: 11, overflow: "auto", maxHeight: 220 }}>{JSON.stringify(stats, null, 2) || "loading..."}</pre>
+        <div className="card" style={{ minWidth: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>Stats Detail</h3>
+            <button onClick={() => navigator.clipboard.writeText(JSON.stringify(stats, null, 2))} style={{ fontSize: 11, padding: "4px 8px" }}>Copy</button>
+          </div>
+          <pre style={{ fontSize: 11, maxHeight: 220, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere", margin: 0, maxWidth: "100%" }}>{JSON.stringify(stats, null, 2).slice(0, 4000) || "loading..."}{JSON.stringify(stats, null, 2).length > 4000 ? "\n... (truncated, Copy để xem đủ)" : ""}</pre>
         </div>
       </div>
 
