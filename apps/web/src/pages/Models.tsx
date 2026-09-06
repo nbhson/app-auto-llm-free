@@ -19,6 +19,8 @@ export default function Models() {
   const [models, setModels] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
+  const [provider, setProvider] = useState("");
+  const [providerDebounced, setProviderDebounced] = useState("");
   const [verified, setVerified] = useState<string>("all");
   const [live, setLive] = useState<Record<string, any>>({});
   const [checking, setChecking] = useState(false);
@@ -49,11 +51,13 @@ export default function Models() {
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
+  useEffect(() => { const id = setTimeout(() => setProviderDebounced(provider.trim()), 400); return () => clearTimeout(id); }, [provider]);
 
   const fetchModels = () => {
     const params = new URLSearchParams();
     if (verified !== "all") params.set("verified", verified);
     if (qDebounced) params.set("q", qDebounced);
+    if (providerDebounced) params.set("provider", providerDebounced);
     if (hasKeyOnly) params.set("hasKey", "1");
     // When hide filters are on, fetch larger set and do client-side pagination after filtering to ensure each page has full limit visible
     const needClientSide = hide404 || hidePayment;
@@ -78,9 +82,9 @@ export default function Models() {
       const map: Record<string, number> = {}; for (const l of d.data || []) { const id = l.model || ""; map[id] = (map[id] || 0) + 1; } setUsage(map);
     }).catch(() => {});
   };
-  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, hasKeyOnly, hide404, hidePayment]);
-  useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, hasKeyOnly, hide404, hidePayment]);
-  useEffect(() => { setPage(1); }, [qDebounced, verified, limit, hasKeyOnly, hide404, hidePayment]);
+  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment]);
+  useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment]);
+  useEffect(() => { setPage(1); }, [qDebounced, providerDebounced, verified, limit, hasKeyOnly, hide404, hidePayment]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
   useEffect(() => { localStorage.setItem("hidePayment", hidePayment ? "1" : "0"); }, [hidePayment]);
   useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
@@ -109,6 +113,11 @@ export default function Models() {
   const isDisabled = (m: any) => {
     const h = live[m.id] || (m as any).health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
   };
+  // For hide filtering, use only persisted health (m.health / persisted_404 / live_status), NOT transient live[m.id] from just-checked Check Live.
+  // This keeps just-checked 404/payment rows visible with strikethrough so user can see the Live result instead of instantly disappearing.
+  const isDisabledForHide = (m: any) => {
+    const h = (m as any).health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
+  };
   const isPaymentError = (m: any) => {
     const h = live[m.id] || (m as any).health;
     if (!h) return false;
@@ -121,10 +130,22 @@ export default function Models() {
     if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
     return false;
   };
+  const isPaymentForHide = (m: any) => {
+    const h = (m as any).health;
+    if (!h) return false;
+    const status = h.http_status;
+    const err = (h.error || h.message || "").toLowerCase();
+    if (status === 402 || status === 429) {
+      if (/out of credits|no payment|payment method|insufficient|quota|billing|payment_required|unpaid|exceeded|balance|credit/i.test(err)) return true;
+      if (status === 402) return true;
+    }
+    if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
+    return false;
+  };
   const hideActive = hide404 || hidePayment;
   let filteredAfterHide = filtered;
-  if (hide404) filteredAfterHide = filteredAfterHide.filter((m) => !isDisabled(m));
-  if (hidePayment) filteredAfterHide = filteredAfterHide.filter((m) => !isPaymentError(m));
+  if (hide404) filteredAfterHide = filteredAfterHide.filter((m) => !isDisabledForHide(m));
+  if (hidePayment) filteredAfterHide = filteredAfterHide.filter((m) => !isPaymentForHide(m));
   // When hide filters are active, we fetched 100 and do client-side pagination to ensure each page has full limit visible
   const totalDisplay = hideActive ? filteredAfterHide.length : total;
   const totalPagesDisplay = hideActive ? Math.max(1, Math.ceil(filteredAfterHide.length / limit)) : totalPages;
@@ -166,9 +187,38 @@ export default function Models() {
 
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[280px] max-w-[380px]">
+          <div className="relative flex-1 min-w-[220px] max-w-[320px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input placeholder="Filter by ID..." value={q} onChange={(e) => setQ(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
+            <input placeholder="Filter by ID..." value={q} onChange={(e) => setQ(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
+            {q && <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full"><X className="w-3 h-3 text-slate-400" /></button>}
+          </div>
+          <div className="relative flex-1 min-w-[180px] max-w-[260px]">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input list="provider-list" placeholder="Filter by provider..." value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
+            {provider && <button onClick={() => setProvider("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full"><X className="w-3 h-3 text-slate-400" /></button>}
+            <datalist id="provider-list">
+              <option value="nvidia-nim" />
+              <option value="openrouter" />
+              <option value="kilo-code" />
+              <option value="opencode" />
+              <option value="google-gemini" />
+              <option value="groq" />
+              <option value="cerebras" />
+              <option value="modelscope" />
+              <option value="cloudflare-workers-ai" />
+              <option value="cohere" />
+              <option value="mistral-ai" />
+              <option value="hugging-face" />
+              <option value="agnes-ai" />
+              <option value="sambanova" />
+              <option value="chutes-ai" />
+              <option value="llm7-io" />
+              <option value="ovhcloud-ai-endpoints" />
+              <option value="ollama-cloud" />
+              <option value="z-ai-zhipu-ai" />
+              <option value="aion-labs" />
+              <option value="pollinations" />
+            </datalist>
           </div>
           <select value={verified} onChange={(e) => setVerified(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold">
             <option value="all">{t("models.verified_all")} ({total})</option>
@@ -210,10 +260,11 @@ export default function Models() {
           <button onClick={syncLive} disabled={syncing} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold ${syncing ? "bg-slate-100 text-slate-500 border border-slate-200" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>{syncing ? t("models.syncing") : t("models.sync")}</button>
           <button onClick={fetchModels} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50"><RefreshCw className="w-3.5 h-3.5" /> {t("models.refresh")}</button>
         </div>
-        {(qDebounced || verified !== "all" || hasKeyOnly || hide404 || hidePayment) && (
+        {(qDebounced || providerDebounced || verified !== "all" || hasKeyOnly || hide404 || hidePayment) && (
           <div className="flex flex-wrap gap-2 items-center text-xs text-slate-600 border-t border-slate-100 pt-3">
             <span className="font-semibold">Filters:</span>
-            {qDebounced && <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">{qDebounced}<button onClick={() => setQ("")} className="p-0.5 hover:bg-slate-200 rounded-full"><X className="w-3 h-3" /></button></span>}
+            {qDebounced && <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">id: {qDebounced}<button onClick={() => setQ("")} className="p-0.5 hover:bg-slate-200 rounded-full"><X className="w-3 h-3" /></button></span>}
+            {providerDebounced && <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-2.5 py-1 rounded-full font-semibold">provider: {providerDebounced}<button onClick={() => setProvider("")} className="p-0.5 hover:bg-blue-100 rounded-full"><X className="w-3 h-3" /></button></span>}
             {verified !== "all" && <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">{verified}<button onClick={() => setVerified("all")} className="p-0.5 hover:bg-slate-200 rounded-full"><X className="w-3 h-3" /></button></span>}
             {hasKeyOnly && <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">{t("models.hasKey")}</span>}
             {hide404 && <span className="bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-1 rounded-full font-semibold">{t("models.hide404")}</span>}
