@@ -14,8 +14,8 @@ function getMasterKey() {
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: "◈", end: true },
-  { to: "/models", label: "Models", icon: "◫", desc: "316" },
   { to: "/providers", label: "Providers", icon: "⬡", desc: "30" },
+  { to: "/models", label: "Models", icon: "◫", desc: "316" },
   { to: "/keys", label: "Keys", icon: "🔑" },
   { to: "/logs", label: "Logs", icon: "≡" },
 ];
@@ -79,8 +79,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/models" element={<Models />} />
           <Route path="/providers" element={<Providers />} />
+          <Route path="/models" element={<Models />} />
           <Route path="/keys" element={<Keys />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
