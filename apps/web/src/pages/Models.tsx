@@ -79,7 +79,7 @@ export default function Models() {
     }).catch(() => {});
   };
   useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, hasKeyOnly, hide404, hidePayment]);
-  useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, page, limit, hasKeyOnly, hide404, hidePayment]);
+  useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, hasKeyOnly, hide404, hidePayment]);
   useEffect(() => { setPage(1); }, [qDebounced, verified, limit, hasKeyOnly, hide404, hidePayment]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
   useEffect(() => { localStorage.setItem("hidePayment", hidePayment ? "1" : "0"); }, [hidePayment]);
