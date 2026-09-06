@@ -1,16 +1,32 @@
 import type { Provider, ChatRequest, ModelInfo } from "./base.js";
 import { translateOpenAIToGemini, translateGeminiToOpenAI } from "../lib/format-translator.js";
+import { geminiToOpenAIStream } from "../lib/gemini-stream.js";
+
+function sanitizeGeminiModel(raw: string): string {
+  // raw like "gemini/gemini 3.6 flash" or "gemini-2.0-flash" or "auto"
+  const base = raw.includes("/") ? raw.split("/").pop()! : raw;
+  const cleaned = base.trim().toLowerCase();
+  // Map freellms names with spaces to real Gemini ids
+  if (cleaned.includes("3.6")) return "gemini-2.0-flash";
+  if (cleaned.includes("3.5") && cleaned.includes("lite")) return "gemini-2.0-flash-lite";
+  if (cleaned.includes("3.5")) return "gemini-2.0-flash";
+  if (cleaned.includes("2.0")) return "gemini-2.0-flash";
+  if (cleaned.includes("1.5")) return "gemini-1.5-flash";
+  if (cleaned === "auto" || cleaned === "gemini" || cleaned === "gemini-flash") return "gemini-2.0-flash";
+  // Keep dash form if looks like gemini-*
+  if (cleaned.startsWith("gemini-")) return cleaned.replace(/\s+/g, "-");
+  return "gemini-2.0-flash";
+}
 
 export const geminiProvider: Provider = {
   id: "gemini",
   type: "gemini",
   async chat(req: ChatRequest, apiKey: string): Promise<Response> {
-    // Gemini streaming vs non-streaming uses different endpoint
-    const model = req.model.includes("/") ? req.model.split("/").pop()! : req.model;
-    const geminiModel = model.replace("gemini/", "") || "gemini-2.0-flash";
+    const geminiModel = sanitizeGeminiModel(req.model);
     const isStream = req.stream ?? false;
     const endpoint = isStream ? "streamGenerateContent" : "generateContent";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:${endpoint}?key=${apiKey}`;
+    // alt=sse for true SSE from Gemini
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:${endpoint}${isStream ? "?alt=sse" : ""}&key=${apiKey}`;
 
     const geminiBody = translateOpenAIToGemini(req);
 
@@ -29,21 +45,23 @@ export const geminiProvider: Provider = {
       });
     }
 
-    // Streaming: Gemini returns JSON array stream, we convert to SSE
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...geminiBody, generationConfig: { ...geminiBody.generationConfig } }),
+      body: JSON.stringify(geminiBody),
     });
     if (!res.ok) return res;
-
-    // For MVP, passthrough with minimal transform — real SSE conversion in P2
-    // Return as SSE for gateway to proxy
     const stream = res.body;
     if (!stream) return res;
-    return new Response(stream, {
+    // Transform Gemini SSE JSON to OpenAI SSE
+    const ct = res.headers.get("content-type") || "";
+    // If Gemini already returns text/event-stream with JSON, transform; else wrap
+    const transformed = ct.includes("text/event-stream") || ct.includes("application/json")
+      ? geminiToOpenAIStream(stream, req.model)
+      : stream;
+    return new Response(transformed, {
       status: 200,
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
     });
   },
   async models(apiKey?: string): Promise<ModelInfo[]> {

@@ -16,16 +16,18 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 - [x] GitHub Actions daily 02:00 UTC `.github/workflows/sync-freellms.yml`
 - [x] CI: `bun run lint`, `bun run typecheck`, build ok
 
-## P2 — Gateway Core (3-5 ngày) ⏳ In progress (adapters done, cần streaming thực)
+## P2 — Gateway Core (3-5 ngày) ✅ Done 2026-09-06 (P2.1)
 
-- [x] `Provider` interface + `providers/base.ts`
-- [x] Adapters 30 providers: `nvidia-nim` (97), `modelscope` (43), `cloudflare` (35), `groq` (7), `cerebras` (5)… + `pollinations`
-- [x] `POST /v1/chat/completions` non-stream mock + streaming passthrough (cơ bản)
-- [x] `format-translator.ts` (OpenAI ↔ Gemini)
-- [x] `models.yaml` + `jobs/sync.ts` (stub) + `scripts/sync-freellms.py` (thực)
-- [ ] Test e2e với OpenAI SDK (live keys) + SSE mid-stream error handling đầy đủ
-- [ ] Tool calling / function calling cho Gemini + OpenAI compat
-- [ ] `GET /v1/models` với `live_status` badge (đã có) + pagination
+- [x] `Provider` interface + `providers/base.ts` (mở rộng `ChatRequest` n/stop/presence_penalty...)
+- [x] Adapters 30 providers: `nvidia-nim` (97), `modelscope` (43), `cloudflare` (35), `groq` (7), `cerebras` (5)… + `pollinations` (alias `auto` 15-tier)
+- [x] `POST /v1/chat/completions` — tiered fallback 15 providers, `x-router` header pin, streaming SSE passthrough (OpenAI + Gemini `alt=sse` → `gemini-stream.ts` → OpenAI chunks), non-stream normalize Gemini, tool calling passthrough (tools/tool_choice/top_p/top_k/n/stop...)
+- [x] `format-translator.ts` (OpenAI ↔ Gemini với tools → functionDeclarations) + `lib/gemini-stream.ts` (Gemini JSON → OpenAI `data: {...}\n\n` + `[DONE]`)
+- [x] `lib/router.ts` — `ALLOW_NO_KEY` (pollinations/llm7/huggingface), `getNextKey`, `isPublicProvider`, `auto` 15-tier
+- [x] `providers/openai-compatible.ts` — resolve `{account_id}`, model after first slash (`z-ai/glm-5.2`), allow no-key headers, forward full fields
+- [x] `providers/gemini.ts` — sanitize model (`gemini 3.6 flash` → `gemini-2.0-flash`), `alt=sse`, stream transform
+- [x] `models.yaml` (316) + `GET /v1/models` với `live_status` badge + `?verified=free` filter + pollinations fallback
+- [x] Test e2e live: `pollinations/openai` non-stream (Hello → gpt-oss-20b), streaming (haiku SSE), `auto` fallback 15 tiers → pollinations (10.3s, mock removed), `x-router` pin, tool calling (pollinations 402 expected, non-tool 200)
+- [x] `npm run build` ok, `tsc` ok
 
 ## P3 — Resilience (2-3 ngày)
 

@@ -6,34 +6,53 @@ export function createOpenAICompatibleProvider(opts: {
   modelsPath?: string;
 }): Provider {
   const modelsPath = opts.modelsPath || "/models";
+  // Resolve templated baseUrl like cloudflare {account_id}
+  function resolveBase(): string {
+    let base = opts.baseUrl.replace(/\/$/, "");
+    if (base.includes("{account_id}")) {
+      const acct = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+      base = base.replace("{account_id}", acct);
+    }
+    return base;
+  }
   return {
     id: opts.id,
     type: "openai-compatible",
     async chat(req: ChatRequest, apiKey: string): Promise<Response> {
-      const url = `${opts.baseUrl.replace(/\/$/, "")}/chat/completions`;
+      const base = resolveBase();
+      const url = `${base}/chat/completions`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      // Extract model after provider prefix (e.g. nvidia-nim/z-ai/glm-5.2 -> z-ai/glm-5.2)
+      const rawModel = req.model.includes("/") ? req.model.split("/").slice(1).join("/") : req.model;
+      const model = rawModel || req.model;
       return fetch(url, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
-          model: req.model,
-          messages: req.messages,
+          model,
           temperature: req.temperature,
           max_tokens: req.max_tokens,
           stream: req.stream ?? false,
           tools: req.tools,
           tool_choice: req.tool_choice,
           top_p: req.top_p,
+          top_k: (req as any).top_k,
+          n: req.n,
+          stop: req.stop,
+          presence_penalty: req.presence_penalty,
+          frequency_penalty: req.frequency_penalty,
+          user: req.user,
         }),
       });
     },
     async models(apiKey?: string): Promise<ModelInfo[]> {
-      const url = `${opts.baseUrl.replace(/\/$/, "")}${modelsPath}`;
+      const base = resolveBase();
+      const url = `${base}${modelsPath}`;
       const headers: Record<string, string> = {};
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-      // Allow no-key for public providers (llm7, huggingface router still needs key but we try)
       const res = await fetch(url, { headers });
       if (!res.ok) return [];
       const data: any = await res.json().catch(() => ({}));
@@ -47,7 +66,8 @@ export function createOpenAICompatibleProvider(opts: {
     },
     async health(apiKey: string): Promise<boolean> {
       try {
-        const url = `${opts.baseUrl.replace(/\/$/, "")}${modelsPath}`;
+        const base = resolveBase();
+        const url = `${base}${modelsPath}`;
         const headers: Record<string, string> = {};
         if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
         const res = await fetch(url, { headers });

@@ -14,7 +14,7 @@ export const providers: Record<string, Provider> = {
   cerebras: OPENAI({ id: "cerebras", baseUrl: "https://api.cerebras.ai/v1" }), // 5
   "github-models": OPENAI({ id: "github-models", baseUrl: "https://models.github.ai/inference" }), // 13, quota
   "ovhcloud-ai-endpoints": OPENAI({ id: "ovhcloud-ai-endpoints", baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1" }), // 10
-  cohere: OPENAI({ id: "cohere", baseUrl: "https://api.cohere.com/v2" }), // 10, rerank/embedding
+  cohere: OPENAI({ id: "cohere", baseUrl: "https://api.cohere.ai/compatibility/v1" }), // 10, rerank/embedding (OpenAI compat)
   "mistral-ai": OPENAI({ id: "mistral-ai", baseUrl: "https://api.mistral.ai/v1" }), // 9, quota
   mistral: OPENAI({ id: "mistral", baseUrl: "https://api.mistral.ai/v1" }), // alias
 
@@ -90,9 +90,25 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   deepseek: { name: "DeepSeek", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
 };
 
-// Alias map for smart routing (freellms-aware)
+// Alias map for smart routing (freellms-aware) — auto includes full 4-tier + public fallback
 export const modelAliases: Record<string, string[]> = {
-  auto: ["nvidia-nim", "groq", "cerebras", "google-gemini", "cloudflare-workers-ai"],
+  auto: [
+    "nvidia-nim",
+    "groq",
+    "cerebras",
+    "google-gemini",
+    "cloudflare-workers-ai",
+    "cohere",
+    "sambanova",
+    "siliconflow",
+    "ovhcloud-ai-endpoints",
+    "modelscope",
+    "llm7-io",
+    "hugging-face",
+    "openrouter",
+    "kilo-code",
+    "pollinations",
+  ],
   "gpt-4": ["groq", "cerebras", "google-gemini", "openrouter", "nvidia-nim"],
   "gpt-3.5": ["groq", "pollinations", "ovhcloud-ai-endpoints", "modelscope"],
   "claude-3": ["cohere", "hugging-face", "openrouter", "mistral-ai"],

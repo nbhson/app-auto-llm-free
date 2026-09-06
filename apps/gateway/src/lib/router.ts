@@ -30,14 +30,19 @@ export function getProvidersForRequest(model: string, strategy: Strategy = "tier
   return ordered;
 }
 
+const ALLOW_NO_KEY = new Set(["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"]);
+
 export function getNextKey(providerId: string): string | null {
   const keys = config.providerKeys[providerId] || [];
   if (keys.length === 0) {
-    // pollinations etc don't need key
-    if (providerId === "pollinations") return "";
+    if (ALLOW_NO_KEY.has(providerId)) return "";
     return null;
   }
   const key = keys[rrIndex % keys.length];
   rrIndex++;
   return key;
+}
+
+export function isPublicProvider(providerId: string): boolean {
+  return ALLOW_NO_KEY.has(providerId);
 }

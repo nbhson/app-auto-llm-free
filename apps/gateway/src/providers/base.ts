@@ -14,6 +14,12 @@ export interface ChatRequest {
   tools?: unknown[];
   tool_choice?: unknown;
   top_p?: number;
+  top_k?: number;
+  n?: number;
+  stop?: string | string[];
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  user?: string;
 }
 
 export interface ModelInfo {

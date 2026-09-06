@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
-import { getProvidersForRequest, getNextKey } from "../../lib/router.js";
+import { getProvidersForRequest, getNextKey, isPublicProvider } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
 import { logger } from "../../middleware/logger.js";
 
@@ -14,6 +14,7 @@ const chatSchema = z.object({
       content: z.union([z.string(), z.array(z.any())]),
       tool_call_id: z.string().optional(),
       name: z.string().optional(),
+      tool_calls: z.array(z.any()).optional(),
     })
   ),
   temperature: z.number().optional(),
@@ -22,6 +23,12 @@ const chatSchema = z.object({
   tools: z.array(z.any()).optional(),
   tool_choice: z.any().optional(),
   top_p: z.number().optional(),
+  top_k: z.number().optional(),
+  n: z.number().optional(),
+  stop: z.union([z.string(), z.array(z.string())]).optional(),
+  presence_penalty: z.number().optional(),
+  frequency_penalty: z.number().optional(),
+  user: z.string().optional(),
 });
 
 export const chatRoute = new Hono();
@@ -32,21 +39,29 @@ chatRoute.post(
   async (c) => {
     const body = c.req.valid("json");
     const model = body.model || config.defaultModel;
-    const providerOrder = getProvidersForRequest(model, "tiered");
 
-    // Try providers in order with stub fallback
+    // x-router header to pin provider (e.g. x-router: nvidia-nim)
+    const pinned = c.req.header("x-router")?.trim();
+    let providerOrder: string[];
+    if (pinned && providers[pinned]) {
+      providerOrder = [pinned, ...getProvidersForRequest(model, "tiered").filter((p) => p !== pinned)];
+      logger.info({ pinned, model }, "x-router pinned");
+    } else {
+      providerOrder = getProvidersForRequest(model, "tiered");
+    }
+
     const errors: any[] = [];
     for (const pid of providerOrder) {
       const provider = providers[pid];
       if (!provider) continue;
       const key = getNextKey(pid);
       if (key === null) {
-        errors.push({ provider: pid, error: "no key configured" });
+        errors.push({ provider: pid, error: "no key configured (set " + pid.toUpperCase().replace(/-/g, "_") + "_API_KEYS)" });
         continue;
       }
       try {
-        // For providers without key (pollinations) we still try; for others if key empty skip
-        if (pid !== "pollinations" && !key) {
+        // Allow public providers without key (pollinations, llm7-io, hugging-face)
+        if (!key && !isPublicProvider(pid)) {
           errors.push({ provider: pid, error: "missing key" });
           continue;
         }
@@ -60,16 +75,20 @@ chatRoute.post(
             tools: body.tools,
             tool_choice: body.tool_choice,
             top_p: body.top_p,
+            top_k: body.top_k,
+            n: body.n,
+            stop: body.stop,
+            presence_penalty: body.presence_penalty,
+            frequency_penalty: body.frequency_penalty,
+            user: body.user,
           },
           key
         );
 
-        // If provider returned error, fallback
+        // If provider returned error, fallback to next tier
         if (!res.ok) {
           const text = await res.text().catch(() => "");
           errors.push({ provider: pid, status: res.status, error: text.slice(0, 500) });
-          // 401/403 shouldn't fallback to same tier? but for P1 we fallback anyway unless 400
-          if (res.status === 400) break;
           continue;
         }
 

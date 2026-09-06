@@ -59,18 +59,34 @@ modelsRoute.get("/", async (c) => {
   if (freellmsModels.length > 0) {
     for (const m of freellmsModels) {
       if (providerFilter && m.owned_by !== providerFilter) continue;
-      // Annotate with live verification if exists
       const v = verifiedMap.get(m.id);
       const annotated = v
         ? { ...m, live_status: v.status, live_free: v.live_free, live_found: v.live_found, last_verified: v.last_verified, verified_error: v.error }
         : { ...m, live_status: "unverified_no_data" as const, last_verified: null };
-      // Apply verified filter
       if (verifiedFilter) {
         if (verifiedFilter === "free" && annotated.live_status !== "verified_free") continue;
         if (verifiedFilter === "deprecated" && annotated.live_status !== "deprecated") continue;
         if (verifiedFilter === "unverified" && !["unverified_no_key", "unverified_no_data", "error"].includes(annotated.live_status)) continue;
       }
       all.push(annotated);
+    }
+    // Always include pollinations public fallback (not in freellms)
+    const pollinationsModel = {
+      id: "pollinations/openai",
+      object: "model",
+      owned_by: "pollinations",
+      provider: "pollinations",
+      display_name: "Pollinations OpenAI",
+      context_length: 8192,
+      score: 50,
+      tier: "permanent",
+      live_status: "public",
+      capabilities: ["text"],
+      limit: "no key",
+      created: 1715433600,
+    };
+    if (!providerFilter || providerFilter === "pollinations") {
+      if (!verifiedFilter || verifiedFilter === "free") all.push(pollinationsModel);
     }
     if (!providerFilter || providerFilter === "gateway") {
       all.unshift(

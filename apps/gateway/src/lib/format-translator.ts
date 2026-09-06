@@ -1,6 +1,6 @@
 import type { ChatRequest } from "../providers/base.js";
 
-// OpenAI -> Gemini
+// OpenAI -> Gemini (with tools support)
 export function translateOpenAIToGemini(req: ChatRequest) {
   const contents = req.messages
     .filter((m) => m.role !== "system")
@@ -10,17 +10,44 @@ export function translateOpenAIToGemini(req: ChatRequest) {
     }));
 
   const systemInstruction = req.messages.find((m) => m.role === "system");
+
+  // Tools -> Gemini functionDeclarations
+  let tools: any = undefined;
+  if (req.tools && Array.isArray(req.tools) && req.tools.length > 0) {
+    const fns = req.tools
+      .map((t: any) => t.function || t)
+      .filter(Boolean)
+      .map((fn: any) => ({
+        name: fn.name,
+        description: fn.description || "",
+        parameters: fn.parameters,
+      }));
+    if (fns.length > 0) tools = [{ functionDeclarations: fns }];
+  }
+
   return {
     contents,
     systemInstruction: systemInstruction
       ? { parts: [{ text: typeof systemInstruction.content === "string" ? systemInstruction.content : "" }] }
       : undefined,
+    tools,
     generationConfig: {
       temperature: req.temperature,
       maxOutputTokens: req.max_tokens,
       topP: req.top_p,
     },
   };
+}
+
+// Create OpenAI SSE chunk from text delta
+export function createOpenAIChunk(model: string, content: string, finish?: string) {
+  return `data: ${JSON.stringify({
+    id: `chatcmpl-${Date.now()}`,
+    object: "chat.completion.chunk",
+    created: Math.floor(Date.now() / 1000),
+    model,
+    choices: [{ index: 0, delta: { content }, finish_reason: finish || null }],
+  })}\n\n`;
 }
 
 // Gemini -> OpenAI
