@@ -56,12 +56,6 @@ export default function Dashboard() {
         <p style={{ fontSize: 12, color: "#555" }}>Tạo <code>MASTER_KEY</code> và <code>ENCRYPTION_KEY</code> ngay trên trình duyệt (client-side, không gửi server). Dùng thay cho <code>openssl rand -hex</code>.</p>
         <KeyGen />
       </div>
-
-      <div className="card">
-        <h3>Quick Test</h3>
-        <code style={{ display: "block", whiteSpace: "pre-wrap", fontSize: 12 }}>{`curl http://localhost:8080/v1/chat/completions -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`}</code>
-        <p style={{ fontSize: 13, color: "#555" }}>Mặc định dev cho phép bất kỳ <code>fgk-...</code> key nào. Tạo key riêng trong <b>Keys</b> với scope model/provider và RPM limit.</p>
-      </div>
     </div>
   );
 }

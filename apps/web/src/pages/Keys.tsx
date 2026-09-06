@@ -56,6 +56,20 @@ export default function Keys() {
         </tbody>
       </table>
       {keys.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>No keys — tạo key đầu tiên ở trên, hoặc dùng <code>MASTER_KEY</code>.</p>}
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>Quick Test</h3>
+        <p style={{ fontSize: 12, color: "#555" }}>Dùng <code>fgk-...</code> vừa tạo để gọi gateway (thay <code>$FGK_KEY</code> bằng key vừa copy):</p>
+        <code style={{ display: "block", whiteSpace: "pre-wrap", fontSize: 12, background: "#f8fafc", padding: 8, borderRadius: 6, overflow: "auto" }}>{`curl http://localhost:8080/v1/chat/completions \\
+  -H "Authorization: Bearer $FGK_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`}</code>
+        <p style={{ fontSize: 12, color: "#555", marginTop: 8 }}>Hoặc với <code>x-router</code> pin provider public (không cần provider key):</p>
+        <code style={{ display: "block", whiteSpace: "pre-wrap", fontSize: 12, background: "#f8fafc", padding: 8, borderRadius: 6, overflow: "auto" }}>{`curl http://localhost:8080/v1/chat/completions \\
+  -H "Authorization: Bearer $FGK_KEY" -H "x-router: pollinations" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"pollinations/openai","messages":[{"role":"user","content":"Hi"}]}'`}</code>
+      </div>
     </div>
   );
 }
