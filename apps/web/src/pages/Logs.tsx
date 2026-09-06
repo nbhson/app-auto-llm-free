@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
 export default function Logs() {
@@ -58,6 +59,40 @@ export default function Logs() {
         <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white" }}>{live ? "● Live ON" : "Live OFF"}</button>
         <span style={{ fontSize: 12, color: "#666", alignSelf: "center" }}>{stats?.logs?.total ?? 0} total • avg {stats?.logs?.avgLatencyMs ?? 0}ms • {Math.round((stats?.logs?.errorRate || 0) * 100)}% errors</span>
       </div>
+      {stats && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div className="card">
+            <h3>Requests by Provider</h3>
+            {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#2563eb" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+          </div>
+          <div className="card">
+            <h3>Status Distribution</h3>
+            {stats?.logs?.total > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={[
+                    { name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) },
+                    { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) },
+                  ]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                    <Cell fill="#16a34a" /><Cell fill="#dc2626" />
+                  </Pie>
+                  <Tooltip /><Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : <p style={{ fontSize: 12, color: "#888" }}>Chưa có data</p>}
+          </div>
+        </div>
+      )}
       {stats?.logs?.byProvider && <div className="card" style={{ fontSize: 12 }}><b>By provider (last 100):</b> {Object.entries(stats.logs.byProvider).map(([k, v]) => `${k}:${v}`).join(" • ") || "—"}</div>}
       <table>
         <thead><tr><th>Time</th><th>Key</th><th>Provider</th><th>Model</th><th>Tokens</th><th>MS</th><th>Status</th><th>Verified</th></tr></thead>
