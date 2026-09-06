@@ -114,7 +114,6 @@ modelsRoute.get("/", async (c) => {
     }
     // also add gateway aliases and extraModels if hasKey
     const extraModels = [
-      { id: "kilo-code/kilo-auto", object: "model", owned_by: "kilo-code", provider: "kilo-code", display_name: "kilo-auto", context_length: 262000, score: 70, tier: "quota", live_status: "alias", capabilities: ["text"], limit: "~200 req/hr", created: 1715433600 },
       { id: "kilo-code/auto", object: "model", owned_by: "kilo-code", provider: "kilo-code", display_name: "auto", context_length: 262000, score: 70, tier: "quota", live_status: "alias", capabilities: ["text"], limit: "~200 req/hr", created: 1715433600 },
       { id: "openrouter/auto", object: "model", owned_by: "openrouter", provider: "openrouter", display_name: "openrouter/auto", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day", created: 1715433600 },
       { id: "agnes-ai/agnes-2.5-flash", object: "model", owned_by: "agnes-ai", provider: "agnes-ai", display_name: "agnes-2.5-flash", context_length: 256000, score: 82, tier: "permanent", live_status: "alias", capabilities: ["text","vision"], limit: "30 RPM", created: 1715433600 },
@@ -181,7 +180,6 @@ modelsRoute.get("/", async (c) => {
       }
       // Always include free auto aliases (kilo/openrouter) and newer agnes model not in freellms
       const extraModels = [
-        { id: "kilo-code/kilo-auto", object: "model", owned_by: "kilo-code", provider: "kilo-code", display_name: "kilo-auto", context_length: 262000, score: 70, tier: "quota", live_status: "alias", capabilities: ["text"], limit: "~200 req/hr", created: 1715433600 },
         { id: "kilo-code/auto", object: "model", owned_by: "kilo-code", provider: "kilo-code", display_name: "auto", context_length: 262000, score: 70, tier: "quota", live_status: "alias", capabilities: ["text"], limit: "~200 req/hr", created: 1715433600 },
         { id: "openrouter/auto", object: "model", owned_by: "openrouter", provider: "openrouter", display_name: "openrouter/auto", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day", created: 1715433600 },
         { id: "agnes-ai/agnes-2.5-flash", object: "model", owned_by: "agnes-ai", provider: "agnes-ai", display_name: "agnes-2.5-flash", context_length: 256000, score: 82, tier: "permanent", live_status: "alias", capabilities: ["text","vision"], limit: "30 RPM", created: 1715433600 },
