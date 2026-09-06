@@ -56,7 +56,7 @@ export default function Models() {
     if (hasKeyOnly) params.set("hasKey", "1");
     // When hide filters are on, fetch larger set and do client-side pagination after filtering to ensure each page has full limit visible
     const needClientSide = hide404 || hidePayment;
-    const fetchLimit = needClientSide ? 100 : limit;
+    const fetchLimit = needClientSide ? 1000 : limit;
     const fetchPage = needClientSide ? 1 : page;
     params.set("page", String(fetchPage)); params.set("limit", String(fetchLimit));
     fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
@@ -77,8 +77,8 @@ export default function Models() {
       const map: Record<string, number> = {}; for (const l of d.data || []) { const id = l.model || ""; map[id] = (map[id] || 0) + 1; } setUsage(map);
     }).catch(() => {});
   };
-  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, hasKeyOnly]);
-  useEffect(() => { setSelected(new Set()); setLive({}); }, [verified, qDebounced, page, limit, hasKeyOnly]);
+  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, hasKeyOnly, hide404, hidePayment]);
+  useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, page, limit, hasKeyOnly, hide404, hidePayment]);
   useEffect(() => { setPage(1); }, [qDebounced, verified, limit, hasKeyOnly, hide404, hidePayment]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
   useEffect(() => { localStorage.setItem("hidePayment", hidePayment ? "1" : "0"); }, [hidePayment]);

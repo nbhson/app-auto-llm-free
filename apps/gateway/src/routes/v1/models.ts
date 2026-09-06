@@ -92,7 +92,7 @@ modelsRoute.get("/", async (c) => {
   const freeOnly = c.req.query("free") !== "0";
   const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
   const rawLimit = parseInt(c.req.query("limit") || c.req.query("per_page") || "25", 10);
-  const limit = [25, 50].includes(rawLimit) ? rawLimit : 25;
+  const limit = [25, 50, 100, 200, 500, 1000].includes(rawLimit) ? rawLimit : 25;
   const rawQ = (c.req.query("q") || "").trim().toLowerCase();
   const qTokens = rawQ ? rawQ.split(/[\s\-_\/:]+/).filter(Boolean) : [];
   const matchesQ = (id: string, display: string, owned: string) => {
