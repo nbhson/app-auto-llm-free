@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
+import { RefreshCw, Radio } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
@@ -9,145 +10,126 @@ export default function Logs() {
   const [live, setLive] = useState(false);
   const [stats, setStats] = useState<any>(null);
 
+  const [authError, setAuthError] = useState<string | null>(null);
   const load = () => {
-    fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => setLogs(d.data || [])).catch(() => {});
-    fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setStats).catch(() => {});
+    fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { setAuthError(r.status === 401 ? "Unauthorized — check MASTER_KEY in header" : `Error ${r.status}`); return { data: [] }; } setAuthError(null); return r.json(); }).then((d) => setLogs(d.data || [])).catch(() => {});
+    fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { if (r.status === 401) setAuthError("Unauthorized — check MASTER_KEY in header"); return null; } return r.json(); }).then((d) => { if (d?.logs) setStats(d); else if (d && !d.logs) setStats(null); }).catch(() => {});
   };
   useEffect(() => { load(); }, []);
-
   useEffect(() => {
     if (!live) return;
     const key = mk();
-    const es = new EventSource(`/api/logs/stream`);
-    // EventSource can't set headers, fallback to polling for now with interval
-    // Use fetch streaming via polling instead
     let timer: any;
-    // Actually gateway /api/logs/stream requires auth header, EventSource won't send; use fetch + reader
     (async () => {
       try {
         const res = await fetch("/api/logs/stream", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.body) return;
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
+        const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = "";
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const parts = buf.split("\n\n");
-          buf = parts.pop() || "";
-          for (const p of parts) {
-            const line = p.split("\n").find((l) => l.startsWith("data: "));
-            if (line) {
-              try {
-                const obj = JSON.parse(line.slice(6));
-                if (obj.id) setLogs((prev) => [obj, ...prev].slice(0, 100));
-              } catch {}
-            }
-          }
+          const { done, value } = await reader.read(); if (done) break;
+          buf += decoder.decode(value, { stream: true }); const parts = buf.split("\n\n"); buf = parts.pop() || "";
+          for (const p of parts) { const line = p.split("\n").find((l) => l.startsWith("data: ")); if (line) { try { const obj = JSON.parse(line.slice(6)); if (obj.id) setLogs((prev) => [obj, ...prev].slice(0, 100)); } catch {} } }
         }
       } catch {}
     })();
-    // Fallback polling every 2s
     timer = setInterval(load, 2000);
     return () => clearInterval(timer);
   }, [live]);
 
   return (
-    <div>
-      <h2>{t("logs.title")}</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={load}>{t("logs.refresh")}</button>
-        <button onClick={() => setLive(!live)} style={{ background: live ? "#dcfce7" : "white", border: `1px solid ${live ? "#86efac" : "#e2e8f0"}`, display: "flex", gap: 6, alignItems: "center" }}>{live ? t("logs.live_on") : t("logs.live_off")}</button>
-        <span style={{ fontSize: 12, color: "#666", alignSelf: "center" }}>{stats?.logs?.total ?? 0} total • {stats?.logs?.allTimeTokens?.toLocaleString() ?? 0} tokens all-time • avg {stats?.logs?.avgLatencyMs ?? 0}ms/{stats?.logs?.avgTokens ?? 0} tok • {Math.round((stats?.logs?.errorRate || 0) * 100)}% err</span>
+    <div className="space-y-6 pb-12">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("logs.title")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Real-time HTTP proxy logs and token analytics.</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs"><RefreshCw className="w-3.5 h-3.5" />{t("logs.refresh")}</button>
+          <button onClick={() => setLive(!live)} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold shadow-xs border ${live ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-700 border-slate-200"}`}>{live ? <Radio className="w-3.5 h-3.5 animate-pulse" /> : null}{live ? t("logs.live_on") : t("logs.live_off")}</button>
+        </div>
       </div>
-      {stats && (
+
+      {authError && <div className="px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold">⚠️ {authError} — nhập đúng MASTER_KEY ở header trên cùng (localStorage.masterKey). Mặc định là fgk-master-dev-key nếu .env chưa đổi.</div>}
+
+      <div className="px-5 py-3.5 bg-slate-900 text-slate-100 rounded-xl shadow-xs border border-slate-800 flex flex-wrap justify-between gap-3 text-xs font-medium">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />{stats?.logs?.total ?? 0} requests</span>
+          <span className="text-slate-700">•</span><span className="text-slate-300">{stats?.logs?.allTimeTokens?.toLocaleString() ?? 0} tokens all-time</span>
+          <span className="text-slate-700">•</span><span className="font-mono font-bold text-emerald-400">{stats?.logs?.avgLatencyMs ?? 0}ms avg</span>
+          <span className="text-slate-700">•</span><span>{Math.round((stats?.logs?.errorRate || 0) * 100)}% err</span>
+        </div>
+        <span className="text-sky-300 font-mono">{Object.keys(stats?.logs?.byProvider||{}).length} providers</span>
+      </div>
+
+      {stats?.logs && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-            <div className="card">
-              <h3>{t("dashboard.requests_by_provider")}</h3>
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center gap-2 mb-3"><div className="p-1.5 bg-blue-50 rounded-lg"><BarChart width={14} height={14} /></div><h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.requests_by_provider")}</h3></div>
               {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#2563eb" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
+                <ResponsiveContainer width="100%" height={160}><BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="count" fill="#2563eb" radius={[4,4,0,0]} /></BarChart></ResponsiveContainer>
+              ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
             </div>
-            <div className="card">
-              <h3>{t("dashboard.tokens_by_provider")}</h3>
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center gap-2 mb-3"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.tokens_by_provider")}</h3></div>
               {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="tokens" fill="#9333ea" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
+                <ResponsiveContainer width="100%" height={160}><BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="tokens" fill="#9333ea" radius={[4,4,0,0]} /></BarChart></ResponsiveContainer>
+              ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
             </div>
-            <div className="card">
-              <h3>Status Distribution</h3>
+            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Status Distribution</h3>
               {stats?.logs?.total > 0 ? (
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie data={[
-                      { name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) },
-                      { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) },
-                    ]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
-                      <Cell fill="#16a34a" /><Cell fill="#dc2626" />
-                    </Pie>
-                    <Tooltip /><Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
+                <ResponsiveContainer width="100%" height={160}><PieChart><Pie data={[{ name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) }, { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) }]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label><Cell fill="#10b981" /><Cell fill="#ef4444" /></Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
+              ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
             </div>
           </div>
-          <div className="card" style={{ fontSize: 12, marginBottom: 12 }}><b>Tokens:</b> {(stats.logs.totalTokens ?? 0).toLocaleString()} last 100 ({(stats.logs.promptTokens ?? 0).toLocaleString()} prompt + {(stats.logs.completionTokens ?? 0).toLocaleString()} completion, avg {stats.logs.avgTokens ?? 0}/req) • <b>All-time:</b> {(stats.logs.allTimeTokens ?? 0).toLocaleString()} • <b>By provider:</b> {Object.entries(stats.logs.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}</div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs text-xs">
+            <b>Tokens:</b> {(stats?.logs?.totalTokens ?? 0).toLocaleString()} last 100 ({(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt + {(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion, avg {stats?.logs?.avgTokens ?? 0}/req) • <b>All-time:</b> {(stats?.logs?.allTimeTokens ?? 0).toLocaleString()} • <b>By provider:</b> {Object.entries(stats?.logs?.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}
+          </div>
         </>
       )}
-      {stats?.logs?.byProvider && <div className="card" style={{ fontSize: 12 }}><b>By provider (last 100):</b> {Object.entries(stats.logs.byProvider).map(([k, v]) => `${k}:${v}`).join(" • ") || "—"}</div>}
-      <table>
-        <thead><tr><th></th><th>Time</th><th>Key</th><th>Provider</th><th>Model</th><th>Tokens</th><th>MS</th><th>Status</th><th>Verified</th></tr></thead>
-        <tbody>
-          {logs.map((l) => {
-            const expanded = (l as any)._expanded;
-            return (
-              <>
-                <tr key={l.id} style={{ background: expanded ? "#f8fafc" : "transparent" }}>
-                  <td><button onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !(x as any)._expanded } : x))} style={{ fontSize: 11, padding: "2px 6px", minWidth: 28 }}>{expanded ? "−" : "+"}</button></td>
-                  <td style={{ fontSize: 11 }}>{new Date(l.timestamp).toLocaleTimeString()}</td>
-                  <td style={{ fontSize: 11 }}>{l.virtualKeyName || l.virtualKeyId || "-"}</td>
-                  <td><code style={{ fontSize: 11 }}>{l.provider}</code></td>
-                  <td style={{ fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={l.model}>{l.model}</td>
-                  <td style={{ fontSize: 11 }}>{l.totalTokens ?? "-"}<span style={{ color: "#888", fontSize: 10 }}> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td>
-                  <td>{l.latencyMs}</td>
-                  <td>{l.status === 200 ? <span style={{ color: "#16a34a" }}>200</span> : <span style={{ color: "#dc2626" }}>{l.status}</span>}</td>
-                  <td style={{ fontSize: 11 }}>{l.verifiedStatus || "-"}</td>
-                </tr>
-                {expanded && (
-                  <tr key={l.id + "-detail"}>
-                    <td colSpan={9} style={{ background: "#f8fafc", padding: 12 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12 }}>
-                        <div><b>ID:</b> <code>{l.id}</code><br /><b>Time:</b> {new Date(l.timestamp).toLocaleString()}<br /><b>Key:</b> {l.virtualKeyName} ({l.virtualKeyId})<br /><b>Provider:</b> {l.provider}<br /><b>Model:</b> <code>{l.model}</code></div>
-                        <div><b>Tokens:</b> {l.promptTokens ?? 0} prompt + {l.completionTokens ?? 0} completion = <b>{l.totalTokens ?? 0}</b><br /><b>Latency:</b> {l.latencyMs}ms<br /><b>Status:</b> {l.status} {l.error ? `— ${l.error.slice(0, 200)}` : ""}<br /><b>Verified:</b> {l.verifiedStatus || "-"}<br /><b>Error:</b> <pre style={{ fontSize: 11, background: "white", padding: 8, borderRadius: 6, maxHeight: 120, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 4 }}>{l.error || "—"}</pre></div>
-                      </div>
-                      <div style={{ marginTop: 8 }}><b>Raw JSON:</b><pre style={{ fontSize: 11, background: "white", padding: 8, borderRadius: 6, maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(l, null, 2)}</pre></div>
-                    </td>
-                  </tr>
-                )}
-              </>
-            );
-          })}
-        </tbody>
-      </table>
-      {logs.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>{t("logs.no_logs")}</p>}
+
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
+              <tr><th className="px-4 py-3"></th><th className="px-4 py-3">Time</th><th className="px-4 py-3">Key</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Model</th><th className="px-4 py-3">Tokens</th><th className="px-4 py-3">MS</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Verified</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {logs.map((l) => {
+                const expanded = (l as any)._expanded;
+                return (
+                  <>
+                    <tr key={l.id} className={`${expanded ? "bg-slate-50/80" : "hover:bg-slate-50/80"} cursor-pointer`} onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !(x as any)._expanded } : x))}>
+                      <td className="px-4 py-3"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-slate-100 border border-slate-200 text-[11px] font-bold">{expanded ? "−" : "+"}</span></td>
+                      <td className="px-4 py-3 font-mono text-slate-600">{new Date(l.timestamp).toLocaleTimeString()}</td>
+                      <td className="px-4 py-3 font-mono text-[11px]">{l.virtualKeyName || l.virtualKeyId || "-"}</td>
+                      <td className="px-4 py-3"><span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200">{l.provider}</span></td>
+                      <td className="px-4 py-3 font-mono text-[11px] max-w-[200px] truncate" title={l.model}>{l.model}</td>
+                      <td className="px-4 py-3 font-mono">{l.totalTokens ?? "-"}<span className="text-slate-400 text-[10px]"> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td>
+                      <td className="px-4 py-3 font-mono">{l.latencyMs}</td>
+                      <td className="px-4 py-3"><span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${l.status === 200 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"}`}>{l.status}</span></td>
+                      <td className="px-4 py-3 text-[11px]">{l.verifiedStatus || "-"}</td>
+                    </tr>
+                    {expanded && (
+                      <tr key={l.id + "-detail"}>
+                        <td colSpan={9} className="bg-slate-50/80 p-4">
+                          <div className="grid md:grid-cols-2 gap-4 text-xs">
+                            <div className="space-y-1"><div><b>ID:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.id}</code></div><div><b>Time:</b> {new Date(l.timestamp).toLocaleString()}</div><div><b>Key:</b> {l.virtualKeyName} ({l.virtualKeyId})</div><div><b>Provider:</b> {l.provider}</div><div><b>Model:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.model}</code></div></div>
+                            <div className="space-y-1"><div><b>Tokens:</b> {l.promptTokens ?? 0} prompt + {l.completionTokens ?? 0} completion = <b>{l.totalTokens ?? 0}</b></div><div><b>Latency:</b> {l.latencyMs}ms</div><div><b>Status:</b> {l.status}</div><div><b>Verified:</b> {l.verifiedStatus || "-"}</div><pre className="bg-white border border-slate-200 rounded-lg p-3 max-h-32 overflow-auto font-mono text-[11px] whitespace-pre-wrap break-all">{l.error || "—"}</pre></div>
+                          </div>
+                          <div className="mt-3"><b className="text-xs">Raw JSON:</b><pre className="bg-slate-950 text-slate-200 rounded-xl p-4 font-mono text-xs overflow-auto max-h-48 mt-1">{JSON.stringify(l, null, 2)}</pre></div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {logs.length === 0 && <div className="p-8 text-center text-sm text-slate-400">{t("logs.no_logs")}</div>}
+      </div>
     </div>
   );
 }

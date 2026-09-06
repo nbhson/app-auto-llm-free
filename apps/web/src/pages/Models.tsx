@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
+import { Search, RefreshCw, X, Check } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
 function badge(status?: string) {
-  if (status === "verified_free") return <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>verified</span>;
-  if (status === "deprecated") return <span style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>deprecated</span>;
-  if (status === "unverified_no_key") return <span style={{ background: "#fef9c3", color: "#854d0e", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>no-key</span>;
-  if (status === "public" || status === "alias") return <span style={{ background: "#e0e7ff", color: "#3730a3", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>{status}</span>;
-  return <span style={{ background: "#f1f5f9", color: "#64748b", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>{status || "unverified"}</span>;
+  if (status === "verified_free") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">verified</span>;
+  if (status === "deprecated") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">deprecated</span>;
+  if (status === "unverified_no_key") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">no-key</span>;
+  if (status === "public" || status === "alias") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">{status}</span>;
+  return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">{status || "unverified"}</span>;
 }
 
-function parseLimit(limit?: string): string {
-  if (!limit) return "-";
-  // Shorten: "Up to 40 RPM" -> "40 RPM", "15 RPM, 1,500 RPD" -> "15 RPM"
-  return limit;
-}
+function parseLimit(limit?: string): string { return limit || "-"; }
 
 export default function Models() {
   const { t } = useLang();
@@ -32,59 +29,60 @@ export default function Models() {
   const [limit, setLimit] = useState(25);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [hasKeyOnly, setHasKeyOnly] = useState(false);
+  const [hasKeyOnly, setHasKeyOnly] = useState(() => {
+    const v = localStorage.getItem("hasKeyOnly");
+    if (v === null) { localStorage.setItem("hasKeyOnly", "1"); return true; }
+    return v !== "0";
+  });
   const [hide404, setHide404] = useState(() => {
     const v = localStorage.getItem("hide404");
     const migrated = localStorage.getItem("hide404_migrated");
-    if (!migrated) {
-      localStorage.setItem("hide404_migrated", "1");
-      localStorage.setItem("hide404", "1");
-      return true;
-    }
+    if (!migrated) { localStorage.setItem("hide404_migrated", "1"); localStorage.setItem("hide404", "1"); return true; }
+    return v !== "0";
+  });
+  const [hidePayment, setHidePayment] = useState(() => {
+    const v = localStorage.getItem("hidePayment");
+    if (v === null) { localStorage.setItem("hidePayment", "1"); return true; }
     return v !== "0";
   });
   const [syncing, setSyncing] = useState(false);
 
-  // Debounce q 400ms to avoid 429 on typing
-  useEffect(() => {
-    const t = setTimeout(() => setQDebounced(q), 400);
-    return () => clearTimeout(t);
-  }, [q]);
+  useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
 
   const fetchModels = () => {
     const params = new URLSearchParams();
     if (verified !== "all") params.set("verified", verified);
     if (qDebounced) params.set("q", qDebounced);
     if (hasKeyOnly) params.set("hasKey", "1");
-    params.set("page", String(page));
-    params.set("limit", String(limit));
-    fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } })
-      .then((r) => r.json())
-      .then((d) => {
+    // When hide filters are on, fetch larger set and do client-side pagination after filtering to ensure each page has full limit visible
+    const needClientSide = hide404 || hidePayment;
+    const fetchLimit = needClientSide ? 100 : limit;
+    const fetchPage = needClientSide ? 1 : page;
+    params.set("page", String(fetchPage)); params.set("limit", String(fetchLimit));
+    fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
+      if (needClientSide) {
+        // For hide filters, backend returns up to 100, we will handle pagination client-side after filtering in visible logic.
+        // Store all fetched for client-side pagination; total will be recalculated after filtering.
         setModels(d.data || []);
+        // Use backend total as estimate, but visible pagination will be based on filtered length
         setTotal(d.total ?? d.data?.length ?? 0);
-        setTotalPages(d.pagination?.total_pages ?? Math.ceil((d.total ?? 0) / limit) ?? 1);
-      })
-      .catch(() => setModels([]));
+        setTotalPages(Math.max(1, Math.ceil((d.total ?? 0) / limit)));
+      } else {
+        setModels(d.data || []); setTotal(d.total ?? d.data?.length ?? 0); setTotalPages(d.pagination?.total_pages ?? Math.ceil((d.total ?? 0) / limit) ?? 1);
+      }
+    }).catch(() => setModels([]));
   };
-
   const fetchUsage = () => {
-    fetch(`/api/logs?limit=200`, { headers: { Authorization: `Bearer ${mk()}` } })
-      .then((r) => r.json()).then((d) => {
-        const map: Record<string, number> = {};
-        for (const l of d.data || []) {
-          const id = l.model || "";
-          map[id] = (map[id] || 0) + 1;
-        }
-        setUsage(map);
-      }).catch(() => {});
+    fetch(`/api/logs?limit=200`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
+      const map: Record<string, number> = {}; for (const l of d.data || []) { const id = l.model || ""; map[id] = (map[id] || 0) + 1; } setUsage(map);
+    }).catch(() => {});
   };
-
   useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, hasKeyOnly]);
   useEffect(() => { setSelected(new Set()); setLive({}); }, [verified, qDebounced, page, limit, hasKeyOnly]);
-  // Debounce q -> reset page
-  useEffect(() => { setPage(1); }, [qDebounced, verified, limit, hasKeyOnly]);
+  useEffect(() => { setPage(1); }, [qDebounced, verified, limit, hasKeyOnly, hide404, hidePayment]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
+  useEffect(() => { localStorage.setItem("hidePayment", hidePayment ? "1" : "0"); }, [hidePayment]);
+  useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
 
   const syncLive = async () => {
     if (!confirm("Sync Live sẽ gọi provider.models() bằng key thật trong .env để cập nhật danh sách model mới nhất (có thể mất 10-20s). Tiếp tục?")) return;
@@ -92,12 +90,9 @@ export default function Models() {
     try {
       const res = await fetch(`/api/models/live/sync`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" } });
       const data = await res.json().catch(() => null);
-      // also refresh verify for deprecated tracking
       await fetch(`/api/verify`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) }).catch(() => {});
-      alert(data ? `Sync xong: ${data.total} live models từ ${data.providers} providers` : "Sync done");
-      fetchModels();
-    } catch (e: any) { alert("Sync failed: " + e.message); }
-    finally { setSyncing(false); }
+      alert(data ? `Sync xong: ${data.total} live models từ ${data.providers} providers` : "Sync done"); fetchModels();
+    } catch (e: any) { alert("Sync failed: " + e.message); } finally { setSyncing(false); }
   };
 
   const filtered = [...models].sort((a, b) => {
@@ -111,159 +106,146 @@ export default function Models() {
     return 0;
   });
   const isDisabled = (m: any) => {
-    const h = live[m.id] || (m as any).health;
-    const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404;
-    const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
-    return is404 || isGone || m.live_status === "deprecated";
+    const h = live[m.id] || (m as any).health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
   };
-  const visibleBase = filtered;
-  const visible = hide404 ? visibleBase.filter((m) => !isDisabled(m)) : visibleBase;
+  const isPaymentError = (m: any) => {
+    const h = live[m.id] || (m as any).health;
+    if (!h) return false;
+    const status = h.http_status;
+    const err = (h.error || h.message || "").toLowerCase();
+    if (status === 402 || status === 429) {
+      if (/out of credits|no payment|payment method|insufficient|quota|billing|payment_required|unpaid|exceeded|balance|credit/i.test(err)) return true;
+      if (status === 402) return true;
+    }
+    if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
+    return false;
+  };
+  const hideActive = hide404 || hidePayment;
+  let filteredAfterHide = filtered;
+  if (hide404) filteredAfterHide = filteredAfterHide.filter((m) => !isDisabled(m));
+  if (hidePayment) filteredAfterHide = filteredAfterHide.filter((m) => !isPaymentError(m));
+  // When hide filters are active, we fetched 100 and do client-side pagination to ensure each page has full limit visible
+  const totalDisplay = hideActive ? filteredAfterHide.length : total;
+  const totalPagesDisplay = hideActive ? Math.max(1, Math.ceil(filteredAfterHide.length / limit)) : totalPages;
+  const visible = hideActive ? filteredAfterHide.slice((page - 1) * limit, page * limit) : filteredAfterHide;
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "id" ? "asc" : "desc" }));
   const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
-
-  const visibleEnabled = visible.filter((m) => !isDisabled(m));
+  const visibleEnabled = visible; // allow 404/payment to be re-checked (only truly deprecated without 404 was previously blocked)
   const allVisibleSelected = visibleEnabled.length > 0 && visibleEnabled.every((m) => selected.has(m.id));
-  const toggle = (id: string) => {
-    const m = visible.find((x) => x.id === id);
-    if (m && isDisabled(m)) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-  const toggleAll = () => {
-    if (allVisibleSelected) setSelected(new Set());
-    else setSelected(new Set(visibleEnabled.map((m) => m.id)));
-  };
-
+  const toggle = (id: string) => { setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
+  const toggleAll = () => { if (allVisibleSelected) setSelected(new Set()); else setSelected(new Set(visibleEnabled.map((m) => m.id))); };
   const checkSelected = async () => {
-    const ids = Array.from(selected);
-    if (ids.length === 0) { alert("Chọn ít nhất 1 model (tick checkbox)"); return; }
+    const ids = Array.from(selected); if (ids.length === 0) { alert("Chọn ít nhất 1 model (tick checkbox)"); return; }
     if (ids.length > 20) { if (!confirm(`Check ${ids.length} models sẽ mất ~${ids.length * 2}s và có thể hit rate limit. Tiếp tục?`)) return; }
     setChecking(true);
     try {
-      const toPersist: string[] = [];
-      const persistPayload: any[] = [];
+      const toPersist: string[] = []; const persistPayload: any[] = [];
       for (const id of ids) {
         const res = await fetch(`/api/models/health?model=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${mk()}` } });
         const data = await res.json().catch(() => null);
-        if (data) {
-          setLive((prev) => ({ ...prev, [id]: data }));
-          if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) {
-            toPersist.push(id);
-            persistPayload.push({ id, http_status: data.http_status, error: data.error });
-          }
-        }
+        if (data) { setLive((prev) => ({ ...prev, [id]: data })); if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) { toPersist.push(id); persistPayload.push({ id, http_status: data.http_status, error: data.error }); } }
       }
       if (toPersist.length > 0) {
-        // Persist 404/410 to DB/file so reload keeps strikethrough + router skips it
-        await fetch(`/api/models/health/mark`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: toPersist, http_status: 404, error: "model_not_found", details: persistPayload }),
-        }).catch(() => {});
-        // Also cache in localStorage for immediate offline
-        try {
-          const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}");
-          for (const id of toPersist) cur[id] = { http_status: 404, updated_at: new Date().toISOString() };
-          localStorage.setItem("modelHealth404", JSON.stringify(cur));
-        } catch {}
+        await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: toPersist, http_status: 404, error: "model_not_found", details: persistPayload }) }).catch(() => {});
+        try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); for (const id of toPersist) cur[id] = { http_status: 404, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch {}
       }
     } finally { setChecking(false); }
   };
-
-  // Load persisted 404/410 on mount so rows already strikethrough without re-check
   useEffect(() => {
-    fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } })
-      .then((r) => r.json()).then((d) => {
-        const map: Record<string, any> = {};
-        for (const row of d.data || []) map[row.id] = row;
-        if (Object.keys(map).length > 0) setLive((prev) => ({ ...map, ...prev }));
-      }).catch(() => {});
-    try {
-      const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}");
-      if (Object.keys(cur).length > 0) setLive((prev) => ({ ...cur, ...prev }));
-    } catch {}
+    fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => { const map: Record<string, any> = {}; for (const row of d.data || []) map[row.id] = row; if (Object.keys(map).length > 0) setLive((prev) => ({ ...map, ...prev })); }).catch(() => {});
+    try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (Object.keys(cur).length > 0) setLive((prev) => ({ ...cur, ...prev })); } catch {}
   }, []);
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
-        <h2 style={{ margin: 0 }}>{t("models.title")} <span style={{ fontSize: 13, fontWeight: 400, color: "#64748b", background: "white", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 20 }}>{total}</span></h2>
-        <span style={{ fontSize: 12, color: "#64748b" }}>{t("common.page")} {page}/{totalPages}</span>
+    <div className="space-y-4 pb-12">
+      <div className="flex items-baseline gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("models.title")} <span className="text-sm font-mono font-semibold bg-white border border-slate-200 px-2.5 py-0.5 rounded-full">{total}</span></h1>
+        <span className="text-xs text-slate-500 font-mono">Page {page}/{totalPages}</span>
       </div>
-      <div className="card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: "1 1 280px", maxWidth: 380 }}>
-            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13 }}>🔍</span>
-            <input placeholder={t("models.filter_placeholder")} value={q} onChange={(e) => setQ(e.target.value)} style={{ padding: "8px 12px 8px 32px", width: "100%", border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc" }} />
+
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative flex-1 min-w-[280px] max-w-[380px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input placeholder={t("models.filter_placeholder")} value={q} onChange={(e) => setQ(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
           </div>
-          <select value={verified} onChange={(e) => setVerified(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #e2e8f0", borderRadius: 10, background: "white", fontSize: 13 }}>
+          <select value={verified} onChange={(e) => setVerified(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold">
             <option value="all">{t("models.verified_all")} ({total})</option>
             <option value="free">{t("models.verified_free")}</option>
             <option value="deprecated">{t("models.verified_deprecated")}</option>
             <option value="unverified">{t("models.verified_unverified")}</option>
           </select>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
-            <label title={t("models.hasKey")} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, fontWeight: 500, background: hasKeyOnly ? "#dcfce7" : "white", border: `1px solid ${hasKeyOnly ? "#86efac" : "#e2e8f0"}`, padding: "7px 12px", borderRadius: 20, cursor: "pointer", color: hasKeyOnly ? "#166534" : "#475569" }}><input type="checkbox" checked={hasKeyOnly} onChange={(e) => setHasKeyOnly(e.target.checked)} style={{ accentColor: "#16a34a" }} /> {t("models.hasKey")}</label>
-            <label title={t("models.hide404")} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, fontWeight: 500, background: hide404 ? "#fee2e2" : "white", border: `1px solid ${hide404 ? "#fca5a5" : "#e2e8f0"}`, padding: "7px 12px", borderRadius: 20, cursor: "pointer", color: hide404 ? "#991b1b" : "#475569" }}><input type="checkbox" checked={hide404} onChange={(e) => setHide404(e.target.checked)} style={{ accentColor: "#dc2626" }} /> {t("models.hide404")}</label>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${hasKeyOnly ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white text-slate-600 border-slate-200"}`}><input type="checkbox" checked={hasKeyOnly} onChange={(e) => setHasKeyOnly(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> {t("models.hasKey")}</label>
+            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${hide404 ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-white text-slate-600 border-slate-200"}`}><input type="checkbox" checked={hide404} onChange={(e) => setHide404(e.target.checked)} className="w-4 h-4 accent-rose-600" /> {t("models.hide404")}</label>
+            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${hidePayment ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-white text-slate-600 border-slate-200"}`} title="Hide models with 'out of credits' / 'no payment method' / 402"><input type="checkbox" checked={hidePayment} onChange={(e) => setHidePayment(e.target.checked)} className="w-4 h-4 accent-amber-600" /> Hide credits/payment</label>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap", paddingTop: 4 }}>
-          <button onClick={checkSelected} disabled={checking || selected.size === 0} style={{ background: selected.size > 0 ? "#2563eb" : "white", color: selected.size > 0 ? "white" : "#94a3b8", border: `1px solid ${selected.size > 0 ? "#2563eb" : "#e2e8f0"}`, display: "flex", gap: 6, alignItems: "center", fontWeight: 600 }}>
-            {checking ? `⏳ ${t("models.checking")}` : `✓ ${t("models.check_live")} (${selected.size})`}
-          </button>
-          <button onClick={syncLive} disabled={syncing} style={{ background: syncing ? "#f1f5f9" : "#16a34a", color: syncing ? "#64748b" : "white", border: `1px solid ${syncing ? "#e2e8f0" : "#16a34a"}`, display: "flex", gap: 6, alignItems: "center" }}>{syncing ? `⏳ ${t("models.syncing")}` : t("models.sync")}</button>
-          <button onClick={fetchModels} title={t("models.refresh")} style={{ display: "flex", gap: 6, alignItems: "center" }}>↻ {t("models.refresh")}</button>
+        <div className="flex flex-wrap gap-2 justify-center pt-2 border-t border-slate-100">
+          <button onClick={checkSelected} disabled={checking || selected.size === 0} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold shadow-xs ${selected.size > 0 ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-white text-slate-400 border border-slate-200"}`}>{checking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}{checking ? t("models.checking") : `${t("models.check_live")} (${selected.size})`}</button>
+          <button onClick={syncLive} disabled={syncing} className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold ${syncing ? "bg-slate-100 text-slate-500 border border-slate-200" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>{syncing ? t("models.syncing") : t("models.sync")}</button>
+          <button onClick={fetchModels} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50"><RefreshCw className="w-3.5 h-3.5" /> {t("models.refresh")}</button>
         </div>
-        {(qDebounced || verified !== "all" || hasKeyOnly || hide404) && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 11, color: "#64748b", borderTop: "1px solid #f1f5f9", paddingTop: 8 }}>
-            <span>Filters:</span>
-            {qDebounced && <span style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 20 }}>q: {qDebounced} <button onClick={() => setQ("")} style={{ marginLeft: 4, padding: "0 4px", fontSize: 10, border: "none", background: "transparent", cursor: "pointer" }}>✕</button></span>}
-            {verified !== "all" && <span style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", padding: "2px 8px", borderRadius: 20 }}>{verified} <button onClick={() => setVerified("all")} style={{ marginLeft: 4, padding: "0 4px", fontSize: 10, border: "none", background: "transparent", cursor: "pointer" }}>✕</button></span>}
-            {hasKeyOnly && <span style={{ background: "#dcfce7", border: "1px solid #86efac", padding: "2px 8px", borderRadius: 20, color: "#166534" }}>{t("models.hasKey")}</span>}
-            {hide404 && <span style={{ background: "#fee2e2", border: "1px solid #fca5a5", padding: "2px 8px", borderRadius: 20, color: "#991b1b" }}>{t("models.hide404")}</span>}
-            <span style={{ marginLeft: "auto", color: "#94a3b8" }}>{selected.size} {t("models.selected")} • {visible.length} visible</span>
+        {(qDebounced || verified !== "all" || hasKeyOnly || hide404 || hidePayment) && (
+          <div className="flex flex-wrap gap-2 items-center text-xs text-slate-600 border-t border-slate-100 pt-3">
+            <span className="font-semibold">Filters:</span>
+            {qDebounced && <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">{qDebounced}<button onClick={() => setQ("")} className="p-0.5 hover:bg-slate-200 rounded-full"><X className="w-3 h-3" /></button></span>}
+            {verified !== "all" && <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">{verified}<button onClick={() => setVerified("all")} className="p-0.5 hover:bg-slate-200 rounded-full"><X className="w-3 h-3" /></button></span>}
+            {hasKeyOnly && <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">{t("models.hasKey")}</span>}
+            {hide404 && <span className="bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-1 rounded-full font-semibold">{t("models.hide404")}</span>}
+            {hidePayment && <span className="bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full font-semibold">Hide credits/payment</span>}
+            <span className="ml-auto text-slate-400 font-mono">{selected.size} selected • {visible.length} visible</span>
           </div>
         )}
       </div>
-      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, display: "flex", gap: 6, alignItems: "center" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block" }}></span> {t("models.verified_desc")}</div>
-      <table>
-        <thead><tr><th><input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} title={visibleEnabled.length === 0 ? t("models.no_match") : ""} disabled={visibleEnabled.length === 0} /></th><th onClick={() => toggleSort("id")} style={{ cursor: "pointer", userSelect: "none" }}>{t("models.th_id")} {arrow("id")}</th><th onClick={() => toggleSort("provider")} style={{ cursor: "pointer", userSelect: "none" }}>{t("models.th_provider")} {arrow("provider")}</th><th onClick={() => toggleSort("context")} style={{ cursor: "pointer", userSelect: "none" }}>{t("models.th_context")} {arrow("context")}</th><th onClick={() => toggleSort("score")} style={{ cursor: "pointer", userSelect: "none" }}>{t("models.th_score")} {arrow("score")}</th><th onClick={() => toggleSort("status")} style={{ cursor: "pointer", userSelect: "none" }}>{t("models.th_status")} {arrow("status")}</th><th>{t("models.th_live")}</th><th onClick={() => toggleSort("used")} style={{ cursor: "pointer", userSelect: "none" }}>{t("models.th_used")} {arrow("used")}</th></tr></thead>
-        <tbody>
-          {visible.map((m) => {
-            const h = live[m.id] || (m as any).health || (m.persisted_404 ? { http_status: 404, error: "model_not_found" } : null);
-            const used = usage[m.id] || 0;
-            const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || (m as any).persisted_404;
-            const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
-            const disabled = is404 || isGone || m.live_status === "deprecated";
-            const rowStyle: any = disabled
-              ? { background: "#fff1f2", opacity: 0.6, textDecoration: "line-through", textDecorationColor: "#dc2626" }
-              : { background: selected.has(m.id) ? "#f0f9ff" : "transparent" };
-            return (
-              <tr key={m.id} style={rowStyle} title={disabled ? "404/410 disabled - đã lưu, không cho live check lại" : ""}>
-                <td style={{ textDecoration: "none" }}><input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} disabled={disabled} title={disabled ? "Model 404/410 đã disabled" : ""} /></td>
-                <td><code style={{ fontSize: 12, textDecoration: is404 || isGone ? "line-through" : "none" }}>{m.id}</code></td>
-                <td style={{ fontSize: 12 }}>{m.owned_by || m.provider}</td>
-                <td>{m.context_length ? (m.context_length >= 1000000 ? (m.context_length/1000000)+"M" : m.context_length >= 1000 ? Math.round(m.context_length/1000)+"K" : m.context_length) : "-"}</td>
-                <td>{m.score ?? "-"}</td>
-                <td style={{ textDecoration: "none" }}>{badge(m.live_status)}</td>
-                <td style={{ fontSize: 11, textDecoration: "none" }}>{h ? (h.status === "usable" ? <span style={{ color: "#16a34a" }}>✅ usable {h.latency_ms}ms</span> : h.status === "no-key" ? <span style={{ color: "#854d0e" }}>no-key</span> : <span style={{ color: "#dc2626", fontWeight: is404 || isGone ? 600 : 400 }}>{h.status}{h.http_status ? ` ${h.http_status}` : ""}</span>) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
-                <td style={{ fontSize: 11, textDecoration: "none" }}><span style={{ fontWeight: used > 0 ? 600 : 400 }}>{used}</span> / {parseLimit(m.limit)}</td>
+
+      <div className="flex items-center gap-2 text-xs text-slate-500"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />{t("models.verified_desc")}</div>
+
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
+              <tr>
+                <th className="px-3 py-3 text-center"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} disabled={visibleEnabled.length === 0} className="w-4 h-4 accent-slate-900" /></th>
+                <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("id")}>{t("models.th_id")} {arrow("id")}</th>
+                <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("provider")}>{t("models.th_provider")} {arrow("provider")}</th>
+                <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("context")}>{t("models.th_context")} {arrow("context")}</th>
+                <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("score")}>{t("models.th_score")} {arrow("score")}</th>
+                <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("status")}>{t("models.th_status")} {arrow("status")}</th>
+                <th className="px-3 py-3">{t("models.th_live")}</th>
+                <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("used")}>{t("models.th_used")} {arrow("used")}</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div style={{ position: "sticky", bottom: 0, background: "white", borderTop: "1px solid #e5e7eb", padding: "10px 12px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", zIndex: 10, boxShadow: "0 -2px 8px rgba(0,0,0,0.04)" }}>
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>{t("common.prev")}</button>
-        <span style={{ fontSize: 12 }}>{t("common.page")} {page} / {totalPages} • {total} models</span>
-        <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>{t("common.next")}</button>
-        <label style={{ fontSize: 12, marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>{t("models.lov")} <select value={limit} onChange={(e) => setLimit(parseInt(e.target.value))} style={{ padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 8, background: "white" }}><option value={25}>25</option><option value={50}>50</option></select></label>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {visible.map((m) => {
+                const h = live[m.id] || (m as any).health || (m.persisted_404 ? { http_status: 404, error: "model_not_found" } : null);
+                const used = usage[m.id] || 0; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || (m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you\'re out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })(); const disabled = is404 || isGone || isPayment || m.live_status === "deprecated";
+                return (
+                  <tr key={m.id} className={`${disabled ? `${isPayment ? "bg-amber-50/60 opacity-60 line-through decoration-amber-400" : "bg-rose-50/60 opacity-60 line-through decoration-rose-400"}` : selected.has(m.id) ? "bg-blue-50/40" : "hover:bg-slate-50/80"} transition-colors`} title={isPayment ? "Out of credits / payment required — click to re-check" : is404 || isGone ? "404/410 — click to re-check" : ""}>
+                    <td className="px-3 py-3 text-center"><input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} className="w-4 h-4 accent-slate-900" /></td>
+                    <td className="px-3 py-3"><code className={`text-xs font-mono px-2 py-0.5 rounded border font-semibold ${disabled ? "bg-rose-100 text-rose-700 border-rose-200 line-through" : "bg-slate-100 text-slate-800 border-slate-200"}`}>{m.id}</code></td>
+                    <td className="px-3 py-3 font-medium text-slate-700">{m.owned_by || m.provider}</td>
+                    <td className="px-3 py-3 font-mono text-slate-600">{m.context_length ? (m.context_length >= 1000000 ? (m.context_length/1000000)+"M" : m.context_length >= 1000 ? Math.round(m.context_length/1000)+"K" : m.context_length) : "-"}</td>
+                    <td className="px-3 py-3 font-mono font-bold">{m.score ?? "-"}</td>
+                    <td className="px-3 py-3">{badge(m.live_status)}</td>
+                    <td className="px-3 py-3 text-xs">{h ? (isPayment ? <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold text-[11px]">out of credits {h.http_status ? ` ${h.http_status}` : ""}</span> : h.status === "usable" ? <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold text-[11px]"><Check className="w-3 h-3" /> usable {h.latency_ms}ms</span> : h.status === "no-key" ? <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-[11px] font-semibold">no-key</span> : <span className="text-rose-700 font-semibold">{h.status}{h.http_status ? ` ${h.http_status}` : ""}</span>) : <span className="text-slate-400">—</span>}</td>
+                    <td className="px-3 py-3 font-mono text-slate-600"><span className={used>0 ? "font-bold text-slate-800" : ""}>{used}</span> / {parseLimit(m.limit)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filtered.length === 0 && <div className="p-8 text-center text-sm text-slate-400">{t("models.no_match")}</div>}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/70 border-t border-slate-200 text-xs font-semibold text-slate-600 sticky bottom-0 z-10 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md shadow-2xs disabled:opacity-40 hover:bg-slate-50">‹ {t("common.prev")}</button>
+            <span className="font-mono text-slate-600">Page {page} / {totalPagesDisplay} • {hideActive ? `${filteredAfterHide.length} total • ${visible.length} visible` : `${total} models`} {`• ${limit}/page`}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPagesDisplay, p + 1))} disabled={page >= totalPagesDisplay} className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md shadow-2xs disabled:opacity-40 hover:bg-slate-50">{t("common.next")} ›</button>
+          </div>
+          <label className="flex items-center gap-2 ml-auto">Rows: <select value={limit} onChange={(e) => { const v=parseInt(e.target.value); setLimit(v); setPage(1); }} className="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold"><option value={25}>25</option><option value={50}>50</option></select></label>
+        </div>
       </div>
-      {filtered.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>{t("models.no_match")}</p>}
     </div>
   );
 }

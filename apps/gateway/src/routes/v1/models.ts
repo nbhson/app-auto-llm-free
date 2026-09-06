@@ -93,7 +93,17 @@ modelsRoute.get("/", async (c) => {
   const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
   const rawLimit = parseInt(c.req.query("limit") || c.req.query("per_page") || "25", 10);
   const limit = [25, 50].includes(rawLimit) ? rawLimit : 25;
-  const q = (c.req.query("q") || "").toLowerCase();
+  const rawQ = (c.req.query("q") || "").trim().toLowerCase();
+  const qTokens = rawQ ? rawQ.split(/[\s\-_\/:]+/).filter(Boolean) : [];
+  const matchesQ = (id: string, display: string, owned: string) => {
+    if (!rawQ) return true;
+    const hay = `${id} ${display} ${owned}`.toLowerCase();
+    const normHay = hay.replace(/[^a-z0-9]/g, "");
+    return qTokens.every((tok) => {
+      const normTok = tok.replace(/[^a-z0-9]/g, "");
+      return hay.includes(tok) || normHay.includes(normTok);
+    });
+  };
   const hasKeyOnly = c.req.query("hasKey") === "1" || c.req.query("has_key") === "1";
   const verifiedMap = loadVerifiedMap();
   const healthMap = loadHealthMap();
@@ -105,7 +115,7 @@ modelsRoute.get("/", async (c) => {
   if (hasKeyOnly && liveModelsCache.length > 0) {
     for (const m of liveModelsCache) {
       if (providerFilter && m.owned_by !== providerFilter) continue;
-      if (q && !m.id.toLowerCase().includes(q) && !(m.display_name || "").toLowerCase().includes(q) && !(m.owned_by || "").toLowerCase().includes(q)) continue;
+      if (!matchesQ(m.id, m.display_name || "", m.owned_by || "")) continue;
       const h = healthMap.get(m.id);
       if (h && (h.http_status === 404 || h.http_status === 410)) continue; // skip persisted 404 even in live
       if (verifiedFilter === "deprecated" && !(h && (h.http_status === 404 || h.http_status === 410))) continue;
@@ -141,7 +151,7 @@ modelsRoute.get("/", async (c) => {
         const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(m.owned_by);
         if (!hasRealKey) continue;
       }
-      if (q && !m.id.toLowerCase().includes(q) && !(m.display_name || "").toLowerCase().includes(q) && !(m.owned_by || "").toLowerCase().includes(q)) continue;
+      if (!matchesQ(m.id, m.display_name || "", m.owned_by || "")) continue;
       const v = verifiedMap.get(m.id) || verifiedMap.get((m as any).raw_id);
       const h = healthMap.get(m.id) || healthMap.get((m as any).raw_id);
       let live_status: string = v ? v.status : "unverified_no_data";
@@ -225,7 +235,7 @@ modelsRoute.get("/", async (c) => {
   const curPage = Math.min(page, totalPages);
   const offset = (curPage - 1) * limit;
   const paginated = all.slice(offset, offset + limit);
-  if (q && all.length === 0 && total === 0) {
+  if (rawQ && all.length === 0 && total === 0) {
     // q already filtered above
   }
 
@@ -236,7 +246,7 @@ modelsRoute.get("/", async (c) => {
     free: freellmsModels.length,
     verified: verifiedSummary,
     pagination: { page: curPage, limit, total, total_pages: totalPages, has_next: curPage < totalPages, has_prev: curPage > 1 },
-    filters: { provider: providerFilter || null, verified: verifiedFilter || null, q: q || null, hasKey: hasKeyOnly || false },
+    filters: { provider: providerFilter || null, verified: verifiedFilter || null, q: rawQ || null, hasKey: hasKeyOnly || false },
   });
 });
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend } from "recharts";
+import { Layers, Activity, Clock, Sparkles, BarChart3, Copy, Check } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
@@ -10,6 +11,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [verify, setVerify] = useState<any>(null);
   const [recent, setRecent] = useState<any[]>([]);
+  const [copiedHealth, setCopiedHealth] = useState(false);
+  const [copiedStats, setCopiedStats] = useState(false);
 
   useEffect(() => {
     fetch("/v1/health").then((r) => r.json()).then(setHealth).catch(() => {});
@@ -19,102 +22,224 @@ export default function Dashboard() {
     fetch("/api/logs?limit=5", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.json()).then((d) => setRecent(d.data || [])).catch(() => {});
   }, []);
 
+  const handleCopyHealth = () => {
+    navigator.clipboard.writeText(JSON.stringify(health, null, 2));
+    setCopiedHealth(true); setTimeout(()=>setCopiedHealth(false),2000);
+  };
+  const handleCopyStats = () => {
+    navigator.clipboard.writeText(JSON.stringify(stats, null, 2));
+    setCopiedStats(true); setTimeout(()=>setCopiedStats(false),2000);
+  };
+
   return (
-    <div>
-      <h2>{t("dashboard.title")}</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
-        <div className="card"><h3>{t("dashboard.providers")}</h3><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.providers ?? 40}</div><div style={{ fontSize: 12, color: "#666" }}>{stats?.free_models ?? 316} free / 365 total • {stats?.freellms_providers ?? 30} freellms</div></div>
-        <div className="card"><h3>{t("dashboard.verify")}</h3>{verify ? <><div style={{ fontSize: 20, fontWeight: 600, color: verify.total_verified_free > 300 ? "#16a34a" : "#ea580c" }}>{verify.total_verified_free}/{verify.total_freellms_free} verified</div><div style={{ fontSize: 12 }}>{verify.total_deprecated} deprecated • {verify.total_unverified_no_key} unverified</div></> : <span style={{ fontSize: 12 }}>loading / no data</span>}</div>
-        <div className="card"><h3>{t("dashboard.requests")}</h3><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.logs?.total ?? stats?.requests ?? 0}</div><div style={{ fontSize: 12, color: "#666" }}>avg {stats?.logs?.avgLatencyMs ?? 0}ms • {Math.round((stats?.logs?.errorRate || 0) * 100)}% err • {Object.keys(stats?.logs?.byProvider || {}).length} providers</div></div>
-        <div className="card" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}><h3>{t("dashboard.tokens")}</h3><div style={{ fontSize: 22, fontWeight: 700, color: "#166534" }}>{(stats?.logs?.allTimeTokens ?? 0).toLocaleString()}<span style={{ fontSize: 12, color: "#666", marginLeft: 4 }}>total</span></div><div style={{ fontSize: 11, color: "#666" }}>{(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt • {(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion • avg {stats?.logs?.avgTokens ?? 0}/req (last 100)</div><div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>All-time tokens</div></div>
+    <div className="space-y-6 pb-12">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("dashboard.title")}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Real-time telemetry, provider health status, and cluster metrics.</p>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-        <div className="card" style={{ minWidth: 0, overflow: "hidden" }}>
-          <h3>{t("dashboard.gateway_health")}</h3>
-          <pre style={{ fontSize: 11, maxHeight: 220, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere", margin: 0 }}>{JSON.stringify(health, null, 2) || "loading..."}</pre>
-        </div>
-        <div className="card" style={{ minWidth: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h3 style={{ margin: 0 }}>{t("dashboard.stats_detail")}</h3>
-            <button onClick={() => navigator.clipboard.writeText(JSON.stringify(stats, null, 2))} style={{ fontSize: 11, padding: "4px 8px" }}>Copy</button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all duration-200 flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("dashboard.providers")}</span>
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-slate-200/70 transition-colors"><Layers className="w-4 h-4" /></div>
           </div>
-          <pre style={{ fontSize: 11, maxHeight: 220, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere", margin: 0, maxWidth: "100%" }}>{JSON.stringify(stats, null, 2).slice(0, 4000) || "loading..."}{JSON.stringify(stats, null, 2).length > 4000 ? "\n... (truncated, Copy để xem đủ)" : ""}</pre>
+          <div className="mt-3">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-mono">{stats?.providers ?? 40}</div>
+            <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+              <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">{stats?.free_models ?? 316} free</span>
+              <span className="text-slate-400">/</span>
+              <span className="text-slate-600">365 total</span>
+              <span className="text-slate-300">•</span>
+              <span className="font-medium text-slate-500">{stats?.freellms_providers ?? 30} freellms</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all duration-200 flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("dashboard.verify")}</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-100/70 transition-colors"><Activity className="w-4 h-4" /></div>
+          </div>
+          <div className="mt-3">
+            {verify ? (
+              <>
+                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight font-mono" style={{ color: verify.total_verified_free > 300 ? "#059669" : "#ea580c" }}>
+                  {verify.total_verified_free}<span className="text-base font-semibold text-slate-400">/{verify.total_freellms_free}</span><span className="text-xs font-semibold text-amber-700 ml-1.5">verified</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2.5 overflow-hidden flex">
+                  <div className="bg-emerald-500 h-full" style={{ width: `${(verify.total_verified_free / verify.total_freellms_free) * 100}%` }} />
+                  <div className="bg-rose-500 h-full" style={{ width: `${(verify.total_deprecated / verify.total_freellms_free) * 100}%` }} />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                  <span className="text-rose-600 font-semibold">{verify.total_deprecated} deprecated</span>
+                  <span className="text-slate-300">•</span>
+                  <span>{verify.total_unverified_no_key} unverified</span>
+                </div>
+              </>
+            ) : <span className="text-xs text-slate-400">loading / no data</span>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all duration-200 flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("dashboard.requests")}</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100/70 transition-colors"><Clock className="w-4 h-4" /></div>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-mono">{stats?.logs?.total ?? stats?.requests ?? 0}</div>
+            <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+              <span className="font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 font-semibold">{stats?.logs?.avgLatencyMs ?? 0}ms</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-slate-600 font-medium">{Math.round((stats?.logs?.errorRate || 0) * 100)}% err</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-slate-500 font-medium">{Object.keys(stats?.logs?.byProvider || {}).length} providers</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-50/70 to-teal-50/40 rounded-xl p-5 border border-emerald-200/80 shadow-2xs hover:shadow-xs hover:border-emerald-300 transition-all duration-200 flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-emerald-900">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">{t("dashboard.tokens")}</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-100/80 flex items-center justify-center text-emerald-700 group-hover:bg-emerald-200/80 transition-colors"><Sparkles className="w-4 h-4" /></div>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-extrabold tracking-tight text-emerald-800 font-mono">{(stats?.logs?.allTimeTokens ?? 0).toLocaleString()} <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">total</span></div>
+            <div className="mt-2.5 pt-2.5 border-t border-emerald-200/60 flex items-center justify-between text-xs text-emerald-900/90 font-medium">
+              <span>{(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt</span>
+              <span className="text-emerald-300">•</span>
+              <span>{(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion</span>
+            </div>
+            <div className="text-[11px] text-emerald-700/80 mt-1 font-medium flex justify-between items-center">
+              <span>All-time tokens</span>
+              <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">avg {stats?.logs?.avgTokens ?? 0}/req</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-        <div className="card">
-          <h3>{t("dashboard.requests_by_provider")}</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
+              <span className="text-slate-300 mx-1">|</span>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.gateway_health")}</h2>
+            </div>
+            <button onClick={handleCopyHealth} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs">
+              {copiedHealth ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}<span>{copiedHealth ? "Copied" : "Copy JSON"}</span>
+            </button>
+          </div>
+          <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-72">
+            <pre className="text-emerald-400"><code>{JSON.stringify(health, null, 2) || "loading..."}</code></pre>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
+              <span className="text-slate-300 mx-1">|</span>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.stats_detail")}</h2>
+            </div>
+            <button onClick={handleCopyStats} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs">
+              {copiedStats ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}<span>{copiedStats ? "Copied" : "Copy"}</span>
+            </button>
+          </div>
+          <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-72">
+            <pre className="text-sky-300"><code>{JSON.stringify(stats, null, 2).slice(0, 4000) || "loading..."}{JSON.stringify(stats, null, 2).length > 4000 ? "\n... (truncated, Copy để xem đủ)" : ""}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-blue-500" /><h3 className="text-sm font-bold text-slate-900">{t("dashboard.requests_by_provider")}</h3></div>
+            <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/70">{Object.keys(stats?.logs?.byProvider||{}).length} providers</span>
+          </div>
           {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
+          ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
         </div>
-        <div className="card">
-          <h3>{t("dashboard.latency")}</h3>
+        <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-emerald-500" /><h3 className="text-sm font-bold text-slate-900">{t("dashboard.latency")}</h3></div>
+            <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/70">{stats?.logs?.avgLatencyMs ?? 0} ms avg</span>
+          </div>
           {recent.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={[...recent].reverse().map((r) => ({ time: new Date(r.timestamp).toLocaleTimeString(), ms: r.latencyMs }))}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="time" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Line type="monotone" dataKey="ms" stroke="#16a34a" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_data")}</p>}
+          ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16, marginTop: 16 }}>
-        <div className="card">
-          <h3>{t("dashboard.verify_dist")}</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-4 bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between mb-2"><h3 className="text-sm font-bold text-slate-900">{t("dashboard.verify_dist")}</h3><span className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded border">{verify?.total_verified_free ?? 0}/{verify?.total_freellms_free ?? 316}</span></div>
           {verify ? (
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={[
-                  { name: "verified", value: verify.total_verified_free },
-                  { name: "deprecated", value: verify.total_deprecated },
-                  { name: "unverified", value: verify.total_unverified_no_key },
-                ]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
-                  <Cell fill="#16a34a" /><Cell fill="#dc2626" /><Cell fill="#eab308" />
+                <Pie data={[{ name: "verified", value: verify.total_verified_free }, { name: "deprecated", value: verify.total_deprecated }, { name: "unverified", value: verify.total_unverified_no_key }]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
+                  <Cell fill="#10b981" /><Cell fill="#ef4444" /><Cell fill="#eab308" />
                 </Pie>
                 <Tooltip /><Legend />
               </PieChart>
             </ResponsiveContainer>
-          ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_verify")}</p>}
+          ) : <p className="text-xs text-slate-400">{t("dashboard.no_verify")}</p>}
         </div>
-        <div className="card">
-          <h3>{t("dashboard.recent_logs")}</h3>
-          {recent.length === 0 ? <p style={{ fontSize: 13, color: "#888" }}>{t("dashboard.no_requests")}</p> : (
-            <table><thead><tr><th>Time</th><th>Provider</th><th>Model</th><th>Tokens</th><th>MS</th><th>Status</th></tr></thead>
-              <tbody>{recent.map((l) => <tr key={l.id}><td style={{ fontSize: 12 }}>{new Date(l.timestamp).toLocaleTimeString()}</td><td><code>{l.provider}</code></td><td style={{ fontSize: 11 }}>{l.model.split("/").pop()}</td><td style={{ fontSize: 11 }}>{l.totalTokens ?? "-"}<span style={{ color: "#888" }}> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td><td>{l.latencyMs}</td><td>{l.status === 200 ? "✅" : "❌"} {l.status}</td></tr>)}</tbody>
-            </table>
-          )}
+        <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+            <h3 className="text-sm font-bold text-slate-900">{t("dashboard.recent_logs")}</h3>
+            <span className="text-xs text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded border border-slate-200/70">{recent.length} records</span>
+          </div>
+          <div className="overflow-x-auto">
+            {recent.length === 0 ? <p className="p-4 text-sm text-slate-400">{t("dashboard.no_requests")}</p> : (
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
+                  <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Model</th><th className="px-4 py-3">Tokens</th><th className="px-4 py-3">MS</th><th className="px-4 py-3">Status</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recent.map((l) => <tr key={l.id} className="hover:bg-slate-50/80"><td className="px-4 py-3 font-mono text-slate-600">{new Date(l.timestamp).toLocaleTimeString()}</td><td className="px-4 py-3"><span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 border font-semibold">{l.provider}</span></td><td className="px-4 py-3 font-semibold text-slate-800">{l.model.split("/").pop()}</td><td className="px-4 py-3 font-mono">{l.totalTokens ?? "-"}<span className="text-slate-400"> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td><td className="px-4 py-3 font-mono">{l.latencyMs}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full text-[11px] border ${l.status === 200 ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-rose-700 bg-rose-50 border-rose-200"}`}>{l.status}</span></td></tr>)}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3>{t("dashboard.tokens_by_provider")}</h3>
+      <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /><h3 className="text-sm font-bold text-slate-900">{t("dashboard.tokens_by_provider")}</h3></div>
+          <span className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/70">{Object.keys(stats?.logs?.tokensByProvider||{}).length} providers</span>
+        </div>
         {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
               <Bar dataKey="tokens" fill="#9333ea" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        ) : <p style={{ fontSize: 12, color: "#888" }}>{t("dashboard.no_tokens")}</p>}
+        ) : <p className="text-xs text-slate-400">{t("dashboard.no_tokens")}</p>}
       </div>
     </div>
   );
