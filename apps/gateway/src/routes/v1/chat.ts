@@ -9,6 +9,8 @@ import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-m
 import { estimateChatTokens } from "../../lib/token-estimator.js";
 import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { addLog } from "../../lib/request-log.js";
+import { hasScope } from "../../lib/virtual-keys.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -58,27 +60,36 @@ chatRoute.post(
   async (c) => {
     const body = c.req.valid("json");
     const model = body.model || config.defaultModel;
+    const vk = (c as any).get("vk") as any;
+
+    // Scope check for virtual key
+    if (vk && !hasScope(vk, model, undefined)) {
+      return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
+    }
 
     // x-router header to pin provider
     const pinned = c.req.header("x-router")?.trim();
     let providerOrder: string[];
     if (pinned && providers[pinned]) {
+      if (vk && !hasScope(vk, undefined, pinned)) {
+        return c.json({ error: { message: `Key not allowed for provider ${pinned}`, type: "insufficient_scope" } }, 403);
+      }
       providerOrder = [pinned, ...getProvidersForRequest(model, "tiered").filter((p) => p !== pinned)];
       logger.info({ pinned, model }, "x-router pinned");
     } else {
       providerOrder = getProvidersForRequest(model, "tiered");
     }
 
-    // Filter deprecated models if verified data exists and model is provider/model specific
+    // Filter deprecated models if verified data exists
     const verifiedMap = loadVerifiedMap();
     if (model.includes("/") && verifiedMap.get(model) === "deprecated") {
-      logger.warn({ model }, "requested model is deprecated, will fallback to next tier");
-      // Remove the deprecated provider from order and try next
+      logger.warn({ model }, "requested model is deprecated, will fallback");
       const prefix = model.split("/")[0];
       providerOrder = providerOrder.filter((p) => p !== prefix);
     }
 
     const estimated = estimateChatTokens({ messages: body.messages as any, max_tokens: body.max_tokens });
+    const startAll = Date.now();
     const errors: any[] = [];
 
     for (const pid of providerOrder) {
@@ -149,14 +160,28 @@ chatRoute.post(
           continue;
         }
 
-        // Success: record
+        // Success: record + log
         recordSuccess(pid);
         markSuccess(pid, key);
         recordUsage(pid, key, estimated.total);
+        const latency = Date.now() - startAll;
+        const vStatus = verifiedMap.get(fullId) || "unknown";
 
         if (body.stream) {
           const contentType = res.headers.get("content-type") || "text/event-stream";
-          // Wrap stream to handle mid-stream errors and record fallback
+          addLog({
+            id: `req-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            virtualKeyId: vk?.id,
+            virtualKeyName: vk?.name,
+            provider: pid,
+            model,
+            promptTokens: estimated.prompt,
+            totalTokens: estimated.total,
+            latencyMs: latency,
+            status: 200,
+            verifiedStatus: vStatus,
+          });
           return new Response(res.body, {
             status: 200,
             headers: {
@@ -165,7 +190,7 @@ chatRoute.post(
               Connection: "keep-alive",
               "X-Provider": pid,
               "X-Model": model,
-              "X-Verified": verifiedMap.get(fullId) || "unknown",
+              "X-Verified": vStatus,
             },
           });
         }
@@ -173,12 +198,39 @@ chatRoute.post(
         const data: any = await res.json().catch(async () => ({ text: await res.text() }));
         if (data.choices) {
           c.header("X-Provider", pid);
-          c.header("X-Verified", verifiedMap.get(fullId) || "unknown");
-          // Record actual usage if provider returns it
+          c.header("X-Verified", vStatus);
           const usage = data.usage;
-          if (usage?.total_tokens) recordUsage(pid, key, usage.total_tokens);
+          const total = usage?.total_tokens || estimated.total;
+          if (usage?.total_tokens) recordUsage(pid, key, total);
+          addLog({
+            id: `req-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            virtualKeyId: vk?.id,
+            virtualKeyName: vk?.name,
+            provider: pid,
+            model,
+            promptTokens: usage?.prompt_tokens ?? estimated.prompt,
+            completionTokens: usage?.completion_tokens ?? 0,
+            totalTokens: total,
+            latencyMs: latency,
+            status: 200,
+            verifiedStatus: vStatus,
+          });
           return c.json(data);
         }
+        addLog({
+          id: `req-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          virtualKeyId: vk?.id,
+          virtualKeyName: vk?.name,
+          provider: pid,
+          model,
+          promptTokens: estimated.prompt,
+          totalTokens: estimated.total,
+          latencyMs: latency,
+          status: 200,
+          verifiedStatus: vStatus,
+        });
         return c.json({
           id: `chatcmpl-${Date.now()}`,
           object: "chat.completion",
@@ -194,6 +246,21 @@ chatRoute.post(
         continue;
       }
     }
+
+    // Log failure
+    addLog({
+      id: `req-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      virtualKeyId: vk?.id,
+      virtualKeyName: vk?.name,
+      provider: errors[0]?.provider || "none",
+      model,
+      promptTokens: estimated.prompt,
+      totalTokens: estimated.total,
+      latencyMs: Date.now() - startAll,
+      status: 502,
+      error: JSON.stringify(errors).slice(0, 500),
+    });
 
     if (config.nodeEnv === "development" && errors.length > 0) {
       return c.json(

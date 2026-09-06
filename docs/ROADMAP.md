@@ -40,14 +40,14 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 - [x] `routes/api.ts` — `GET /api/providers/health` live ping 40 providers parallel 5s timeout, latency, breaker state, summary (online/offline/no_key/open_breaker)
 - [x] Test: `GET /api/providers/health` live (online 13, offline 25), `POST /v1/chat/completions` auto → pollinations vẫn succeed với quota/breaker, `X-Verified` header
 
-## P4 — Auth + Dashboard (3-4 ngày)
+## P4 — Auth + Dashboard (3-4 ngày) ✅ Done 2026-09-06 (P4.1)
 
-- [ ] Virtual keys `fgk-...` (CRUD `/api/keys`, scopes, timing-safe) — stub hiện mock
-- [ ] `middleware/auth.ts` (timing-safe done), `middleware/rateLimit.ts` (stub)
-- [ ] Dashboard pages: `/dashboard` (stats + verify summary), `/models` (316 + filter verified), `/providers` (30 + `detailed[]`), `/keys`, `/logs`
-- [ ] `request_db.ts` + `/api/logs` + `/api/logs/stream` SSE
-- [ ] `/api/stats` đã có (providers 40, free_models 316), cần thêm QPS/latency/fallback rate
-- [ ] Docs Swagger `/docs`
+- [x] `lib/virtual-keys.ts` — `fgk-...` CRUD (hash SHA256, scopes models/providers, rpmLimit, role admin/user), `data/virtual-keys.json` persist, `isValidVirtualKeyLive` + `hasScope`, master `fgk-master-...` admin
+- [x] `lib/auth.ts` timing-safe + `middleware/rate-limit.ts` virtualKey RPM (`x-ratelimit-*`), `app.ts` `virtualKeyRateLimit` + scope check `x-router` & model
+- [x] `lib/request-log.ts` — 1000 logs, `data/request-log.json` persist, `getLogs/getStats/onLog` SSE, `apps/gateway/src/routes/v1/chat.ts` `addLog` per request (prompt/completion/latency/verifiedStatus)
+- [x] `routes/api.ts` — `GET /api/keys` list, `POST /api/keys` create (admin), `DELETE /api/keys/:id`, `GET /api/logs` + `GET /api/logs/stream` SSE, `GET /api/stats` với `logs` + `breakers`
+- [x] Dashboard Vite — `main.tsx` masterKey input, 5 routes: `/` Dashboard (providers 40, verify 314/316, requests avg ms, recent logs), `/models` 316 + filter `verified` + badge xanh/đỏ/vàng, `/providers` detailed + live health check, `/keys` CRUD `fgk-...` với scopes, `/logs` live SSE + polling
+- [x] Test e2e: `POST /api/keys` master → `fgk-...`, `GET /api/keys` list 3, `POST /v1/chat/completions` pollinations với virtual key → `gpt-oss-20b`, scope violation `nvidia-nim` → 403, RPM 2 → 429 `Virtual key RPM limit 2 exceeded`, logs SSE, stats `byProvider`
 
 ## P5 — Hardening & Deploy (2 ngày)
 
@@ -74,7 +74,7 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 | M1 | 2026-09-06 | P1 done: Gateway 40 providers, 316 models, `/v1/models?verified=free`, scheduler 24h |
 | M2 | 2026-09-06 | P2 done: 30 adapters, streaming Gemini SSE, `auto` 15-tier → pollinations live, `x-router` pin |
 | M3 | 2026-09-06 | P3 done: key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health live 40 (online 13) |
-| M4 | P4 | Dashboard 316 models + verify badges, virtual keys |
-| M5 | P5 | Docker prod + Cloudflare + benchmark verified |
+| M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE + Dashboard 5 routes (models badges, keys, logs) |
+| M5 | P5 (next) | Docker prod + Cloudflare + benchmark + OTel + AES rotation |
 
 Gantt tham khảo trong `docs/ARCHITECTURE.md:1`.

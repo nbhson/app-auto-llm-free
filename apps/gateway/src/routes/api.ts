@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { providerIds, providerMeta } from "../providers/registry.js";
 import { config } from "../config.js";
+import { listVirtualKeys, createVirtualKey, deleteVirtualKey } from "../lib/virtual-keys.js";
+import { getLogs, getStats, onLog } from "../lib/request-log.js";
+import { getAllStates } from "../lib/circuit-breaker.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -50,7 +53,6 @@ apiRoute.get("/providers", (c) => {
 
 apiRoute.get("/providers/health", async (c) => {
   const { providers } = await import("../providers/registry.js");
-  const { getAllStates } = await import("../lib/circuit-breaker.js");
   const breakers = getAllStates() as Record<string, any>;
   const results: any[] = [];
   const timeoutMs = 5000;
@@ -91,7 +93,6 @@ apiRoute.get("/providers/health", async (c) => {
     })
   );
 
-  // Sort by status
   results.sort((a, b) => a.id.localeCompare(b.id));
 
   const summary = {
@@ -107,24 +108,6 @@ apiRoute.get("/providers/health", async (c) => {
     generated_at: new Date().toISOString(),
     summary,
     providers: results,
-  });
-});
-
-apiRoute.get("/stats", (c) => {
-  const freellms = loadProvidersJson();
-  let freeModels = 0;
-  try {
-    const p = path.resolve("data/freellms-models-free.json");
-    if (fs.existsSync(p)) freeModels = JSON.parse(fs.readFileSync(p, "utf-8")).length;
-  } catch {}
-  return c.json({
-    uptime: process.uptime(),
-    requests: 0,
-    providers: providerIds.length,
-    freellms_providers: freellms.length || 30,
-    free_models: freeModels || 316,
-    total_models: 365,
-    tiers: config.fallbackTiers,
   });
 });
 
@@ -168,8 +151,76 @@ apiRoute.post("/verify", async (c) => {
   return c.json(report);
 });
 
-apiRoute.get("/keys", (c) => c.json({ keys: [], _mock: true }));
+apiRoute.get("/keys", (c) => {
+  const keys = listVirtualKeys();
+  return c.json({ object: "list", data: keys, total: keys.length });
+});
+
 apiRoute.post("/keys", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json({ id: `key-${Date.now()}`, key: `fgk-mock-${Date.now()}`, name: body.name || "mock", _mock: true }, 201);
+  if (!body.name) return c.json({ error: { message: "name required", type: "invalid_request" } }, 400);
+  const vk = createVirtualKey({
+    name: body.name,
+    scopes: body.scopes || { models: ["*"], providers: ["*"] },
+    rpmLimit: body.rpmLimit || body.rpm_limit || 60,
+    tpdLimit: body.tpdLimit || body.tpd_limit || 100000,
+    role: body.role || "user",
+  });
+  return c.json({ id: vk.id, key: vk.key, name: vk.name, scopes: vk.scopes, rpmLimit: vk.rpmLimit, createdAt: vk.createdAt }, 201);
+});
+
+apiRoute.delete("/keys/:id", (c) => {
+  const id = c.req.param("id");
+  const ok = deleteVirtualKey(id);
+  if (!ok) return c.json({ error: { message: "not found", type: "not_found" } }, 404);
+  return c.json({ deleted: true, id });
+});
+
+apiRoute.get("/logs", (c) => {
+  const limit = parseInt(c.req.query("limit") || "50", 10);
+  const offset = parseInt(c.req.query("offset") || "0", 10);
+  const logs = getLogs(limit, offset);
+  return c.json({ object: "list", data: logs, total: logs.length });
+});
+
+apiRoute.get("/logs/stream", (c) => {
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ connected: true })}\n\n`));
+      const off = onLog((log) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(log)}\n\n`));
+        } catch {}
+      });
+      c.req.raw.signal.addEventListener("abort", () => {
+        off();
+        try { controller.close(); } catch {}
+      });
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+  });
+});
+
+apiRoute.get("/stats", (c) => {
+  const freellms = loadProvidersJson();
+  let freeModels = 0;
+  try {
+    const p = path.resolve("data/freellms-models-free.json");
+    if (fs.existsSync(p)) freeModels = JSON.parse(fs.readFileSync(p, "utf-8")).length;
+  } catch {}
+  const logStats = getStats();
+  return c.json({
+    uptime: process.uptime(),
+    requests: logStats.total,
+    providers: providerIds.length,
+    freellms_providers: freellms.length || 30,
+    free_models: freeModels || 316,
+    total_models: 365,
+    tiers: config.fallbackTiers,
+    logs: logStats,
+    breakers: getAllStates(),
+  });
 });

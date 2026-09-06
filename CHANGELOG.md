@@ -15,17 +15,19 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 - **Gateway**: `models` route freellms + verified annotate, `api` route detailed + stats, `openai-compatible` allow no-key
 - **P2 Gateway Core**: 30 adapters, streaming SSE (Gemini `alt=sse` → OpenAI), tool calling, `auto` 15-tier fallback → pollinations live (10.3s), `x-router` pin, `models` pollinations fallback, e2e pollinations (gpt-oss-20b) non-stream/stream
 - **P3 Resilience**: `key-manager.ts` AES-256-GCM + round-robin + `markRateLimited`, `token-estimator.ts` char/4, `quota-tracker.ts` FREELLMS_LIMITS RPM/TPM + `checkQuota/recordUsage`, `circuit-breaker.ts` 5/30s half-open, chat integration (quota pre-check, breaker skip, deprecated skip, `X-Verified`), `GET /api/providers/health` live parallel 5s (online 13/offline 25)
+- **P4 Auth+Dashboard**: `lib/virtual-keys.ts` `fgk-...` CRUD SHA256 + scopes + RPM + `data/virtual-keys.json`, `middleware/rate-limit.ts` virtualKey RPM + `x-ratelimit-*`, `app.ts` scope check `x-router` & model + admin gate, `lib/request-log.ts` 1000 logs `data/request-log.json` + SSE `onLog`, `routes/api.ts` `GET/POST/DELETE /api/keys` + `GET /api/logs` + `/api/logs/stream` + `/api/stats` logs/breakers, chat `addLog` per request, Vite Dashboard 5 routes (Dashboard verify 314/316, Models badges verified/deprecated/no-key, Providers detailed+health, Keys CRUD fgk, Logs live)
 
 ### Changed
 - `config.ts` hỗ trợ 30 providers keys + 4-tier default
 - `openai-compatible.ts` resolve `{account_id}`, model after first slash, allow no-key, forward full fields
 - `gemini.ts` sanitize + `alt=sse` + `gemini-stream.ts`
 - `router.ts` `ALLOW_NO_KEY`, `auto` 15-tier, `isPublicProvider`
-- `README.md` cập nhật 30 providers / 316 models / P2+P3 done
+- `app.ts` virtualKeyRateLimit + isValidVirtualKeyLive + scope checks
+- `routes/v1/chat.ts` hasScope + quota + breaker + verified skip + request-log
+- `README.md` cập nhật 30 providers / 316 models / P2+P3+P4 done
 
 ### Planned
-- P4 Dashboard: model catalog 316 với badge verified/deprecated, virtual keys `fgk-...`
-- P5 Hardening: benchmark verified, OTel, Cloudflare deploy
+- P5 Hardening: benchmark verified, OTel, Cloudflare deploy, AES rotation
 
 ## [0.2.0] - 2026-09-06
 

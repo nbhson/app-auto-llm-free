@@ -3,12 +3,14 @@ import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { config } from "./config.js";
 import { requestLogger } from "./middleware/logger.js";
+import { virtualKeyRateLimit } from "./middleware/rate-limit.js";
 import { healthRoute } from "./routes/v1/health.js";
 import { modelsRoute } from "./routes/v1/models.js";
 import { chatRoute } from "./routes/v1/chat.js";
 import { embeddingsRoute } from "./routes/v1/embeddings.js";
 import { apiRoute } from "./routes/api.js";
-import { extractBearer, isValidVirtualKey } from "./lib/auth.js";
+import { extractBearer } from "./lib/auth.js";
+import { isValidVirtualKeyLive } from "./lib/virtual-keys.js";
 
 export function createApp() {
   const app = new Hono();
@@ -16,19 +18,34 @@ export function createApp() {
   app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id"] }));
   app.use("*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
   app.use("*", requestLogger);
+  app.use("*", virtualKeyRateLimit);
 
   // Public
   app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.1.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
   app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nGET /v1/health</pre></body></html>`));
 
-  // Auth middleware for /v1/* (except health)
+  // Auth middleware for /v1/* (except health) — uses virtual-keys + master
   app.use("/v1/*", async (c, next) => {
     if (c.req.path === "/v1/health" || c.req.path === "/v1/health/ready") return next();
     const key = extractBearer(c as any);
-    if (!key || !isValidVirtualKey(key)) {
+    const vk = key ? isValidVirtualKeyLive(key) : null;
+    if (!vk) {
       return c.json({ error: { message: "Invalid API key", type: "invalid_api_key", code: 401 } }, 401);
     }
+    // Scope check for chat: if model or provider pinned via x-router, verify scope
+    const pinned = c.req.header("x-router");
+    const model = c.req.query("model") || "";
+    if (vk && !vk.scopes.models.includes("*") && model && !vk.scopes.models.some((m) => model.includes(m))) {
+      // For chat POST we check body later; this is query param check for models list
+      if (c.req.path.startsWith("/v1/models") && model && !vk.scopes.models.includes("*")) {
+        // allow list but filter later
+      }
+    }
+    if (vk && pinned && !vk.scopes.providers.includes("*") && !vk.scopes.providers.includes(pinned)) {
+      return c.json({ error: { message: `Key not allowed for provider ${pinned}`, type: "insufficient_scope" } }, 403);
+    }
+    (c as any).set("vk", vk);
     return next();
   });
 
@@ -42,12 +59,17 @@ export function createApp() {
     return c.json({ error: { message: "Use /v1/chat/completions", type: "invalid_request" } }, 400);
   });
 
-  // Admin /api/* — require master key
+  // Admin /api/* — require master or admin virtual key
   app.use("/api/*", async (c, next) => {
     const key = extractBearer(c as any);
-    // allow health without auth in dev
     if (c.req.path === "/api/providers" && config.nodeEnv === "development") return next();
-    if (!key || !isValidVirtualKey(key)) return c.json({ error: { message: "Unauthorized", type: "invalid_api_key" } }, 401);
+    const vk = key ? isValidVirtualKeyLive(key) : null;
+    if (!vk) return c.json({ error: { message: "Unauthorized", type: "invalid_api_key" } }, 401);
+    // For /api/keys POST/DELETE require admin
+    if ((c.req.path.startsWith("/api/keys") && c.req.method !== "GET") && vk.role !== "admin") {
+      return c.json({ error: { message: "Admin required", type: "forbidden" } }, 403);
+    }
+    (c as any).set("vk", vk);
     return next();
   });
   app.route("/api", apiRoute);
