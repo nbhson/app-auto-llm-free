@@ -24,6 +24,7 @@ export default function Models() {
   const [checking, setChecking] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [usage, setUsage] = useState<Record<string, number>>({});
+  const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "score", dir: "desc" });
 
   const fetchModels = () => {
     const params = new URLSearchParams();
@@ -49,9 +50,21 @@ export default function Models() {
   useEffect(() => { fetchModels(); fetchUsage(); }, [verified]);
   useEffect(() => { setSelected(new Set()); setLive({}); }, [verified, q]);
 
-  const filtered = models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase()) || (m.provider || "").toLowerCase().includes(q.toLowerCase()) || (m.owned_by || "").toLowerCase().includes(q.toLowerCase()));
+  const filteredRaw = models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase()) || (m.provider || "").toLowerCase().includes(q.toLowerCase()) || (m.owned_by || "").toLowerCase().includes(q.toLowerCase()));
+  const filtered = [...filteredRaw].sort((a, b) => {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    if (sort.col === "id") return a.id.localeCompare(b.id) * dir;
+    if (sort.col === "provider") return (a.owned_by || a.provider || "").localeCompare(b.owned_by || b.provider || "") * dir;
+    if (sort.col === "context") return ((a.context_length || 0) - (b.context_length || 0)) * dir;
+    if (sort.col === "score") return ((a.score || 0) - (b.score || 0)) * dir;
+    if (sort.col === "used") return ((usage[a.id] || 0) - (usage[b.id] || 0)) * dir;
+    if (sort.col === "status") return (a.live_status || "").localeCompare(b.live_status || "") * dir;
+    return 0;
+  });
   const visible = filtered.slice(0, 200);
   const allVisibleSelected = visible.length > 0 && visible.every((m) => selected.has(m.id));
+  const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "id" ? "asc" : "desc" }));
+  const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -99,7 +112,7 @@ export default function Models() {
       </div>
       <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Verified: probe 24h (xanh verified, đỏ deprecated, vàng no-key). <b>Live</b>: tick checkbox rồi bấm <code>Check Live</code> để gọi thử <code>POST /v1/chat/completions</code> (8s timeout) — biết model nào thực sự <b>usable</b>.</div>
       <table>
-        <thead><tr><th><input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} title="Chọn tất cả visible" /></th><th>ID</th><th>Provider</th><th>Context</th><th>Score</th><th>Status</th><th>Live</th><th>Used / Limit</th></tr></thead>
+        <thead><tr><th><input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} title="Chọn tất cả visible" /></th><th onClick={() => toggleSort("id")} style={{ cursor: "pointer", userSelect: "none" }}>ID {arrow("id")}</th><th onClick={() => toggleSort("provider")} style={{ cursor: "pointer", userSelect: "none" }}>Provider {arrow("provider")}</th><th onClick={() => toggleSort("context")} style={{ cursor: "pointer", userSelect: "none" }}>Context {arrow("context")}</th><th onClick={() => toggleSort("score")} style={{ cursor: "pointer", userSelect: "none" }}>Score {arrow("score")}</th><th onClick={() => toggleSort("status")} style={{ cursor: "pointer", userSelect: "none" }}>Status {arrow("status")}</th><th>Live</th><th onClick={() => toggleSort("used")} style={{ cursor: "pointer", userSelect: "none" }}>Used / Limit {arrow("used")}</th></tr></thead>
         <tbody>
           {visible.map((m) => {
             const h = live[m.id];

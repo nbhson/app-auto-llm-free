@@ -7,6 +7,7 @@ export default function Providers() {
   const [data, setData] = useState<any>(null);
   const [health, setHealth] = useState<any>(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
+  const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "free", dir: "desc" });
 
   const load = () => {
     fetch("/api/providers", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setData).catch(() => {});
@@ -17,6 +18,9 @@ export default function Providers() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "provider" ? "asc" : "desc" }));
+  const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
 
   return (
     <div>
@@ -31,9 +35,29 @@ export default function Providers() {
           </div>
           <div style={{ overflowX: "auto" }}>
           <table>
-            <thead><tr><th>Provider</th><th>Tier</th><th>Free</th><th>Keys</th><th>Health</th><th>Caps</th><th>Base URL</th><th>Get Key</th></tr></thead>
+            <thead><tr>
+              <th onClick={() => toggleSort("provider")} style={{ cursor: "pointer", userSelect: "none" }}>Provider {arrow("provider")}</th>
+              <th onClick={() => toggleSort("tier")} style={{ cursor: "pointer", userSelect: "none" }}>Tier {arrow("tier")}</th>
+              <th onClick={() => toggleSort("free")} style={{ cursor: "pointer", userSelect: "none" }}>Free {arrow("free")}</th>
+              <th onClick={() => toggleSort("keys")} style={{ cursor: "pointer", userSelect: "none" }}>Keys {arrow("keys")}</th>
+              <th>Health</th>
+              <th>Caps</th>
+              <th>Base URL</th>
+              <th>Get Key</th>
+            </tr></thead>
             <tbody>
-              {(data.detailed || []).map((p: any) => {
+              {[...(data.detailed || [])].sort((a, b) => {
+                const dir = sort.dir === "asc" ? 1 : -1;
+                if (sort.col === "provider") return a.id.localeCompare(b.id) * dir;
+                if (sort.col === "tier") return (a.tier_type || "").localeCompare(b.tier_type || "") * dir;
+                if (sort.col === "free") return (a.free_models - b.free_models) * dir;
+                if (sort.col === "keys") {
+                  const ak = (a.keys === "none" ? 0 : parseInt(a.keys) || 0);
+                  const bk = (b.keys === "none" ? 0 : parseInt(b.keys) || 0);
+                  return (ak - bk) * dir;
+                }
+                return 0;
+              }).map((p: any) => {
                 const h = health?.providers?.find((x: any) => x.id === p.id);
                 const baseUrl = p.baseUrl || getBaseUrl(p.id);
                 return (
