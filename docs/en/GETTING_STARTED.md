@@ -7,53 +7,35 @@
 ## 1. What Do You Need?
 
 - **Docker Desktop** (recommended) **or** Node 20+ (`node -v`)
-- **2 self-generated keys** (no provider signup required):
-  - `MASTER_KEY` — gateway admin key (you choose it, e.g. `fgk-master-...`)
-  - `ENCRYPTION_KEY` — 64 hex characters for encryption (generated with one command)
+- **No manual key generation:** `MASTER_KEY` (single API key for `/v1/*` + `/api/*`) and `ENCRYPTION_KEY` (internal AES-256-GCM) are **auto-generated** on first boot if missing/placeholder and persisted to `.env` (or `data/.gateway-keys.json` when running Docker without `.env`) — check `docker compose logs gateway | grep MASTER_KEY`.
 - **Provider keys are optional:** you can leave them empty and still run `pollinations` (20b) via `auto`. With real keys you get live models via `?hasKey=1` (live sync 882 free).
 - **Docs:** Root `README.md` default English, `README.vi.md` Vietnamese; you are in `docs/en/` (English banner). UI has `VI/EN` selector in header (persists `localStorage lang`) — `lib/i18n.tsx:1`.
 
-## 2. Quick Setup (Docker) — 3 Commands
+## 2. Quick Setup (Docker) — 2 Commands
 
 ```bash
 # 1. Clone the code
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 
-# 2. Create the config file
+# 2. Create the config file (no need to edit keys — auto-generated)
 cp .env.example .env
+# Leave GROQ_API_KEYS, GEMINI_API_KEYS... empty if you don't have them — gateway still runs.
 
-# 3. Generate the 2 required keys (run each command, copy the result into .env)
-openssl rand -hex 32
-# -> e.g. a1b2c3...64 characters, paste into the ENCRYPTION_KEY= line in .env
-
-echo "fgk-master-$(openssl rand -hex 16)"
-# -> e.g. fgk-master-8f3a9c... , paste into the MASTER_KEY= line in .env
-
-# Without openssl (Windows): use Node
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-node -e "console.log('fgk-master-'+require('crypto').randomBytes(16).toString('hex'))"
-```
-
-Open `.env` in Notepad/VS Code and replace these 2 lines:
-
-```
-MASTER_KEY=fgk-master-xxx... (the one you just generated)
-ENCRYPTION_KEY=a1b2...64 hex (the one you just generated)
-```
-
-Leave lines like `GROQ_API_KEYS`, `GEMINI_API_KEYS`... empty if you don't have them yet — the gateway will still run.
-
-```bash
-# 4. Run
+# 3. Run
 docker compose up -d --build
-docker compose logs -f gateway   # wait for "🚀 Gateway listening on http://localhost:8080"
+docker compose logs -f gateway   # wait for "🚀 Gateway listening on http://localhost:8080" + "Auto-generated MASTER_KEY=fgk-master-..."
 
 # Verify
 curl http://localhost:8080/v1/health
+# Get the auto-generated MASTER_KEY (single key for /v1/* + /api/*)
+grep MASTER_KEY .env
+# or: docker compose logs gateway | grep MASTER_KEY
 ```
 
-Open the Dashboard: **http://localhost:3000** — **2-row header**: row 1 left `⚡ Free LLM Gateway • 30 providers • 316 free` + `● online`, right `VI/EN` selector + **Master** input on same row, row 2 centered nav `Dashboard→Providers→Models→Keys→Logs`. Enter the `MASTER_KEY` you just created into the **Master** field at the top-right header row 1 (saved to localStorage). Or use Dashboard → **Key Generator** to generate it directly (no `openssl` needed).
+Open the Dashboard: **http://localhost:3000** — **2-row header**: row 1 left `⚡ Free LLM Gateway • 30 providers • 316 free` + `● online`, right `VI/EN` selector + **Master** input on same row, row 2 centered nav `Dashboard→Providers→Models→Keys→Logs`. If Master field is empty, paste `MASTER_KEY` from `.env`/logs (saved to localStorage). `ENCRYPTION_KEY` is internal — auto-generated, no need to enter. To rotate, use Dashboard → **Keys → Key Generator** (optional).
+
+> To use your own keys, edit `MASTER_KEY`/`ENCRYPTION_KEY` in `.env` before `compose up`.
 
 ## 3. Setup Without Docker (Node)
 
@@ -61,23 +43,33 @@ Open the Dashboard: **http://localhost:3000** — **2-row header**: row 1 left `
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 cp .env.example .env
-# edit MASTER_KEY + ENCRYPTION_KEY as above
+# no need to edit MASTER_KEY/ENCRYPTION_KEY — auto-generated
 npm install
 npm run build
-npm run dev:gateway   # http://localhost:8080
+npm run dev:gateway   # http://localhost:8080 — check log Auto-generated MASTER_KEY
 npm run dev:web       # http://localhost:5173 (in another tab)
+# Get key: grep MASTER_KEY .env
 ```
 
-## 4. Create Your First API Key (`fgk-...`)
+## 4. Use Your Single API Key
 
-**Option 1 — Dashboard (easiest):**
+`MASTER_KEY` (auto-generated in `.env`) already works for **all** endpoints `/v1/*` + `/api/*` — no need to create `fgk-...`. Create `fgk-...` only for per-app scoped keys.
 
-1. Open http://localhost:3000/keys
-2. Enter `MASTER_KEY` in the header row 1 (if not already set) — switch `VI`/`EN` if needed
-3. Name: `my-app` — Scopes: `{"models":["*"],"providers":["*"]}` — RPM: `60` → **Create**
-4. Copy the `fgk-...` that appears (shown only once!)
+**Single-key usage (recommended for dev):**
 
-**Option 2 — curl:**
+```bash
+MASTER=$(grep MASTER_KEY .env | cut -d= -f2) # or from docker logs
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $MASTER" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+**Create scoped fgk-... (optional):**
+
+*Dashboard:* Open http://localhost:3000/keys → Master field already filled → Name `my-app`, Scopes `{"models":["*"],"providers":["*"]}`, RPM `60` → **Create** → copy `fgk-...` (shown once).
+
+*curl:*
 
 ```bash
 MASTER=fgk-master-xxx... # from .env
@@ -86,6 +78,7 @@ curl -X POST http://localhost:8080/api/keys \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
 # -> {"key":"fgk-...","id":"vk-..."}
+# Narrow: -d '{"name":"pollinations-only","scopes":{"models":["*"],"providers":["pollinations"]}}'
 ```
 
 Narrow scope example — pollinations only:
@@ -173,15 +166,16 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 
 | Error | Cause | Fix |
 |-----|-------|-----|
-| `401 Invalid API key` | Using `MASTER_KEY` for `/v1/chat/completions` instead of `fgk-...`, or `fgk-...` not yet created | Create a new key at `/keys` and use that `fgk-...` for `/v1/*` |
+| `401 Invalid API key` | Wrong `fgk-...` or missing `MASTER_KEY` | Use `MASTER_KEY` from `.env` for `/v1/*` (single-key) or create `fgk-...` at `/keys` |
 | `403 Admin required` on `POST /api/keys` | Using a user `fgk-...` instead of `MASTER_KEY` | Use `MASTER_KEY` for `/api/keys` POST/DELETE |
 | `403 Key not allowed for provider nvidia-nim` | Key scope is only `pollinations` but `x-router: nvidia-nim` was sent | Create a key with `providers: ["*"]` or `["nvidia-nim"]` |
 | `429 Virtual key RPM limit 2 exceeded` | `rpmLimit` is small and you called too quickly / typed search continuously | Fixed: search debounced 400ms + list endpoints 4x (200) in `middleware/rate-limit.ts`; if still 429 create key with `rpmLimit: 60` or wait 60s |
 | `404 page not found` from `nvidia-nim` | Missing `NVIDIA_API_KEYS` or placeholder `xxx` | Add real key (`!xxx`, length>20) or use `x-router: pollinations`; check `GET /api/providers?hasKey=1` |
 | `Only 7 models` | Running old `npm run dev:gateway` without rebuilding after the `paths.ts` fix | `git pull && npm run build -w apps-gateway && docker compose up -d --build` + hard reload `Ctrl+Shift+R` |
 | `Hide 404 not hiding` | model-health not persisted | Tick checkbox then Check Live 410 → persists to `data/model-health.json`; toggle `Hide 404 models` default checked |
-| `verified 0/316` | Missing `ENCRYPTION_KEY`/provider keys, scheduler not yet run | Wait 5s after starting the gateway (scheduler auto-verifies + syncLiveModels dry-run) or `POST /api/verify` / `POST /api/models/live/sync` with `{"freeOnly":true}` |
+| `verified 0/316` | Missing real provider keys, scheduler not yet run | Wait 5s after starting the gateway (scheduler auto-verifies + syncLiveModels dry-run) or `POST /api/verify` / `POST /api/models/live/sync` with `{"freeOnly":true}` — `ENCRYPTION_KEY` is auto-generated, no manual step |
 | `npm i` fails `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + old `better-sqlite3@9` has no prebuild (ABI 147) | Fixed at `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. If still fails, use Node 22 LTS (`brew install node@22`) or `npm i --build-from-source` with Xcode CLT `xcode-select --install` |
+| `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` | Behind corporate SSL-inspection proxy (Zscaler) | Dev: uncomment `NODE_TLS_REJECT_UNAUTHORIZED=0` in `.env` (commented by default), prod: use `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` to keep verification |
 | `EADDRINUSE :::8080` on `npm run dev` | Old gateway still running (`nohup npm run dev:gateway` or `tsx watch` not killed) | `pkill -f "tsx watch"; lsof -ti:8080 \| xargs kill -9; sleep 2; lsof -i :8080` (empty) then `npm run dev` |
 
 ## 9. Useful Commands
@@ -217,9 +211,9 @@ python scripts/sync-freellms.py
 npm run verify:free:dry -w apps-gateway
 npx tsx scripts/benchmark.ts --gateway http://localhost:8080 --key $MASTER
 
-# Rotate MASTER_KEY / ENCRYPTION_KEY
-openssl rand -hex 32
-echo "fgk-master-$(openssl rand -hex 16)"
+# Rotate MASTER_KEY / ENCRYPTION_KEY (optional — auto-generated, only when needed)
+grep MASTER_KEY .env
+# Or generate new: openssl rand -hex 32 ; echo "fgk-master-$(openssl rand -hex 16)"
 npx tsx scripts/rotate-keys.ts --old $OLD --new $NEW
 ```
 

@@ -5,52 +5,34 @@
 ## 1. Bạn cần gì?
 
 - **Docker Desktop** (khuyến nghị) **hoặc** Node 20+ (`node -v`)
-- **2 key tự tạo** (không cần xin provider nào):
-  - `MASTER_KEY` — key admin của gateway (bạn tự đặt, vd `fgk-master-...`)
-  - `ENCRYPTION_KEY` — 64 hex để mã hóa (tạo bằng 1 lệnh)
+- **Không cần tạo key thủ công:** `MASTER_KEY` (1 key duy nhất cho `/v1/*` + `/api/*`) và `ENCRYPTION_KEY` (nội bộ AES-256-GCM) sẽ **tự sinh** lần đầu khởi động nếu thiếu/placeholder, rồi persist vào `.env` (hoặc `data/.gateway-keys.json` khi chạy Docker không có `.env`) — xem logs `docker compose logs gateway | grep MASTER_KEY`.
 - **Provider keys là tùy chọn:** để trống vẫn chạy được `pollinations` (20b) qua `auto`.
 
-## 2. Cài đặt nhanh (Docker) — 3 lệnh
+## 2. Cài đặt nhanh (Docker) — 2 lệnh
 
 ```bash
 # 1. Tải code
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 
-# 2. Tạo file cấu hình
+# 2. Tạo file cấu hình (không cần sửa key — sẽ tự sinh)
 cp .env.example .env
+# Để trống GROQ_API_KEYS, GEMINI_API_KEYS... nếu chưa có — gateway vẫn chạy.
 
-# 3. Tạo 2 key bắt buộc (chạy từng lệnh, copy kết quả dán vào .env)
-openssl rand -hex 32
-# -> vd a1b2c3...64 ký tự, dán vào dòng ENCRYPTION_KEY= trong .env
-
-echo "fgk-master-$(openssl rand -hex 16)"
-# -> vd fgk-master-8f3a9c... , dán vào dòng MASTER_KEY= trong .env
-
-# Không có openssl (Windows): dùng Node
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-node -e "console.log('fgk-master-'+require('crypto').randomBytes(16).toString('hex'))"
-```
-
-Mở `.env` bằng Notepad/VS Code, thay 2 dòng:
-
-```
-MASTER_KEY=fgk-master-xxx... (bạn vừa tạo)
-ENCRYPTION_KEY=a1b2...64 hex (bạn vừa tạo)
-```
-
-Để trống các dòng `GROQ_API_KEYS`, `GEMINI_API_KEYS`... nếu chưa có — gateway vẫn chạy.
-
-```bash
-# 4. Chạy
+# 3. Chạy
 docker compose up -d --build
-docker compose logs -f gateway   # đợi thấy "🚀 Gateway listening on http://localhost:8080"
+docker compose logs -f gateway   # đợi thấy "🚀 Gateway listening on http://localhost:8080" + "Auto-generated MASTER_KEY=fgk-master-..."
 
 # Kiểm tra
 curl http://localhost:8080/v1/health
+# Lấy MASTER_KEY đã sinh (dùng cho mọi endpoint /v1/* + /api/*)
+grep MASTER_KEY .env
+# hoặc: docker compose logs gateway | grep MASTER_KEY
 ```
 
-Mở Dashboard: **http://localhost:3000** — nhập `MASTER_KEY` vừa tạo vào ô **Master** góc phải header (lưu localStorage). Hoặc dùng Dashboard → **Key Generator** để tạo luôn (không cần `openssl`).
+Mở Dashboard: **http://localhost:3000** — `MASTER_KEY` đã tự điền nếu gateway và web cùng `.env`? Nếu chưa, copy `MASTER_KEY` từ `.env`/`logs` dán vào ô **Master** góc phải header (lưu localStorage). `ENCRYPTION_KEY` là nội bộ, không cần nhập — tự sinh.
+
+> Muốn tự đặt key: sửa `MASTER_KEY`/`ENCRYPTION_KEY` trong `.env` trước khi `compose up`, hoặc dùng Dashboard → **Keys → Key Generator** (tùy chọn, cho rotate).
 
 ## 3. Cài đặt không Docker (Node)
 
@@ -58,23 +40,33 @@ Mở Dashboard: **http://localhost:3000** — nhập `MASTER_KEY` vừa tạo v�
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 cp .env.example .env
-# sửa MASTER_KEY + ENCRYPTION_KEY như trên
+# không cần sửa MASTER_KEY/ENCRYPTION_KEY — sẽ tự sinh
 npm install
 npm run build
-npm run dev:gateway   # http://localhost:8080
+npm run dev:gateway   # http://localhost:8080 — xem log Auto-generated MASTER_KEY
 npm run dev:web       # http://localhost:5173 (mở tab khác)
+# Lấy key: grep MASTER_KEY .env
 ```
 
-## 4. Tạo key đầu tiên để gọi API (`fgk-...`)
+## 4. Gọi API ngay với 1 key duy nhất
 
-**Cách 1 — Dashboard (dễ nhất):**
+`MASTER_KEY` (tự sinh trong `.env`) đã dùng được luôn cho **mọi endpoint** `/v1/*` + `/api/*` — không bắt buộc tạo thêm `fgk-...`. Tạo `fgk-...` chỉ khi cần key riêng per-app với scope/RPM khác nhau.
 
-1. Mở http://localhost:3000/keys
-2. Nhập `MASTER_KEY` ở header (nếu chưa)
-3. Tên: `my-app` — Scopes: `{"models":["*"],"providers":["*"]}` — RPM: `60` → **Create**
-4. Copy `fgk-...` hiện ra (chỉ hiện 1 lần!)
+**Dùng luôn MASTER_KEY (single-key, khuyến nghị cho dev):**
 
-**Cách 2 — curl:**
+```bash
+MASTER=$(grep MASTER_KEY .env | cut -d= -f2) # hoặc lấy từ docker logs
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $MASTER" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+**Tạo scoped fgk-... (tùy chọn):**
+
+*Dashboard:* Mở http://localhost:3000/keys → `MASTER_KEY` ở header đã tự có → Tên `my-app`, Scopes `{"models":["*"],"providers":["*"]}`, RPM `60` → **Create** → copy `fgk-...` (chỉ hiện 1 lần).
+
+*curl:*
 
 ```bash
 MASTER=fgk-master-xxx... # lấy từ .env
@@ -83,12 +75,7 @@ curl -X POST http://localhost:8080/api/keys \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
 # -> {"key":"fgk-...","id":"vk-..."}
-```
-
-Scope hẹp ví dụ chỉ cho pollinations:
-
-```bash
--d '{"name":"pollinations-only","scopes":{"models":["*"],"providers":["pollinations"]}}'
+# Scope hẹp: -d '{"name":"pollinations-only","scopes":{"models":["*"],"providers":["pollinations"]}}'
 ```
 
 ## 5. Gọi thử API (3 cách)
@@ -162,14 +149,15 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 
 | Lỗi | Nguyên nhân | Sửa |
 |-----|-------------|-----|
-| `401 Invalid API key` | Dùng `MASTER_KEY` cho `/v1/chat/completions` thay vì `fgk-...`, hoặc `fgk-...` chưa tạo | Tạo key mới ở `/keys` và dùng `fgk-...` đó cho `/v1/*` |
+| `401 Invalid API key` | `fgk-...` sai hoặc chưa có `MASTER_KEY` | Dùng `MASTER_KEY` từ `.env` cho `/v1/*` (single-key) hoặc tạo `fgk-...` ở `/keys` |
 | `403 Admin required` khi `POST /api/keys` | Dùng `fgk-...` user thay vì `MASTER_KEY` | Dùng `MASTER_KEY` cho `/api/keys` POST/DELETE |
 | `403 Key not allowed for provider nvidia-nim` | Key scope chỉ `pollinations` mà `x-router: nvidia-nim` | Tạo key với `providers: ["*"]` hoặc `["nvidia-nim"]` |
 | `429 Virtual key RPM limit 2 exceeded` | `rpmLimit` nhỏ, gọi quá nhanh | Tạo key mới với `rpmLimit: 60` hoặc đợi 60s |
 | `404 page not found` từ `nvidia-nim` | Thiếu `NVIDIA_API_KEYS` | Thêm key hoặc dùng `x-router: pollinations` để test không cần key |
 | `Models chỉ 7` | Chạy `npm run dev:gateway` cũ chưa rebuild sau fix `paths.ts` | `git pull && npm run build -w apps-gateway && docker compose up -d --build` + hard reload `Ctrl+Shift+R` |
-| `verified 0/316` | Chưa có `ENCRYPTION_KEY`/provider keys, scheduler chưa chạy | Đợi 5s sau khi start gateway (scheduler tự verify dry-run) hoặc `POST /api/verify` với `{"dryRun":true}` |
+| `verified 0/316` | Chưa có provider keys thật, scheduler chưa chạy | Đợi 5s sau khi start gateway (scheduler tự verify dry-run) hoặc `POST /api/verify` với `{"dryRun":true}` — `ENCRYPTION_KEY` đã tự sinh, không cần nhập tay |
 | `npm i` lỗi `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + `better-sqlite3@9` cũ không có prebuild (ABI 147) | Đã fix ở `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. Nếu vẫn lỗi, dùng Node 22 LTS (`brew install node@22`) hoặc `npm i --build-from-source` với Xcode CLT `xcode-select --install` |
+| `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` | Sau corporate proxy SSL inspection (Zscaler) | Dev tạm uncomment `NODE_TLS_REJECT_UNAUTHORIZED=0` trong `.env` (đã ghi sẵn), prod dùng `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` để giữ verify |
 | `EADDRINUSE :::8080` khi `npm run dev` | Gateway cũ vẫn chạy (`nohup npm run dev:gateway` hoặc `tsx watch` trước chưa kill) | `pkill -f "tsx watch"; lsof -ti:8080 \| xargs kill -9; sleep 2; lsof -i :8080` (trống) rồi `npm run dev` lại |
 
 ## 9. Lệnh hữu ích
@@ -195,9 +183,9 @@ python scripts/sync-freellms.py
 npm run verify:free:dry -w apps-gateway
 npx tsx scripts/benchmark.ts --gateway http://localhost:8080 --key $MASTER
 
-# Đổi MASTER_KEY / ENCRYPTION_KEY
-openssl rand -hex 32
-echo "fgk-master-$(openssl rand -hex 16)"
+# Đổi MASTER_KEY / ENCRYPTION_KEY (tùy chọn — đã tự sinh, chỉ rotate khi cần)
+grep MASTER_KEY .env
+# Hoặc gen mới: openssl rand -hex 32 ; echo "fgk-master-$(openssl rand -hex 16)"
 npx tsx scripts/rotate-keys.ts --old $OLD --new $NEW
 ```
 

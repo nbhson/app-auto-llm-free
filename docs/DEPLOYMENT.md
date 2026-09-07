@@ -35,10 +35,12 @@ volumes: { pgdata: {} }
 
 ```bash
 cp .env.example .env
-# điền MASTER_KEY, ENCRYPTION_KEY, provider keys (30 providers freellms)
+# không cần điền MASTER_KEY/ENCRYPTION_KEY — tự sinh lần đầu và persist vào .env hoặc data/.gateway-keys.json (volume gateway-data)
+# chỉ điền provider keys (30 providers freellms) nếu có
 # SYNC_INTERVAL_MS=86400000 (24h) hoặc DISABLE_SCHEDULER=1
 docker compose up -d --build
-docker compose logs -f gateway
+docker compose logs -f gateway  # xem Auto-generated MASTER_KEY=fgk-master-...
+grep MASTER_KEY .env  # lấy key cho /v1/* + /api/*
 ```
 
 Health check: `curl http://localhost:8080/v1/health` → `providers:43`, `tiers` 4-tier freellms  
@@ -106,8 +108,7 @@ Dashboard (`apps/web`) deploy trực tiếp Vercel (Vite). Gateway có thể dep
 ## 5. Biến môi trường production
 
 * `NODE_ENV=production`, `LOG_LEVEL=warn`
-* `ENCRYPTION_KEY` sinh bằng `openssl rand -hex 32` và lưu secret manager (không commit)
-* `MASTER_KEY` dạng `fgk-master-$(openssl rand -hex 16)`
+* `ENCRYPTION_KEY`/`MASTER_KEY` đã tự sinh cho dev; **prod** nên override qua secret manager (không commit): `ENCRYPTION_KEY=$(openssl rand -hex 32)`, `MASTER_KEY=fgk-master-$(openssl rand -hex 16)`
 * `CORS_ORIGIN=https://yourdomain.com` (không để `*`)
 * `SYNC_INTERVAL_MS=86400000` (24h), `DISABLE_SCHEDULER=0`
 * Provider keys: ít nhất 5 P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để verify 60-70% models; các provider còn lại sẽ `unverified_no_key` nhưng vẫn phục vụ

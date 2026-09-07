@@ -72,8 +72,9 @@ Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 cp .env.example .env
-# Điền MASTER_KEY/ENCRYPTION_KEY: mở http://localhost:3000 → Key Generator (thay openssl) hoặc openssl rand -hex
+# Không cần điền MASTER_KEY/ENCRYPTION_KEY — tự sinh lần đầu và lưu vào .env (hoặc data/.gateway-keys.json)
 # Provider keys (GROQ_API_KEYS...) để trống vẫn chạy pollinations
+# Xem key đã sinh: docker compose logs gateway | grep MASTER_KEY  hoặc  cat .env | grep MASTER_KEY
 ```
 
 ### 2. Chạy với Docker (khuyến nghị)
@@ -100,7 +101,7 @@ import OpenAI from "openai";
 
 const client = new OpenAI({
   baseURL: "http://localhost:8080/v1",
-  apiKey: "fgk-your-virtual-key", // tạo trong Dashboard /api/keys
+  apiKey: "fgk-master-xxx", // MASTER_KEY tự sinh trong .env/logs — dùng 1 key cho mọi endpoint, hoặc tạo fgk-... riêng ở /keys
 });
 
 const res = await client.chat.completions.create({
@@ -143,8 +144,9 @@ Xem [.env.example](.env.example) và [docs/CONFIGURATION.md](docs/CONFIGURATION.
 PORT=8080
 DATABASE_URL=file:./data.db          # hoặc postgres://...
 REDIS_URL=redis://localhost:6379
-MASTER_KEY=fgk-master-xxx
-ENCRYPTION_KEY=32bytes-hex...
+# MASTER_KEY / ENCRYPTION_KEY tự sinh nếu thiếu/placeholder — không bắt buộc nhập tay
+# MASTER_KEY=fgk-master-xxx   # 1 key duy nhất cho /v1/* + /api/* (xem logs hoặc .env sau lần chạy đầu)
+# ENCRYPTION_KEY=64hex...      # key nội bộ AES-256-GCM, không dùng làm API key
 SYNC_INTERVAL_MS=86400000            # 24h verify live
 DISABLE_SCHEDULER=0
 
@@ -156,13 +158,14 @@ NVIDIA_API_KEYS=nvapi-xxx
 # ... 30 providers, xem .env.example đầy đủ
 ```
 
-Tạo virtual key:
+Tạo virtual key có scope (tùy chọn — MASTER_KEY đã dùng được cho /v1/*):
 
 ```bash
 curl -X POST http://localhost:8080/api/keys \
   -H "Authorization: Bearer fgk-master-xxx" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
+# Hoặc dùng luôn MASTER_KEY cho single-key: Authorization: Bearer fgk-master-xxx
 ```
 
 ## 📚 Tài liệu

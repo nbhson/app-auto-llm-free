@@ -37,10 +37,12 @@ volumes: { pgdata: {} }
 
 ```bash
 cp .env.example .env
-# fill in MASTER_KEY, ENCRYPTION_KEY, provider keys (30 freellms providers, real keys for hasKey)
+# no need to fill MASTER_KEY/ENCRYPTION_KEY — auto-generated on first boot and persisted to .env or data/.gateway-keys.json (volume gateway-data)
+# only fill provider keys (30 freellms providers, real keys for hasKey) if you have them
 # SYNC_INTERVAL_MS=86400000 (24h) or DISABLE_SCHEDULER=1
 docker compose up -d --build
-docker compose logs -f gateway
+docker compose logs -f gateway  # check Auto-generated MASTER_KEY=fgk-master-...
+grep MASTER_KEY .env  # single key for /v1/* + /api/*
 ```
 
 Health check: `curl http://localhost:8080/v1/health` → `providers:43`, `tiers` 4-tier freellms  
@@ -114,8 +116,7 @@ The Dashboard (`apps/web`) can be deployed directly to Vercel (Vite, 2-row heade
 ## 5. Production Environment Variables
 
 * `NODE_ENV=production`, `LOG_LEVEL=warn`
-* Generate `ENCRYPTION_KEY` with `openssl rand -hex 32` and store it in a secret manager (never commit it)
-* `MASTER_KEY` format `fgk-master-$(openssl rand -hex 16)`
+* `ENCRYPTION_KEY`/`MASTER_KEY` are auto-generated for dev; **prod** should override via secret manager (never commit): `ENCRYPTION_KEY=$(openssl rand -hex 32)`, `MASTER_KEY=fgk-master-$(openssl rand -hex 16)`
 * `CORS_ORIGIN=https://yourdomain.com` (do not leave as `*`)
 * `SYNC_INTERVAL_MS=86400000` (24h), `DISABLE_SCHEDULER=0` — scheduler calls both `verifyFreeModels` + `syncLiveModels` every 24h
 * Provider keys: at least 5 P0 providers (NVIDIA, Groq, Cerebras, Gemini, GitHub) for live sync 882 free / 853 hasKey; remaining providers will be `unverified_no_key` but still serve traffic; real-key check `!xxx`, length>20 for `hasKey`

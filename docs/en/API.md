@@ -6,7 +6,7 @@ OpenAI-compatible gateway API (43 provider IDs — 30 freellms + 13 aliases; fre
 
 Base URL: `http://localhost:8080/v1` (with dashboard at `http://localhost:3000` — 2-row header, i18n VI/EN)
 
-Auth: `Authorization: Bearer fgk-...` (virtual key created in the Dashboard or `MASTER_KEY`). Health check requires no auth.
+Auth: `Authorization: Bearer fgk-master-...` (auto-generated MASTER_KEY — single key for `/v1/*` + `/api/*`) or scoped `fgk-...` created in Dashboard. Health check requires no auth.
 
 ## Endpoints
 

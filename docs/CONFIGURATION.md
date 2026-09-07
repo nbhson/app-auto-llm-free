@@ -12,10 +12,11 @@ Xem `.env.example` đầy đủ (30 providers freellms.org). Dưới đây là n
 | `NODE_ENV` | `development` | `development`/`production` |
 | `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) hoặc `postgres://user:pass@host/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis cho rate limit; nếu trống fallback in-memory |
-| `MASTER_KEY` | (required) | Key admin `fgk-master-...` để tạo virtual keys |
-| `ENCRYPTION_KEY` | (required) | 32 bytes hex cho AES-256-GCM (vd: `openssl rand -hex 32`) |
+| `MASTER_KEY` | (auto-generated) | 1 key duy nhất cho `/v1/*` + `/api/*` admin. Tự sinh `fgk-master-...` nếu thiếu/placeholder, persist vào `.env` hoặc `data/.gateway-keys.json` (Docker). Override cho prod qua secret manager. |
+| `ENCRYPTION_KEY` | (auto-generated) | Key nội bộ AES-256-GCM 32 bytes hex. Tự sinh 64 hex nếu thiếu, không dùng làm API key, không cần nhập tay. |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `CORS_ORIGIN` | `*` | Cho phép Dashboard |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | _(không đặt)_ | Chỉ dev sau proxy SSL inspection (Zscaler) khi gặp `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` tắt verify → MITM, **không bao giờ prod**. Thay thế an toàn: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 
 ### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers
 
@@ -123,6 +124,10 @@ Trong `virtual_keys` table:
   "scopes": { "models": ["*"], "providers": ["nvidia-nim","groq","google-gemini"] }
 }
 ```
+
+## TLS sau corporate proxy
+
+Nếu fetch upstream lỗi `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` do proxy Zscaler, dev có thể tạm `NODE_TLS_REJECT_UNAUTHORIZED=0` trong `.env` (đã comment sẵn). Prod **không** dùng — hãy thêm CA: `NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.crt` để giữ verify.
 
 ## Drizzle config
 

@@ -44,7 +44,7 @@ export default function Keys() {
 
       <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600"><Key className="w-4 h-4" /></div><div><h2 className="text-sm font-bold text-slate-900">Key Generator — MASTER_KEY & ENCRYPTION_KEY</h2><p className="text-xs text-slate-500">Generate 2 gateway keys locally (replaces openssl).</p></div></div>
+          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600"><Key className="w-4 h-4" /></div><div><h2 className="text-sm font-bold text-slate-900">Key Generator — MASTER_KEY & ENCRYPTION_KEY (optional)</h2><p className="text-xs text-slate-500">Auto-generated on first boot — use here only to rotate.</p></div></div>
         </div>
         <KeyGen />
       </div>

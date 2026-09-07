@@ -4,7 +4,7 @@ OpenAI-compatible API của gateway (43 provider ids — 30 freellms + 13 alias,
 
 Base URL: `http://localhost:8080/v1` (kèm dashboard tại `http://localhost:3000`)
 
-Auth: `Authorization: Bearer fgk-...` (virtual key tạo trong Dashboard hoặc `MASTER_KEY`). Health không cần auth.
+Auth: `Authorization: Bearer fgk-master-...` (MASTER_KEY tự sinh — 1 key duy nhất cho `/v1/*` + `/api/*`) hoặc `fgk-...` scoped tạo trong Dashboard. Health không cần auth.
 
 ## Endpoints
 

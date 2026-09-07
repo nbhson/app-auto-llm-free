@@ -76,8 +76,9 @@ See [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md)
 git clone https://github.com/nbhson/app-auto-llm-free.git
 cd app-auto-llm-free
 cp .env.example .env
-# Fill MASTER_KEY/ENCRYPTION_KEY: open http://localhost:3000 → Key Generator (replaces openssl) or openssl rand -hex
+# No need to edit MASTER_KEY/ENCRYPTION_KEY — auto-generated on first boot and persisted to .env (or data/.gateway-keys.json)
 # Provider keys (GROQ_API_KEYS...) can be empty — still runs via pollinations
+# Check generated key: docker compose logs gateway | grep MASTER_KEY  or  cat .env | grep MASTER_KEY
 ```
 
 ### 2. Run with Docker (recommended)
@@ -104,7 +105,8 @@ import OpenAI from "openai";
 
 const client = new OpenAI({
   baseURL: "http://localhost:8080/v1",
-  apiKey: "fgk-your-virtual-key", // create in Dashboard /api/keys
+  apiKey: "fgk-master-xxx", // auto-generated MASTER_KEY from .env/logs — also works for /v1/* single-key usage
+  // or create scoped fgk-... in Dashboard /keys for per-app keys
 });
 
 const res = await client.chat.completions.create({
@@ -146,8 +148,9 @@ See [.env.example](.env.example) and [docs/en/CONFIGURATION.md](docs/en/CONFIGUR
 PORT=8080
 DATABASE_URL=file:./data.db          # or postgres://...
 REDIS_URL=redis://localhost:6379
-MASTER_KEY=fgk-master-xxx
-ENCRYPTION_KEY=32bytes-hex...
+# MASTER_KEY / ENCRYPTION_KEY are optional — auto-generated on first boot if missing/placeholder
+# MASTER_KEY=fgk-master-xxx   # single API key for /v1/* + /api/* (check logs or .env after first start)
+# ENCRYPTION_KEY=64hex...      # internal AES-256-GCM, never exposed as API key
 SYNC_INTERVAL_MS=86400000            # 24h verify live
 DISABLE_SCHEDULER=0
 
@@ -159,13 +162,14 @@ NVIDIA_API_KEYS=nvapi-xxx
 # ... 30 providers, see .env.example
 ```
 
-Create virtual key:
+Create scoped virtual key (optional — MASTER_KEY already works for /v1/*):
 
 ```bash
 curl -X POST http://localhost:8080/api/keys \
   -H "Authorization: Bearer fgk-master-xxx" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
+# Or just use MASTER_KEY directly for single-key usage: Authorization: Bearer fgk-master-xxx
 ```
 
 ## 📚 Documentation

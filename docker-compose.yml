@@ -26,6 +26,8 @@ services:
       # override DATABASE_URL to postgres when using compose
       DATABASE_URL: postgres://gateway:gateway@postgres:5432/gateway
       REDIS_URL: redis://redis:6379
+    volumes:
+      - gateway-data:/app/data
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -39,3 +41,4 @@ services:
 
 volumes:
   pgdata:
+  gateway-data:

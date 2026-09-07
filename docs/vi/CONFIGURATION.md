@@ -14,10 +14,11 @@ Xem `.env.example` đầy đủ (30 providers freellms.org, live sync là source
 | `NODE_ENV` | `development` | `development`/`production` |
 | `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) hoặc `postgres://user:pass@host/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis cho rate limit; nếu trống fallback in-memory |
-| `MASTER_KEY` | (required) | Key admin `fgk-master-...` để tạo virtual keys |
-| `ENCRYPTION_KEY` | (required) | 32 bytes hex cho AES-256-GCM (vd: `openssl rand -hex 32`) |
+| `MASTER_KEY` | (auto-generated) | 1 key duy nhất cho `/v1/*` + `/api/*` admin. Tự sinh `fgk-master-...` nếu thiếu/placeholder, lưu vào `.env` hoặc `data/.gateway-keys.json` (Docker). Override cho prod qua secret manager. |
+| `ENCRYPTION_KEY` | (auto-generated) | Key nội bộ AES-256-GCM 32 bytes hex. Tự sinh 64 hex nếu thiếu, không dùng làm API key. |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `CORS_ORIGIN` | `*` | Cho phép Dashboard (header 2 hàng + i18n VI/EN) |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | _(không đặt)_ | Chỉ dev sau proxy SSL inspection (Zscaler) khi gặp `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` tắt verify → MITM, **không bao giờ prod**. An toàn hơn: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 | `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler cho verify + live sync |
 | `DISABLE_SCHEDULER` | `0` | Đặt `1` để tắt scheduler |
 

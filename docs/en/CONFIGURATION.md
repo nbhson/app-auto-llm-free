@@ -14,10 +14,11 @@ See the full `.env.example` (30 providers from freellms.org, live sync is now so
 | `NODE_ENV` | `development` | `development`/`production` |
 | `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) or `postgres://user:pass@host/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis for rate limiting; falls back to in-memory if empty |
-| `MASTER_KEY` | (required) | Admin key `fgk-master-...` for creating virtual keys |
-| `ENCRYPTION_KEY` | (required) | 32-byte hex for AES-256-GCM (e.g. `openssl rand -hex 32`) |
+| `MASTER_KEY` | (auto-generated) | Single API key for `/v1/*` + `/api/*` admin. Auto-generated `fgk-master-...` if missing/placeholder, persisted to `.env` or `data/.gateway-keys.json` (Docker). Override for prod via secret manager. |
+| `ENCRYPTION_KEY` | (auto-generated) | Internal AES-256-GCM 32-byte hex. Auto-generated 64 hex if missing, never used as API key. |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `CORS_ORIGIN` | `*` | Allow Dashboard origin (2-row header + i18n VI/EN) |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | _(unset)_ | Dev-only behind corporate SSL-inspection proxy (Zscaler) if you hit `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` disables verification → MITM risk, **never in prod**. Safer: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 | `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler for verify + live sync |
 | `DISABLE_SCHEDULER` | `0` | Set to `1` to disable scheduler |
 

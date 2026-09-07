@@ -105,7 +105,8 @@ Fallback: Tiered fallback with circuit breaker (5 failures / 30s cooldown, `conf
 
 ## 5. Key Management & Security
 
-* **Encryption at rest**: AES-256-GCM (WebCrypto), key derived from `ENCRYPTION_KEY`. Follows `key_encryptor.py` style.
+* **Encryption at rest**: AES-256-GCM (WebCrypto), key derived from `ENCRYPTION_KEY` — **auto-generated** 64 hex if missing/placeholder (`config.ts:32`), persisted to `.env` or `data/.gateway-keys.json`, never used as API key.
+* **Master key (single-key)**: `MASTER_KEY=fgk-master-...` — **single API key** for `/v1/*` + `/api/*` admin, auto-generated if missing and seeds `vk-master` (`lib/virtual-keys.ts:116`). Scoped `fgk-...` keys are optional per-app.
 * **Virtual keys**: `fgk-` prefix, SHA-256 hash, scopes `{models, providers}`, `rpmLimit`, `tpdLimit`.
 * **Key pool**: `GROQ_API_KEYS=gsk_xxx,gsk_yyy` → round-robin, skips `Retry-After`. `config.ts:32` supports 30 freellms providers (including `OVHCLOUD_API_KEYS` alias). Real key check: `k.length>20 && !k.includes('xxx')`.
 * **Auth**: `hono/bearer-auth` + timing-safe compare, `admin`/`user` roles.

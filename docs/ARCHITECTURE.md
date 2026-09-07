@@ -98,7 +98,8 @@ Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config
 
 ## 5. Key Management & Security
 
-* **Encryption at rest**: AES-256-GCM (WebCrypto), key từ `ENCRYPTION_KEY`. `key_encryptor.py` style.
+* **Encryption at rest**: AES-256-GCM (WebCrypto), key từ `ENCRYPTION_KEY` — **tự sinh** 64 hex nếu thiếu/placeholder (`config.ts:32`), persist `.env` hoặc `data/.gateway-keys.json`, không dùng làm API key.
+* **Master key (single-key)**: `MASTER_KEY=fgk-master-...` — **1 key duy nhất** cho `/v1/*` + `/api/*` admin, tự sinh nếu thiếu và seed `vk-master` (`lib/virtual-keys.ts:116`). `fgk-...` scoped là tùy chọn per-app.
 * **Virtual keys**: prefix `fgk-`, hash SHA-256, scopes `{models, providers}`, `rpmLimit`, `tpdLimit`.
 * **Key pool**: `GROQ_API_KEYS=gsk_xxx,gsk_yyy` → round-robin, skip `Retry-After`. `config.ts:32` hỗ trợ 30 providers freellms (kể cả `OVHCLOUD_API_KEYS` alias).
 * **Auth**: `hono/bearer-auth` + timing-safe compare, `admin`/`user`.
