@@ -27,18 +27,15 @@ export const providers: Record<string, Provider> = {
   chutes: OPENAI({ id: "chutes", baseUrl: "https://llm.chutes.ai/v1" }), // alias legacy
   sambanova: OPENAI({ id: "sambanova", baseUrl: "https://api.sambanova.ai/v1" }), // 4
   siliconflow: OPENAI({ id: "siliconflow", baseUrl: "https://api.siliconflow.cn/v1" }), // 2
-  "glhf-chat": OPENAI({ id: "glhf-chat", baseUrl: "https://glhf.chat/api/openai/v1" }), // 2
-  glhf: OPENAI({ id: "glhf-chat", baseUrl: "https://glhf.chat/api/openai/v1" }),
   "hugging-face": OPENAI({ id: "hugging-face", baseUrl: "https://router.huggingface.co/v1" }), // 4, quota
   huggingface: OPENAI({ id: "hugging-face", baseUrl: "https://router.huggingface.co/v1" }),
-  "kilo-code": OPENAI({ id: "kilo-code", baseUrl: "https://api.kilo.ai/api/gateway" }), // 8, :free suffix
+  "kilo-code": OPENAI({ id: "kilo-code", baseUrl: "https://api.kilo.ai/api/gateway" }), // 6 free 2026-08
   opencode: OPENAI({ id: "opencode", baseUrl: "https://opencode.ai/zen/v1" }), // 8
   "llm7-io": OPENAI({ id: "llm7-io", baseUrl: "https://api.llm7.io/v1" }), // 6
   "agnes-ai": OPENAI({ id: "agnes-ai", baseUrl: "https://apihub.agnes-ai.com/v1" }), // 5, 30 RPM
   "aion-labs": OPENAI({ id: "aion-labs", baseUrl: "https://api.aionlabs.ai/v1" }), // 5
   "z-ai-zhipu-ai": OPENAI({ id: "z-ai-zhipu-ai", baseUrl: "https://open.bigmodel.cn/api/paas/v4" }), // 4 GLM
-  "grok-xai": OPENAI({ id: "grok-xai", baseUrl: "https://api.x.ai/v1" }), // 2, needs card
-  xai: OPENAI({ id: "xai", baseUrl: "https://api.x.ai/v1" }),
+  "grok-xai": OPENAI({ id: "grok-xai", baseUrl: "https://api.x.ai/v1" }), // 2, needs card (no free)
   deepseek: OPENAI({ id: "deepseek", baseUrl: "https://api.deepseek.com/v1" }),
   openrouter: OPENAI({ id: "openrouter", baseUrl: "https://openrouter.ai/api/v1" }), // 17 free
   "ollama-cloud": OPENAI({ id: "ollama-cloud", baseUrl: "https://api.ollama.com" }), // 3 free, stub
@@ -89,7 +86,6 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   "hugging-face": { name: "Hugging Face", tier: "Quota", tier_type: "quota", caps: ["text","code"], noCard: true },
   "ollama-cloud": { name: "Ollama Cloud", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   "chutes-ai": { name: "Chutes.ai", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
-  "glhf-chat": { name: "Glhf.chat", tier: "Permanent Free", tier_type: "permanent", caps: ["text"], noCard: true },
   "grok-xai": { name: "Grok (xAI)", tier: "Permanent Free", tier_type: "permanent", caps: ["text"], noCard: false },
   siliconflow: { name: "SiliconFlow", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   deepseek: { name: "DeepSeek", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },

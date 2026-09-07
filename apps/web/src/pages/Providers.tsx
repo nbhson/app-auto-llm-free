@@ -61,11 +61,11 @@ export default function Providers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("providers.title")} <span className="text-slate-500 font-mono text-lg">({data?.pagination?.total ?? data?.count ?? 40})</span></h1>
-          <p className="text-sm text-slate-500 mt-0.5">Configured upstream providers, tiers and live health.</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("providers.subtitle")}</p>
         </div>
       </div>
 
-      {!data ? <p className="text-sm text-slate-400">Loading...</p> : (
+      {!data ? <p className="text-sm text-slate-400">{t("providers.loading")}</p> : (
         <>
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
             <div className="px-5 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
@@ -108,10 +108,10 @@ export default function Providers() {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
                   <span className="text-slate-300 mx-1">|</span>
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">Live Health Summary</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("providers.live_health_summary")}</h2>
                   <span className="text-[11px] font-mono bg-white border border-slate-200 px-2 py-0.5 rounded-full">{health.summary ? `${health.summary.online}/${health.summary.total} online` : `${health.providers?.length ?? 0} providers`}</span>
                 </div>
-                <button onClick={() => setHealth(null)} className="text-[11px] font-semibold text-slate-500 hover:text-slate-700">✕ Close</button>
+                <button onClick={() => setHealth(null)} className="text-[11px] font-semibold text-slate-500 hover:text-slate-700">{t("providers.close")}</button>
               </div>
               <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-72">
                 <pre className="text-emerald-400"><code>{JSON.stringify(health.summary || health, null, 2)}</code></pre>

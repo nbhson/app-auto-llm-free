@@ -13,8 +13,8 @@ export default function Logs() {
   const DISPLAY_LIMIT = 50;
   const [authError, setAuthError] = useState<string | null>(null);
   const load = () => {
-    fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { setAuthError(r.status === 401 ? "Unauthorized — check MASTER_KEY in header" : `Error ${r.status}`); return { data: [] }; } setAuthError(null); return r.json(); }).then((d) => setLogs(d.data || [])).catch(() => {});
-    fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { if (r.status === 401) setAuthError("Unauthorized — check MASTER_KEY in header"); return null; } return r.json(); }).then((d) => { if (d?.logs) setStats(d); else if (d && !d.logs) setStats(null); }).catch(() => {});
+    fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { setAuthError(r.status === 401 ? t("logs.auth_error") : `Error ${r.status}`); return { data: [] }; } setAuthError(null); return r.json(); }).then((d) => setLogs(d.data || [])).catch(() => {});
+    fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { if (r.status === 401) setAuthError(t("logs.auth_error")); return null; } return r.json(); }).then((d) => { if (d?.logs) setStats(d); else if (d && !d.logs) setStats(null); }).catch(() => {});
   };
   const visibleLogs = logs.slice(0, DISPLAY_LIMIT);
   const totalCount = stats?.logs?.total ?? logs.length;
@@ -45,7 +45,7 @@ export default function Logs() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("logs.title")}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time HTTP proxy logs and token analytics.</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("logs.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2.5">
           <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs"><RefreshCw className="w-3.5 h-3.5" />{t("logs.refresh")}</button>
@@ -53,7 +53,7 @@ export default function Logs() {
         </div>
       </div>
 
-      {authError && <div className="px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold">⚠️ {authError} — nhập đúng MASTER_KEY ở header trên cùng (localStorage.masterKey). Mặc định là fgk-master-dev-key nếu .env chưa đổi.</div>}
+      {authError && <div className="px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold">⚠️ {authError} — {t("logs.auth_error_hint")}</div>}
 
       <div className="px-5 py-3.5 bg-slate-900 text-slate-100 rounded-xl shadow-xs border border-slate-800 flex flex-wrap justify-between gap-3 text-xs font-medium">
         <div className="flex flex-wrap items-center gap-3">
@@ -81,14 +81,14 @@ export default function Logs() {
               ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
             </div>
             <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Status Distribution</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">{t("logs.status_distribution")}</h3>
               {stats?.logs?.total > 0 ? (
                 <ResponsiveContainer width="100%" height={160}><PieChart><Pie data={[{ name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) }, { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) }]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label><Cell fill="#10b981" /><Cell fill="#ef4444" /></Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
               ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
             </div>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs text-xs">
-            <b>Tokens:</b> {(stats?.logs?.totalTokens ?? 0).toLocaleString()} last 100 ({(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt + {(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion, avg {stats?.logs?.avgTokens ?? 0}/req) • <b>All-time:</b> {(stats?.logs?.allTimeTokens ?? 0).toLocaleString()} • <b>By provider:</b> {Object.entries(stats?.logs?.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}
+            <b>{t("logs.tokens")}</b> {(stats?.logs?.totalTokens ?? 0).toLocaleString()} last 100 ({(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt + {(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion, avg {stats?.logs?.avgTokens ?? 0}/req) • <b>{t("logs.all_time")}</b> {(stats?.logs?.allTimeTokens ?? 0).toLocaleString()} • <b>{t("logs.by_provider")}</b> {Object.entries(stats?.logs?.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}
           </div>
         </>
       )}

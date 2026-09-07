@@ -38,7 +38,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("dashboard.title")}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time telemetry, provider health status, and cluster metrics.</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("dashboard.subtitle")}</p>
         </div>
         <button onClick={() => setShowSidebar(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-xs">
           <PanelRight className="w-3.5 h-3.5" /> {t("dashboard.gateway_health")} & {t("dashboard.stats_detail")}
@@ -130,25 +130,25 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white"><Zap className="w-4 h-4" /></div>
-            <div><h2 className="text-sm font-bold text-white">Quick Guideline — Cách dùng & config</h2><p className="text-xs text-slate-400">3 bước từ auto key đến gọi API — xem chi tiết tại <NavLink to="/keys" className="underline text-amber-300 hover:text-amber-200">Keys</NavLink></p></div>
+            <div><h2 className="text-sm font-bold text-white">{t("dashboard.quick_guideline_title")}</h2><p className="text-xs text-slate-400">{t("dashboard.quick_guideline_desc")} — <NavLink to="/keys" className="underline text-amber-300 hover:text-amber-200">Keys</NavLink></p></div>
           </div>
-          <NavLink to="/keys" className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 hover:bg-slate-100">Đi tới Keys <ArrowRight className="w-3.5 h-3.5" /></NavLink>
+          <NavLink to="/keys" className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 hover:bg-slate-100">{t("dashboard.go_to_keys")} <ArrowRight className="w-3.5 h-3.5" /></NavLink>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
-            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</span><Key className="w-4 h-4 text-amber-300" /><span className="text-xs font-bold text-white">Auto MASTER_KEY</span></div>
-            <p className="text-xs text-slate-300 leading-relaxed">Gateway tự sinh <code className="bg-white/20 px-1 py-0.5 rounded text-amber-200">fgk-master-...</code> lần đầu (persist <code className="bg-white/20 px-1 rounded">.env</code>), hiển thị <b className="text-white">read-only</b> ở header. Không cần tạo thủ công.</p>
-            <p className="text-[11px] text-slate-400 mt-2">Check: <code className="bg-slate-800 px-1 rounded">grep MASTER_KEY .env</code></p>
+            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</span><Key className="w-4 h-4 text-amber-300" /><span className="text-xs font-bold text-white">{t("dashboard.step1_title")}</span></div>
+            <p className="text-xs text-slate-300 leading-relaxed">{t("dashboard.step1_desc")}</p>
+            <p className="text-[11px] text-slate-400 mt-2">{t("dashboard.step1_check")}</p>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
-            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">2</span><Key className="w-4 h-4 text-blue-300" /><span className="text-xs font-bold text-white">Create fgk-...</span></div>
-            <p className="text-xs text-slate-300 leading-relaxed">Vào <NavLink to="/keys" className="text-blue-300 underline">Keys → Step 2</NavLink> nhập <b className="text-white">Name/RPM/Scopes</b> → <b className="text-white">Create</b>. Key có scope <code className="bg-white/20 px-1 rounded">models/providers</code>.</p>
-            <p className="text-[11px] text-slate-400 mt-2">Cần <code className="bg-slate-800 px-1 rounded">MASTER_KEY</code> ở header (auto).</p>
+            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">2</span><Key className="w-4 h-4 text-blue-300" /><span className="text-xs font-bold text-white">{t("dashboard.step2_title")}</span></div>
+            <p className="text-xs text-slate-300 leading-relaxed">{t("dashboard.step2_desc")}</p>
+            <p className="text-[11px] text-slate-400 mt-2">{t("dashboard.step2_need")}</p>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
-            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">3-4</span><Terminal className="w-4 h-4 text-emerald-300" /><span className="text-xs font-bold text-white">Copy & Quick Test</span></div>
-            <p className="text-xs text-slate-300 leading-relaxed"><b className="text-white">Step 3</b> Copy <code className="bg-white/20 px-1 rounded">fgk-...</code> (hiện 1 lần) → <b className="text-white">Step 4</b> dùng <code className="bg-white/20 px-1 rounded">$FGK_KEY</code> trong <code className="bg-white/20 px-1 rounded">curl</code> Quick Test.</p>
-            <p className="text-[11px] text-slate-400 mt-2">Table keys ở cuối trang Keys.</p>
+            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">3-4</span><Terminal className="w-4 h-4 text-emerald-300" /><span className="text-xs font-bold text-white">{t("dashboard.step3_title")}</span></div>
+            <p className="text-xs text-slate-300 leading-relaxed">{t("dashboard.step3_desc")}</p>
+            <p className="text-[11px] text-slate-400 mt-2">{t("dashboard.step3_table")}</p>
           </div>
         </div>
       </div>
@@ -247,7 +247,7 @@ export default function Dashboard() {
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40" onClick={() => setShowSidebar(false)} />
           <div className="fixed right-0 top-0 h-full w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-              <h2 className="text-sm font-bold text-slate-900">Gateway Health & Stats Detail</h2>
+              <h2 className="text-sm font-bold text-slate-900">{t("dashboard.sidebar_title")}</h2>
               <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4 text-slate-600" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/50">

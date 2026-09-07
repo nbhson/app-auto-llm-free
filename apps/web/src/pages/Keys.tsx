@@ -27,13 +27,13 @@ export default function Keys() {
     <div className="space-y-6 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("keys.title")} <span className="text-sm font-mono bg-slate-900 text-white px-2.5 py-0.5 rounded-full">{keys.length}</span></h1>
-        <p className="text-sm text-slate-500 mt-0.5">Follow 4 steps to configure your gateway access — generator → create → copy → test.</p>
+        <p className="text-sm text-slate-500 mt-0.5">{t("keys.subtitle")}</p>
       </div>
 
       {/* Step 1 */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs">
         <button type="button" onClick={() => setGenOpen(!genOpen)} className="w-full flex items-center justify-between p-5 text-left">
-          <div className="flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</span><div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600"><Key className="w-4 h-4" /></div><div><h2 className="text-sm font-bold text-slate-900">Key Generator — MASTER_KEY & ENCRYPTION_KEY (optional)</h2><p className="text-xs text-slate-500">Auto-generated on first boot — use here only to rotate.</p></div></div>
+          <div className="flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</span><div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600"><Key className="w-4 h-4" /></div><div><h2 className="text-sm font-bold text-slate-900">{t("keys.generator_title")}</h2><p className="text-xs text-slate-500">{t("keys.generator_desc")}</p></div></div>
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${genOpen ? "rotate-180" : ""}`} />
         </button>
         {genOpen && <div className="px-5 pb-5"><KeyGen /></div>}
@@ -55,19 +55,19 @@ export default function Keys() {
       {lastCreated ? (
         <div className="p-5 bg-amber-50 border-2 border-amber-300 rounded-xl shadow-md flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-amber-600 text-white flex items-center justify-center text-xs font-bold">3</span><div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><ShieldAlert className="w-4 h-4 text-amber-600" /> Save your new API Secret (Shown only once) — Step 3: Copy key</div></div>
+            <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-amber-600 text-white flex items-center justify-center text-xs font-bold">3</span><div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><ShieldAlert className="w-4 h-4 text-amber-600" /> {t("keys.save_title")}</div></div>
             <button onClick={() => setLastCreated(null)} className="text-xs underline text-amber-700">Dismiss</button>
           </div>
           <div className="flex items-center gap-2 bg-white/90 p-2.5 rounded-lg border border-amber-200">
             <code className="flex-1 font-mono text-xs truncate select-all">{lastCreated.key}</code>
             <button onClick={() => { navigator.clipboard.writeText(lastCreated.key); setCopied("new"); setTimeout(()=>setCopied(null),1500); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 text-white">{copied==="new" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}{copied==="new" ? "Copied" : "Copy Key"}</button>
           </div>
-          <p className="text-[11px] text-amber-800">This key will not be shown again. Copy now and use it as <code className="bg-white px-1 py-0.5 rounded border">Authorization: Bearer fgk-...</code></p>
+          <p className="text-[11px] text-amber-800">{t("keys.save_desc")}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl p-5 border border-dashed border-slate-300 shadow-2xs">
-          <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">3</span><h2 className="text-sm font-bold text-slate-700">Copy key</h2><span className="text-[11px] text-slate-400">— appears after Create</span></div>
-          <p className="text-xs text-slate-500 mt-2">Your new <code className="bg-slate-100 px-1.5 py-0.5 rounded border">fgk-...</code> will appear here (shown only once). Copy immediately and keep it safe.</p>
+          <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">3</span><h2 className="text-sm font-bold text-slate-700">{t("keys.copy_placeholder_title")}</h2><span className="text-[11px] text-slate-400">{t("keys.copy_placeholder_hint")}</span></div>
+          <p className="text-xs text-slate-500 mt-2">{t("keys.copy_placeholder_desc")}</p>
         </div>
       )}
 
@@ -88,8 +88,8 @@ export default function Keys() {
       {/* Table at bottom */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
-          <h2 className="text-sm font-bold text-slate-900">Your Keys <span className="ml-2 text-xs font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full">{keys.length}</span></h2>
-          <span className="text-[11px] text-slate-500">Table at bottom — all existing fgk-... keys</span>
+          <h2 className="text-sm font-bold text-slate-900">{t("keys.your_keys")} <span className="ml-2 text-xs font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full">{keys.length}</span></h2>
+          <span className="text-[11px] text-slate-500">{t("keys.table_bottom")}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
