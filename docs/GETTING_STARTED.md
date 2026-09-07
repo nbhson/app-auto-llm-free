@@ -30,9 +30,9 @@ grep MASTER_KEY .env
 # hoặc: docker compose logs gateway | grep MASTER_KEY
 ```
 
-Mở Dashboard: **http://localhost:3000** — `MASTER_KEY` đã tự điền nếu gateway và web cùng `.env`? Nếu chưa, copy `MASTER_KEY` từ `.env`/`logs` dán vào ô **Master** góc phải header (lưu localStorage). `ENCRYPTION_KEY` là nội bộ, không cần nhập — tự sinh.
+Mở Dashboard: **http://localhost:3000** — header **read-only** hiển thị `MASTER_KEY` tự sinh (có nút Show/Copy) ở góc phải hàng 1 cùng `VI/EN`; app luôn có 1 admin, không cần nhập. `ENCRYPTION_KEY` nội bộ, tự sinh. Center rộng hơn nhờ giảm padding (`max-w-[1440px]` + `px-6`).
 
-> Muốn tự đặt key: sửa `MASTER_KEY`/`ENCRYPTION_KEY` trong `.env` trước khi `compose up`, hoặc dùng Dashboard → **Keys → Key Generator** (tùy chọn, cho rotate).
+> Muốn tự đặt key: sửa `MASTER_KEY`/`ENCRYPTION_KEY` trong `.env` trước khi `compose up`, hoặc dùng Dashboard → **Keys → Key Generator** (mặc định collapsed, chỉ mở khi rotate).
 
 ## 3. Cài đặt không Docker (Node)
 
@@ -137,10 +137,11 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 
 ## 7. Dashboard walkthrough (nav: Dashboard → Providers → Models → Keys → Logs)
 
-- **`/` Dashboard** — 4 cards: Providers 40, Verify 314/316, Requests, **Tokens** (all-time + last 100 prompt/completion). Dưới là 3 charts: **Requests by Provider**, **Latency**, **Verify Pie** + Recent Logs (5) + **Tokens by Provider** bar. Header có `MASTER_KEY` input + `Key Generator` đã move sang **Keys**.
+- **Header** — 2 hàng, `max-w-[1440px]` center rộng (giảm padding `lg:px-6`), hàng 1 trái `⚡ Free LLM Gateway` + `● online` + `30 providers • 316 free`, phải `VI/EN` + **Master read-only** (masked + Show/Copy, auto-generated, luôn có admin); hàng 2 nav 5 tabs `Dashboard→Providers→Models→Keys→Logs` căn giữa.
+- **`/` Dashboard** — 4 cards: Providers 40, Verify 314/316, Requests, **Tokens** (all-time + last 100 prompt/completion). Ngay dưới là **Quick Guideline** 3 bước (gradient `slate-900`, nút `Đi tới Keys`): `1 Auto MASTER_KEY` → `2 Create fgk-...` → `3-4 Copy & Quick Test`. Tiếp là 3 charts: **Requests by Provider**, **Latency**, **Verify Pie** + Recent Logs (5) + **Tokens by Provider** bar. **Gateway Health & Stats Detail** đã dời ra **sidebar phải** (nút `Gateway Health & Stats Detail` mở drawer `w-[520px]`, backdrop, Copy JSON).
 - **`/providers`** — 43 dòng, `Free`, `Keys`, **Health** (`online`/`offline`/`no-key` + `breaker`), **Caps**, cột **Get Key ↗** (link thẳng console provider + freellms). Nút **Live Health Check** 43 providers 5s.
-- **`/models`** — 316 free, filter `id/provider` (vd `nvidia-nim`), `verified` (xanh/đỏ/vàng), **checkbox** per row + header chọn tất cả, **1 nút duy nhất** `Check Live (n)` cho các model đã tick (hiện `✅ usable 123ms`/`no-key`/`unusable 410`), cột **Used / Limit** (đếm từ logs vs `Up to 40 RPM`).
-- **`/keys`** — **Key Generator** (thay `openssl`) ở trên cùng (Generate `MASTER_KEY`/`ENCRYPTION_KEY` client-side), dưới là CRUD `fgk-...` (name/scopes/RPM) + **Quick Test** `curl` với `$FGK_KEY` (auto + `x-router: pollinations`).
+- **`/models`** — 316 free, **1 hàng filter**: `Filter id` + `Filter provider` + `Verified` + **Filters** dropdown (ngay cạnh Verified, gồm `hasKey`/`hide404`/`Hide credits`/`Hide invalid ID`) + bên phải **3 nút** `Check Live (n)`/`Sync Live`/`Refresh` (đã dời từ hàng 2 lên, nhờ center rộng); checkbox per row + header chọn tất cả, cột **Used / Limit** (đếm từ logs vs `Up to 40 RPM`), chip `Hide invalid ID` mới cho model ID không hợp lệ (thiếu `/`, chứa space/ký tự lạ).
+- **`/keys`** — **4 steps liền mạch**: `1 Key Generator` (optional, mặc định **collapsed**, click để mở) → `2 Create fgk-...` (Name/RPM/Scopes + Create) → `3 Copy key` (banner vàng hiện sau Create, chỉ 1 lần, có `Copy Key`) → `4 Quick Test` (`curl` auto + `x-router: pollinations`). **Table Your Keys** ở **cuối trang** (sau Quick Test), không còn ở giữa để flow không bị ngắt.
 - **`/logs`** — 3 charts: **Requests by Provider** + **Tokens by Provider** + **Status Pie**, header `total • allTimeTokens • avg ms/tok`, table logs + Live SSE.
 
 ## 8. Lỗi thường gặp

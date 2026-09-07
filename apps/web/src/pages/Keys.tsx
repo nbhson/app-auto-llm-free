@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Check, Key, Trash2, ShieldCheck, Dices, Terminal, ShieldAlert } from "lucide-react";
+import { Copy, Check, Key, Trash2, ShieldCheck, Dices, Terminal, ShieldAlert, ChevronDown } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 function randHex(bytes: number) { const a = new Uint8Array(bytes); crypto.getRandomValues(a); return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join(""); }
@@ -12,6 +12,7 @@ export default function Keys() {
   const [rpm, setRpm] = useState("60");
   const [lastCreated, setLastCreated] = useState<any>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [genOpen, setGenOpen] = useState(false);
 
   const load = () => { fetch("/api/keys", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => setKeys(d.data || [])).catch(() => {}); };
   useEffect(() => { load(); }, []);
@@ -26,31 +27,21 @@ export default function Keys() {
     <div className="space-y-6 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("keys.title")} <span className="text-sm font-mono bg-slate-900 text-white px-2.5 py-0.5 rounded-full">{keys.length}</span></h1>
-        <p className="text-sm text-slate-500 mt-0.5">Manage proxy credentials and test them instantly.</p>
+        <p className="text-sm text-slate-500 mt-0.5">Follow 4 steps to configure your gateway access — generator → create → copy → test.</p>
       </div>
 
-      {lastCreated && (
-        <div className="p-5 bg-amber-50 border-2 border-amber-300 rounded-xl shadow-md flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><ShieldAlert className="w-4 h-4 text-amber-600" /> Save your new API Secret (Shown only once)</div>
-            <button onClick={() => setLastCreated(null)} className="text-xs underline text-amber-700">Dismiss</button>
-          </div>
-          <div className="flex items-center gap-2 bg-white/90 p-2.5 rounded-lg border border-amber-200">
-            <code className="flex-1 font-mono text-xs truncate select-all">{lastCreated.key}</code>
-            <button onClick={() => { navigator.clipboard.writeText(lastCreated.key); setCopied("new"); setTimeout(()=>setCopied(null),1500); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 text-white">{copied==="new" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}{copied==="new" ? "Copied" : "Copy Key"}</button>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600"><Key className="w-4 h-4" /></div><div><h2 className="text-sm font-bold text-slate-900">Key Generator — MASTER_KEY & ENCRYPTION_KEY (optional)</h2><p className="text-xs text-slate-500">Auto-generated on first boot — use here only to rotate.</p></div></div>
-        </div>
-        <KeyGen />
+      {/* Step 1 */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs">
+        <button type="button" onClick={() => setGenOpen(!genOpen)} className="w-full flex items-center justify-between p-5 text-left">
+          <div className="flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</span><div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600"><Key className="w-4 h-4" /></div><div><h2 className="text-sm font-bold text-slate-900">Key Generator — MASTER_KEY & ENCRYPTION_KEY (optional)</h2><p className="text-xs text-slate-500">Auto-generated on first boot — use here only to rotate.</p></div></div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${genOpen ? "rotate-180" : ""}`} />
+        </button>
+        {genOpen && <div className="px-5 pb-5"><KeyGen /></div>}
       </div>
 
+      {/* Step 2 */}
       <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-        <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600"><Key className="w-4 h-4" /></div><h2 className="text-sm font-bold text-slate-900">{t("keys.create_title")}</h2></div>
+        <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">2</span><div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600"><Key className="w-4 h-4" /></div><h2 className="text-sm font-bold text-slate-900">{t("keys.create_title")}</h2><span className="ml-auto text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">needs MASTER_KEY</span></div>
         <div className="flex flex-wrap gap-3 items-end bg-slate-50/50 p-3 rounded-lg border border-slate-100">
           <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">Name <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-app" className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono w-36 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" /></label>
           <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">RPM <input value={rpm} onChange={(e) => setRpm(e.target.value)} placeholder="60" className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono w-24 focus:outline-none focus:ring-2 focus:ring-blue-500/20" /></label>
@@ -60,7 +51,46 @@ export default function Keys() {
         <p className="text-[11px] text-slate-500 bg-blue-50/50 border border-blue-100 rounded-lg px-3 py-2">{t("keys.create_scopes_hint")}</p>
       </div>
 
+      {/* Step 3 - Copy key */}
+      {lastCreated ? (
+        <div className="p-5 bg-amber-50 border-2 border-amber-300 rounded-xl shadow-md flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-amber-600 text-white flex items-center justify-center text-xs font-bold">3</span><div className="flex items-center gap-2 text-amber-900 font-bold text-sm"><ShieldAlert className="w-4 h-4 text-amber-600" /> Save your new API Secret (Shown only once) — Step 3: Copy key</div></div>
+            <button onClick={() => setLastCreated(null)} className="text-xs underline text-amber-700">Dismiss</button>
+          </div>
+          <div className="flex items-center gap-2 bg-white/90 p-2.5 rounded-lg border border-amber-200">
+            <code className="flex-1 font-mono text-xs truncate select-all">{lastCreated.key}</code>
+            <button onClick={() => { navigator.clipboard.writeText(lastCreated.key); setCopied("new"); setTimeout(()=>setCopied(null),1500); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 text-white">{copied==="new" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}{copied==="new" ? "Copied" : "Copy Key"}</button>
+          </div>
+          <p className="text-[11px] text-amber-800">This key will not be shown again. Copy now and use it as <code className="bg-white px-1 py-0.5 rounded border">Authorization: Bearer fgk-...</code></p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl p-5 border border-dashed border-slate-300 shadow-2xs">
+          <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">3</span><h2 className="text-sm font-bold text-slate-700">Copy key</h2><span className="text-[11px] text-slate-400">— appears after Create</span></div>
+          <p className="text-xs text-slate-500 mt-2">Your new <code className="bg-slate-100 px-1.5 py-0.5 rounded border">fgk-...</code> will appear here (shown only once). Copy immediately and keep it safe.</p>
+        </div>
+      )}
+
+      {/* Step 4 - Quick Test */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
+        <div className="flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">4</span><div className="p-1.5 bg-slate-900 text-white rounded-md"><Terminal className="w-4 h-4" /></div><h2 className="text-sm font-bold text-slate-900">{t("keys.quick_test")}</h2></div>
+        <p className="text-xs text-slate-500">{t("keys.quick_test_desc")} <code className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-xs">$FGK_KEY</code></p>
+        <div className="relative rounded-xl bg-slate-950 p-4 border border-slate-900 font-mono text-xs shadow-2xs">
+          <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /><span className="text-slate-500 text-[11px] ml-2">Auto router</span></div><button onClick={() => navigator.clipboard.writeText(`curl http://localhost:7373/v1/chat/completions -H "Authorization: Bearer $FGK_KEY" -H "Content-Type: application/json" -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`)} className="text-[11px] font-semibold text-slate-300 hover:text-white">Copy</button></div>
+          <pre className="text-emerald-400 whitespace-pre-wrap break-all">{`curl http://localhost:7373/v1/chat/completions \\\n  -H "Authorization: Bearer $FGK_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`}</pre>
+        </div>
+        <div className="relative rounded-xl bg-slate-950 p-4 border border-slate-900 font-mono text-xs shadow-2xs">
+          <div className="flex items-center gap-1.5 mb-2"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /><span className="text-slate-400 text-[11px] ml-2">Pin provider: pollinations</span></div>
+          <pre className="text-sky-300 whitespace-pre-wrap break-all">{`curl http://localhost:7373/v1/chat/completions \\\n  -H "Authorization: Bearer $FGK_KEY" -H "x-router: pollinations" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"pollinations/openai","messages":[{"role":"user","content":"Hi"}]}'`}</pre>
+        </div>
+      </div>
+
+      {/* Table at bottom */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
+          <h2 className="text-sm font-bold text-slate-900">Your Keys <span className="ml-2 text-xs font-mono bg-slate-900 text-white px-2 py-0.5 rounded-full">{keys.length}</span></h2>
+          <span className="text-[11px] text-slate-500">Table at bottom — all existing fgk-... keys</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
@@ -83,19 +113,6 @@ export default function Keys() {
           </table>
         </div>
         {keys.length === 0 && <div className="p-8 text-center text-sm text-slate-400">{t("keys.no_keys")}</div>}
-      </div>
-
-      <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
-        <div className="flex items-center gap-2"><div className="p-1.5 bg-slate-900 text-white rounded-md"><Terminal className="w-4 h-4" /></div><h2 className="text-sm font-bold text-slate-900">{t("keys.quick_test")}</h2></div>
-        <p className="text-xs text-slate-500">{t("keys.quick_test_desc")} <code className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-xs">$FGK_KEY</code></p>
-        <div className="relative rounded-xl bg-slate-950 p-4 border border-slate-900 font-mono text-xs shadow-2xs">
-          <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /><span className="text-slate-500 text-[11px] ml-2">Auto router</span></div><button onClick={() => navigator.clipboard.writeText(`curl http://localhost:7373/v1/chat/completions -H "Authorization: Bearer $FGK_KEY" -H "Content-Type: application/json" -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`)} className="text-[11px] font-semibold text-slate-300 hover:text-white">Copy</button></div>
-          <pre className="text-emerald-400 whitespace-pre-wrap break-all">{`curl http://localhost:7373/v1/chat/completions \\\n  -H "Authorization: Bearer $FGK_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`}</pre>
-        </div>
-        <div className="relative rounded-xl bg-slate-950 p-4 border border-slate-900 font-mono text-xs shadow-2xs">
-          <div className="flex items-center gap-1.5 mb-2"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /><span className="text-slate-400 text-[11px] ml-2">Pin provider: pollinations</span></div>
-          <pre className="text-sky-300 whitespace-pre-wrap break-all">{`curl http://localhost:7373/v1/chat/completions \\\n  -H "Authorization: Bearer $FGK_KEY" -H "x-router: pollinations" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"pollinations/openai","messages":[{"role":"user","content":"Hi"}]}'`}</pre>
-        </div>
       </div>
     </div>
   );

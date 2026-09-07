@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend } from "recharts";
-import { Layers, Activity, Clock, Sparkles, BarChart3, Copy, Check } from "lucide-react";
+import { Layers, Activity, Clock, Sparkles, BarChart3, Copy, Check, X, PanelRight, Zap, Key, Terminal, ArrowRight } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [recent, setRecent] = useState<any[]>([]);
   const [copiedHealth, setCopiedHealth] = useState(false);
   const [copiedStats, setCopiedStats] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     fetch("/v1/health").then((r) => r.json()).then(setHealth).catch(() => {});
@@ -33,11 +35,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("dashboard.title")}</h1>
           <p className="text-sm text-slate-500 mt-0.5">Real-time telemetry, provider health status, and cluster metrics.</p>
         </div>
+        <button onClick={() => setShowSidebar(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-xs">
+          <PanelRight className="w-3.5 h-3.5" /> {t("dashboard.gateway_health")} & {t("dashboard.stats_detail")}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -120,35 +125,30 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
-              <span className="text-slate-300 mx-1">|</span>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.gateway_health")}</h2>
-            </div>
-            <button onClick={handleCopyHealth} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs">
-              {copiedHealth ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}<span>{copiedHealth ? "Copied" : "Copy JSON"}</span>
-            </button>
+      {/* Quick Guideline */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 border border-slate-800 shadow-2xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white"><Zap className="w-4 h-4" /></div>
+            <div><h2 className="text-sm font-bold text-white">Quick Guideline — Cách dùng & config</h2><p className="text-xs text-slate-400">3 bước từ auto key đến gọi API — xem chi tiết tại <NavLink to="/keys" className="underline text-amber-300 hover:text-amber-200">Keys</NavLink></p></div>
           </div>
-          <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-72">
-            <pre className="text-emerald-400"><code>{JSON.stringify(health, null, 2) || "loading..."}</code></pre>
-          </div>
+          <NavLink to="/keys" className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 hover:bg-slate-100">Đi tới Keys <ArrowRight className="w-3.5 h-3.5" /></NavLink>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
-              <span className="text-slate-300 mx-1">|</span>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.stats_detail")}</h2>
-            </div>
-            <button onClick={handleCopyStats} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs">
-              {copiedStats ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}<span>{copiedStats ? "Copied" : "Copy"}</span>
-            </button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
+            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">1</span><Key className="w-4 h-4 text-amber-300" /><span className="text-xs font-bold text-white">Auto MASTER_KEY</span></div>
+            <p className="text-xs text-slate-300 leading-relaxed">Gateway tự sinh <code className="bg-white/20 px-1 py-0.5 rounded text-amber-200">fgk-master-...</code> lần đầu (persist <code className="bg-white/20 px-1 rounded">.env</code>), hiển thị <b className="text-white">read-only</b> ở header. Không cần tạo thủ công.</p>
+            <p className="text-[11px] text-slate-400 mt-2">Check: <code className="bg-slate-800 px-1 rounded">grep MASTER_KEY .env</code></p>
           </div>
-          <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-72">
-            <pre className="text-sky-300"><code>{JSON.stringify(stats, null, 2).slice(0, 4000) || "loading..."}{JSON.stringify(stats, null, 2).length > 4000 ? "\n... (truncated, Copy để xem đủ)" : ""}</code></pre>
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
+            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">2</span><Key className="w-4 h-4 text-blue-300" /><span className="text-xs font-bold text-white">Create fgk-...</span></div>
+            <p className="text-xs text-slate-300 leading-relaxed">Vào <NavLink to="/keys" className="text-blue-300 underline">Keys → Step 2</NavLink> nhập <b className="text-white">Name/RPM/Scopes</b> → <b className="text-white">Create</b>. Key có scope <code className="bg-white/20 px-1 rounded">models/providers</code>.</p>
+            <p className="text-[11px] text-slate-400 mt-2">Cần <code className="bg-slate-800 px-1 rounded">MASTER_KEY</code> ở header (auto).</p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
+            <div className="flex items-center gap-2 mb-2"><span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">3-4</span><Terminal className="w-4 h-4 text-emerald-300" /><span className="text-xs font-bold text-white">Copy & Quick Test</span></div>
+            <p className="text-xs text-slate-300 leading-relaxed"><b className="text-white">Step 3</b> Copy <code className="bg-white/20 px-1 rounded">fgk-...</code> (hiện 1 lần) → <b className="text-white">Step 4</b> dùng <code className="bg-white/20 px-1 rounded">$FGK_KEY</code> trong <code className="bg-white/20 px-1 rounded">curl</code> Quick Test.</p>
+            <p className="text-[11px] text-slate-400 mt-2">Table keys ở cuối trang Keys.</p>
           </div>
         </div>
       </div>
@@ -241,6 +241,50 @@ export default function Dashboard() {
           </ResponsiveContainer>
         ) : <p className="text-xs text-slate-400">{t("dashboard.no_tokens")}</p>}
       </div>
+
+      {showSidebar && (
+        <>
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40" onClick={() => setShowSidebar(false)} />
+          <div className="fixed right-0 top-0 h-full w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <h2 className="text-sm font-bold text-slate-900">Gateway Health & Stats Detail</h2>
+              <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4 text-slate-600" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/50">
+              <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
+                    <span className="text-slate-300 mx-1">|</span>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.gateway_health")}</h2>
+                  </div>
+                  <button onClick={handleCopyHealth} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs">
+                    {copiedHealth ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}<span>{copiedHealth ? "Copied" : "Copy JSON"}</span>
+                  </button>
+                </div>
+                <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-[45vh]">
+                  <pre className="text-emerald-400"><code>{JSON.stringify(health, null, 2) || "loading..."}</code></pre>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 inline-block" /><span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 inline-block" /></div>
+                    <span className="text-slate-300 mx-1">|</span>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.stats_detail")}</h2>
+                  </div>
+                  <button onClick={handleCopyStats} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs">
+                    {copiedStats ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}<span>{copiedStats ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+                <div className="p-4 bg-slate-950 text-slate-200 font-mono text-xs overflow-x-auto leading-relaxed max-h-[45vh]">
+                  <pre className="text-sky-300"><code>{JSON.stringify(stats, null, 2).slice(0, 4000) || "loading..."}{JSON.stringify(stats, null, 2).length > 4000 ? "\n... (truncated, Copy để xem đủ)" : ""}</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
