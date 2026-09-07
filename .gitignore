@@ -22,6 +22,13 @@ data.db
 data/benchmark.json
 data/request-log.json
 data/virtual-keys.json
+data/live-models.json
+data/model-health.json
+data/verified-models.json
+data/verified-summary.json
+data/evidence-sources.json
+apps/data/live-models.json
+apps/data/*.json
 
 # Logs
 logs/

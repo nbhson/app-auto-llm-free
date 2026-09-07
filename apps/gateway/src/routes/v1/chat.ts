@@ -138,6 +138,10 @@ chatRoute.post(
         continue;
       }
 
+      // Extract session IDs for providers that require them (opencode free tier, etc.)
+      const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
+      const parentSessionId = c.req.header("x-parent-session-id") || c.req.header("X-Parent-Session-ID") || undefined;
+
       try {
         const res = await provider.chat(
           {
@@ -155,6 +159,8 @@ chatRoute.post(
             presence_penalty: body.presence_penalty,
             frequency_penalty: body.frequency_penalty,
             user: body.user,
+            sessionId,
+            parentSessionId,
           },
           key
         );

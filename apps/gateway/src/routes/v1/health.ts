@@ -7,7 +7,7 @@ export const healthRoute = new Hono();
 healthRoute.get("/", (c) => {
   return c.json({
     status: "ok",
-    version: "0.3.0",
+    version: "0.4.0",
     uptime: process.uptime(),
     providers: providerIds.length,
     tiers: config.fallbackTiers,

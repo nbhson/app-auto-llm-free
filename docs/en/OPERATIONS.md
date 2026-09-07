@@ -77,8 +77,8 @@ save to data/live-models.json { total, providers, free_only, total_fetched, mode
 - `GET /api/models/live` — get cache
 - `GET /v1/models?hasKey=1` — when live cache exists serves **live 2190 total** instead of freellms 324
 - `GET /api/providers?hasKey=1` — filter real keys, highlight green
-- **Models UI**: pill `hasKey` (Only providers with keys) + `hide404` (Hide 404 models, checked by default, `hide404_migrated` + `hide404` localStorage), 404 strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json`, hidden when hide404 checked.
-- **Sync Live Now** now only pulls free models (freeOnly=true) — filtered by Permanent Free tier or `:free` suffix or freellms free list.
+ - **Models UI**: 4 toggles in Filters dropdown `hasKey` (default OFF `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (default ON, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` now stores both `404/410` and `200 usable` (usable overrides 404 so reload stays non-red, `v1/models.ts:153` + `isRowDisabled`), hidden when hide toggles checked. `Refresh` clears `q`/`provider`/`verified` and resets `hasKeyOnly:false` + `hide*` true. `Check Live` requires filter `q` or `provider` (tooltip otherwise).
+ - **Sync Live Now** on both `/providers` and `/models` (same `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx:37`/`Models.tsx:99`) only pulls free models — filtered by Permanent Free tier or `:free` suffix or freellms free list, writes `data/live-models.json`, then `POST /api/verify`. Changing `.env` keys **requires restarting the gateway** `config.ts:22` (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) to reload `hasRealKey` before sync.
 
 **Rate limit fix**: Frontend debounces `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` increases limit for list endpoints to 4x (min 200) to avoid 429 while typing/pagination.
 
@@ -112,8 +112,8 @@ DISABLE_SCHEDULER=0   # set to 1 to disable
 | `GET` | `/api/models/live` | **New**: Get live cache |
 | `GET` | `/api/models/health?model=` | Probe 1 model with chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
-| `GET` | `/api/models/health/persisted` | Persisted 404/410 (`data/model-health.json`) — `hide404` default checked, `hide404_migrated` |
-| `POST` | `/api/models/health/mark` | Mark 404/410 `{ids:[],http_status:404,error}` persist + strikethrough |
+| `GET` | `/api/models/health/persisted` | Persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` keeps non-red after reload, `hide404`/others default `hasKey OFF` |
+| `POST` | `/api/models/health/mark` | Mark health `{ids:[],http_status:404|200,error,status:"usable"|"unusable",latency_ms}` — `404` creates deprecated strikethrough, `200 usable` overrides previous `404` and `v1/models.ts:153` flips to `verified_free` + frontend `isRowDisabled` clears red |
 | `GET` | `/api/verify` | Full report `verified-models.json` |
 | `GET` | `/api/verify/summary` | Quick summary |
 | `POST` | `/api/verify` | Trigger immediate verify (body `{dryRun: false}`), scheduler also syncs live |
@@ -164,19 +164,20 @@ Currently recommended: add secrets `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA
 
 - **Dev**: live data via `POST /api/models/live/sync` with 1–2 real keys or freellms snapshot is sufficient; no full verify needed (dry-run <1s)
 - **Prod**: configure at least 5 P0 keys (NVIDIA, Groq, Cerebras, Gemini, GitHub) for live sync of 882 free (853 hasKey) every 24h; scheduler auto-calls both verify and syncLiveModels. Remaining providers will stay `unverified_no_key` but still serve with a warning
-- **Dashboard**:
-  - `/models`: top filter `q` (400ms debounce) + `verified` + pill `hasKey` (green) / `hide404` (red, default checked) + second row 3 centered buttons `Check Live` — `Sync Live Now` (freeOnly green) — `Refresh`; sticky bottom pagination `Page X/Y` + `LOV 25/50`; table strikethrough `#dc2626` + disabled checkbox + `hide404` hide
-  - `/providers`: filter `q` 400ms debounce + pill `hasKey` + `hasRealKey` green highlight; sticky bottom `LOV 25/50`
+ - **Dashboard**:
+   - `/models`: single filter row `q` + `provider` + `verified` + **Filters** dropdown (4 toggles: `hasKey` default OFF + `hide404`/`hidePayment`/`hideInvalid` default ON) + top-right 3 buttons `Check Live (n)` — `Sync Live Now` — `Refresh` (clears `hasKeyOnly:false`); sticky bottom pagination `Page X/Y` + `LOV 25/50`; table `isRowDisabled` prioritizes `live usable 200`/`usage>0` over `deprecated`, per-row `Check` persists `200 usable` to `data/model-health.json` so reload stays non-red; `hide*` hides
+   - `/providers`: filter `q` 400ms debounce + pill `hasKey` (default OFF) + `hasRealKey` green highlight; sticky bottom `LOV 25/50`; **Sync Live Now** same endpoint as Models, writes `data/live-models.json`
   - `/logs`: only **Live ON** (SSE + 2s poll), duplicate `Auto sync 5s` removed
   - Rate limit for list endpoints increased to 4x (200) to prevent 429 while typing/pagination
 
 ## What Happens When a Model Is Deprecated?
 
 The gateway will:
-- Still keep it in `GET /v1/models` but with `live_status: deprecated` + `persisted_404: true` + strikethrough
+- Still keep it in `GET /v1/models` but with `live_status: deprecated` + `persisted_404: true` + strikethrough (disabled `isRowDisabled`)
 - If `?verified=free`, exclude deprecated from the list (so clients only see tiers that are still actually free)
-- `POST /api/models/health/mark` persists 404/410 to `data/model-health.json` + localStorage `hide404`, router will skip deprecated entries in `getProvidersForRequest` if verified data exists (combined with `quota-tracker` verified map)
-- `hide404` pill default checked will hide 404 rows from UI (persist `hide404_migrated`)
+- `POST /api/models/health/mark` persists `404/410` (`unusable`) and also `200 usable` (`usable` overrides 404, `v1/models.ts:153` flips to `verified_free`, frontend `isRowDisabled` clears red, survives reload) to `data/model-health.json` + `localStorage hide404`/`modelHealthUsable`, router will skip deprecated entries in `getProvidersForRequest` if verified data exists
+- Per-row `Check` `GET /api/models/health?model=` → `POST /mark {status:"usable",http_status:200}` keeps `llm7-io/codestral-latest` non-red after reload even though `verified-models.json` said deprecated
+- `hide404`/`hidePayment`/`hideInvalid` default ON, `hasKeyOnly` default OFF will hide rows from UI (persist `*_migrated`), `Refresh` resets to defaults without re-enabling `hasKey`
 
 ## Rate limit 429 fix
 

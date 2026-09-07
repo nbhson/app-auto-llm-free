@@ -112,7 +112,7 @@ curl "http://localhost:7373/v1/models?provider=groq&verified=free&q=llama&page=1
 }
 ```
 
-When `?hasKey=1` with live cache: `total: 2190`, `free: 316` (snapshot), `pagination` still 25/50, `filters.hasKey: true`. Top filter bar has `q`, `provider` (datalist 20, `?provider=` exact), `verified`, pill `hasKey`/`hide404`/`hidePayment`; **LOV 25/50 moved to sticky bottom pagination** with `Page X/Y`. Just-checked 404/payment rows keep visible with strikethrough (hide only applies to persisted `m.health`), so `Check Live` result does not instantly disappear.
+When `?hasKey=1` with live cache: `total: 2190`, `free: 316` (snapshot), `pagination` still 25/50, `filters.hasKey: true`. Top filter bar has `q`, `provider` (datalist 20, `?provider=` exact), `verified`, pill `hasKey` (default OFF `hasKeyOnly:0`)/`hide404`/`hidePayment`/`hideInvalid` (default ON); **LOV 25/50 at sticky bottom pagination** with `Page X/Y`. `Check` per-row `GET /api/models/health?model=` → `POST /api/models/health/mark {status:"usable",http_status:200}` persists `200` so reload keeps `isRowDisabled==false` and `live_status:"verified_free"`; `Delete` persisted + `hasKeyOnly:false` on **Refresh** `Models.tsx:86`.
 
 Query params:
 
@@ -164,10 +164,10 @@ No auth required; returns gateway status and provider pool.
 | `GET` | `/api/models/health?model=` | Probe **1 model** with live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models of a provider (summary usable/unusable) |
 | `GET` | `/api/models/health/:id` | Probe 1 model by full id (e.g. `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) |
-| `GET` | `/api/models/health/persisted` | List persisted 404/410 (`data/model-health.json`) — keeps strikethrough after reload |
-| `POST` | `/api/models/health/mark` | Mark 404/410 `{ids:[],http_status:404,error:"model_not_found"}` -> persist + router skip |
+| `GET` | `/api/models/health/persisted` | List persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` keeps non-red after reload |
+| `POST` | `/api/models/health/mark` | Mark health `{ids:[],http_status:404|200,error,status:"usable"|"unusable",latency_ms}` -> persist to `data/model-health.json`; `200 usable` overrides previous `404` so `GET /v1/models` sets `live_status:"verified_free"` `v1/models.ts:153` + frontend `isRowDisabled` clears strikethrough |
 | `DELETE` | `/api/models/health/persisted/:id` | Remove one persisted entry, `DELETE /api/models/health/persisted` removes all |
-| `POST` | `/api/models/live/sync` | **New**: Sync live models `{freeOnly:true}` (default true, filtered by Permanent Free tier or `:free` suffix or freellms free list) → `data/live-models.json` (2185 total, 882 free) |
+| `POST` | `/api/models/live/sync` | Sync live models `{freeOnly:true}` (default true, filtered by Permanent Free tier or `:free` suffix or freellms free list) → `data/live-models.json` (2185 total, 882 free) — same endpoint used by **Sync Live Now** on both `/providers` and `/models` `Providers.tsx:37`/`Models.tsx:99` |
 | `GET` | `/api/models/live` | **New**: Get live cache `{total, providers, free_only, models[]}` — `/v1/models?hasKey=1` uses this cache |
 | `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers` |
 | `GET` | `/api/models/sync` | Freellms sync info (source, last_sync, script — historical, disabled) |

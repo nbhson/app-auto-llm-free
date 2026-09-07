@@ -62,7 +62,7 @@ AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # usually not needed
 ```
 
-Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). Real-key check for `hasKey`/`Sync Live Now`: `k.length>20 && !k.includes('xxx') && !k.includes('change-me')`. See the full table in `docs/PROVIDERS.md:1`.
+Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` for `hasRealKey` `api.ts:27`. **Changing `.env` requires restarting the gateway** (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) because `config.ts:22` reads only at boot, then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live-models.json`. See the full table in `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -105,6 +105,14 @@ npm run sync:freellms -w apps-gateway  # alias
 ```
 
 The gateway `GET /v1/models` reads `data/live-models.json:1` (live 882) when `?hasKey=1` with real keys, otherwise `data/freellms-models-free.json:1` (316 rows), and `GET /api/providers` returns `detailed[]` with `free_models`, `hasRealKey` (green highlight), `limit`, and `verified`, pagination LOV 25/50 at sticky bottom (400ms debounce).
+
+## UI Filters — hasKeyOnly + hide404/hidePayment/hideInvalid
+
+`apps/web/src/pages/Models.tsx:32,86` 4 toggles in **Filters** dropdown next to `Verified`: `hasKeyOnly` **default OFF** (`localStorage hasKeyOnly:0`, `hasKeyOnly_migrated`), 3 `hide404`/`hidePayment`/`hideInvalid` default ON. `Refresh` `handleRefresh` clears `q`/`provider`/`verified`, resets `hasKeyOnly:false` + `hide*` true, does not auto-enable `hasKey`. `Check Live (n)` requires `qDebounced || providerDebounced` (tooltip when no filter).
+
+## Persisted Health — 404/410 and usable 200
+
+`data/model-health.json` stores both `404/410` **and** `usable 200` (`api.ts:222 POST /api/models/health/mark` saves `status:"usable",http_status:200`). `GET /v1/models` `v1/models.ts:153` if `h.http_status==200` then `live_status:"verified_free"` overrides `deprecated`. Frontend `Models.tsx:160,366` `isRowDisabled`/`isDisabledForHide` prioritizes `(usage>0) || (live usable 200)` before `404/410`/`deprecated`/`isInvalidId`, so per-row `Check` `GET /api/models/health?model=` → `POST /mark usable` keeps non-red after reload. `GET /api/models/health/persisted` `api.ts:217` lists, `DELETE` clears.
 
 ## Rate Limit Config — per-provider (from freellms, live uses same)
 

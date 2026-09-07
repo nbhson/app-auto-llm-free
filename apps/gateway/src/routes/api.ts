@@ -229,8 +229,10 @@ apiRoute.post("/models/health/mark", async (c) => {
   const map = readModelHealth();
   const now = new Date().toISOString();
   for (const id of ids) {
-    // only persist 404/410 unusable
-    if (http_status === 404 || http_status === 410 || /model_not_found|Gone/i.test(error)) {
+    // persist usable/200 to override previous 404/410 so reload keeps non-red
+    if (status === "usable" || http_status === 200) {
+      map[id] = { status: "usable", http_status: 200, error: "", updated_at: now, provider: id.split("/")[0], latency_ms: body.latency_ms || 0 };
+    } else if (http_status === 404 || http_status === 410 || /model_not_found|Gone/i.test(error)) {
       map[id] = { status, http_status, error: String(error).slice(0, 500), updated_at: now, provider: id.split("/")[0] };
     }
   }

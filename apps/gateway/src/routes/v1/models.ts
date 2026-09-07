@@ -137,13 +137,11 @@ modelsRoute.get("/", async (c) => {
       if (!exists) all.push(em as any);
     }
     if (!providerFilter || providerFilter === "gateway") {
-      all.unshift(
-        { id: "auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
-        { id: "gpt-4", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, live_status: "alias" },
-        { id: "gpt-3.5", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, live_status: "alias" },
-      );
-    }
-  } else if (freellmsModels.length > 0) {
+        all.unshift(
+          { id: "llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
+        );
+      }
+    } else if (freellmsModels.length > 0) {
     for (const m of freellmsModels) {
       if (providerFilter && m.owned_by !== providerFilter) continue;
       if (hasKeyOnly) {
@@ -159,6 +157,10 @@ modelsRoute.get("/", async (c) => {
       if (h && (h.http_status === 404 || h.http_status === 410)) {
         live_status = "deprecated";
         persisted404 = h;
+      } else if (h && (h.http_status === 200 || h.status === "usable")) {
+        // Check usable persisted via POST /api/models/health/mark overrides deprecated
+        live_status = "verified_free";
+        persisted404 = null;
       }
       const annotated = v || h
         ? { ...m, live_status, live_free: v?.live_free ?? false, live_found: v?.live_found ?? false, last_verified: h?.updated_at || v?.last_verified || null, verified_error: h?.error || v?.error, persisted_404: !!persisted404, health: h }
@@ -207,9 +209,7 @@ modelsRoute.get("/", async (c) => {
       }
       if (!providerFilter || providerFilter === "gateway") {
         all.unshift(
-          { id: "auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
-          { id: "gpt-4", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, live_status: "alias" },
-          { id: "gpt-3.5", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, live_status: "alias" },
+          { id: "llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
         );
       }
   } else {
@@ -219,8 +219,7 @@ modelsRoute.get("/", async (c) => {
       { id: "gemini/gemini-2.0-flash", object: "model", owned_by: "gemini", context_length: 1000000 },
       { id: "nvidia-nim/z-ai-glm-5.2", object: "model", owned_by: "nvidia-nim", context_length: 1048576 },
       { id: "pollinations/openai", object: "model", owned_by: "pollinations", context_length: 8192 },
-      { id: "auto", object: "model", owned_by: "gateway", context_length: 8192 },
-      { id: "gpt-4", object: "model", owned_by: "gateway", context_length: 8192 },
+      { id: "llm-gateway/auto", object: "model", owned_by: "gateway", context_length: 8192 },
     ];
     for (const m of staticModels) {
       if (!providerFilter || m.owned_by === providerFilter) all.push({ ...m, created: 1715433600 });
@@ -230,11 +229,14 @@ modelsRoute.get("/", async (c) => {
   const verifiedSummary = readDataJson<any>("verified-summary.json", null);
 
   // Pagination: limit 25/50 LOV, page 1-indexed
-  const total = all.length;
+  // Deduplicate by id (fix duplicate keys like hugging-face/Qwen/Qwen2.5-VL-72B-Instruct)
+  const seen = new Set<string>();
+  const deduped = all.filter((m) => { if (seen.has(m.id)) return false; seen.add(m.id); return true; });
+  const total = deduped.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const curPage = Math.min(page, totalPages);
   const offset = (curPage - 1) * limit;
-  const paginated = all.slice(offset, offset + limit);
+  const paginated = deduped.slice(offset, offset + limit);
   if (rawQ && all.length === 0 && total === 0) {
     // q already filtered above
   }

@@ -77,8 +77,8 @@ save to data/live-models.json { total, providers, free_only, total_fetched, mode
 - `GET /api/models/live` — get cache
 - `GET /v1/models?hasKey=1` — khi có live cache sẽ phục vụ **live 2190 total** thay vì freellms 324
 - `GET /api/providers?hasKey=1` — filter real keys, highlight xanh lá
-- **Models UI**: pill `hasKey` (Chỉ hiện provider đã nhập key) + `hide404` (Ẩn model 404, mặc định checked, `hide404_migrated` + `hide404` localStorage), 404 strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json`, ẩn khi hide404 checked.
-- **Sync Live Now** hiện chỉ pull free models (freeOnly=true) — lọc Permanent Free tier hoặc `:free` suffix hoặc freellms free list.
+- **Models UI**: 4 toggles trong Filters dropdown `hasKey` (mặc định TẮT `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (mặc định BẬT, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` hiện lưu cả `404/410` và `200 usable` (usable override 404 nên reload giữ không đỏ, `v1/models.ts:153` + `isRowDisabled`), ẩn khi hide toggles checked. `Refresh` xóa `q`/`provider`/`verified` và reset `hasKeyOnly:false` + `hide*` true. `Check Live` yêu cầu filter `q` hoặc `provider` (tooltip nếu thiếu).
+- **Sync Live Now** ở cả `/providers` và `/models` (cùng `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx:37`/`Models.tsx:99`) chỉ pull free models — lọc Permanent Free tier hoặc `:free` suffix hoặc freellms free list, ghi `data/live-models.json`, sau đó `POST /api/verify`. Đổi `.env` keys **phải restart gateway** `config.ts:22` (`docker compose restart gateway` hoặc `pkill -f "tsx watch"; npm run dev:gateway`) để nạp `hasRealKey` trước sync.
 
 **Rate limit fix**: Frontend debounce `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` tăng limit list endpoints lên 4x (min 200) để tránh 429 khi gõ/pagination.
 
@@ -112,8 +112,8 @@ DISABLE_SCHEDULER=0   # đặt 1 để tắt
 | `GET` | `/api/models/live` | **Mới**: Get live cache |
 | `GET` | `/api/models/health?model=` | Probe 1 model chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
-| `GET` | `/api/models/health/persisted` | Persisted 404/410 (`data/model-health.json`) — `hide404` default checked, `hide404_migrated` |
-| `POST` | `/api/models/health/mark` | Mark 404/410 `{ids:[],http_status:404,error}` persist + strikethrough |
+| `GET` | `/api/models/health/persisted` | Persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` giữ không đỏ sau reload, `hide404`/khác mặc định `hasKey TẮT` |
+| `POST` | `/api/models/health/mark` | Mark health `{ids:[],http_status:404|200,error,status:"usable"|"unusable",latency_ms}` — `404` tạo deprecated strikethrough, `200 usable` override `404` trước và `v1/models.ts:153` đổi `verified_free` + frontend `isRowDisabled` xóa đỏ |
 | `GET` | `/api/verify` | Full report `verified-models.json` |
 | `GET` | `/api/verify/summary` | Summary nhanh |
 | `POST` | `/api/verify` | Trigger verify ngay (body `{dryRun: false}`), scheduler cũng sync live |
@@ -165,18 +165,19 @@ Hiện tại khuyến nghị: secrets `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVI
 - **Dev**: chỉ cần live data qua `POST /api/models/live/sync` với 1–2 real keys hoặc freellms snapshot, không cần verify đầy đủ (dry-run <1s)
 - **Prod**: cấu hình ít nhất 5 keys P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để live sync 882 free (853 hasKey) mỗi 24h; scheduler tự gọi cả verify lẫn syncLiveModels. Các provider còn lại sẽ ở `unverified_no_key` nhưng vẫn phục vụ với cảnh báo
 - **Dashboard**: 
-  - `/models`: top filter `q` (debounce 400ms) + `verified` + pill `hasKey` (xanh) / `hide404` (đỏ, mặc định checked) + hàng 2 3 nút căn giữa `Check Live` — `Sync Live Now` (freeOnly xanh lá) — `Refresh`; sticky bottom pagination `Page X/Y` + `LOV 25/50`; bảng strikethrough `#dc2626` + checkbox disabled + `hide404` ẩn
-  - `/providers`: filter `q` debounce 400ms + pill `hasKey` + highlight `hasRealKey` xanh lá; sticky bottom `LOV 25/50`
+  - `/models`: 1 hàng filter `q` + `provider` + `verified` + **Filters** dropdown (4 toggles: `hasKey` mặc định TẮT + `hide404`/`hidePayment`/`hideInvalid` mặc định BẬT) + phải 3 nút `Check Live (n)` — `Sync Live Now` — `Refresh` (xóa `hasKeyOnly:false`); sticky bottom pagination `Page X/Y` + `LOV 25/50`; bảng `isRowDisabled` ưu tiên `live usable 200`/`usage>0` trước `deprecated`, per-row `Check` persist `200 usable` vào `data/model-health.json` nên reload giữ không đỏ; `hide*` ẩn
+  - `/providers`: filter `q` debounce 400ms + pill `hasKey` (mặc định TẮT) + highlight `hasRealKey` xanh lá; sticky bottom `LOV 25/50`; **Sync Live Now** cùng endpoint với Models, ghi `data/live-models.json`
   - `/logs`: chỉ **Live ON** (SSE + 2s poll), đã bỏ `Auto sync 5s` duplicate
   - Rate limit list endpoints đã tăng 4x (200) để tránh 429 khi gõ/pagination
 
 ## Khi model bị deprecated thì sao?
 
 Gateway sẽ:
-- Vẫn giữ trong `GET /v1/models` nhưng kèm `live_status: deprecated` + `persisted_404: true` + strikethrough
+- Vẫn giữ trong `GET /v1/models` nhưng kèm `live_status: deprecated` + `persisted_404: true` + strikethrough (disabled `isRowDisabled`)
 - Nếu `?verified=free`, loại bỏ deprecated khỏi list (để client chỉ thấy tier thực sự free)
-- `POST /api/models/health/mark` persist 404/410 vào `data/model-health.json` + localStorage `hide404`, router sẽ skip deprecated trong `getProvidersForRequest` nếu có verified data (kết hợp `quota-tracker` dùng verified map)
-- `hide404` pill mặc định checked sẽ ẩn các dòng 404 khỏi UI (persist `hide404_migrated`)
+- `POST /api/models/health/mark` persist `404/410` (`unusable`) và cả `200 usable` (`usable` override 404, `v1/models.ts:153` đổi `verified_free`, frontend `isRowDisabled` xóa đỏ, giữ sau reload) vào `data/model-health.json` + `localStorage hide404`/`modelHealthUsable`, router sẽ skip deprecated trong `getProvidersForRequest` nếu có verified data
+- Per-row `Check` `GET /api/models/health?model=` → `POST /mark {status:"usable",http_status:200}` giữ `llm7-io/codestral-latest` không đỏ sau reload dù `verified-models.json` báo deprecated
+- `hide404`/`hidePayment`/`hideInvalid` mặc định BẬT, `hasKeyOnly` mặc định TẮT sẽ ẩn dòng khỏi UI (persist `*_migrated`), `Refresh` reset về mặc định mà không bật lại `hasKey`
 
 ## Rate limit 429 fix
 

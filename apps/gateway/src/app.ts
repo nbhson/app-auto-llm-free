@@ -18,7 +18,7 @@ export function createApp() {
   const app = new Hono();
 
   app.use("*", secureHeaders());
-  app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id"], maxAge: 86400 }));
+  app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id", "X-Session-ID", "X-Parent-Session-ID", "x-session-id", "x-parent-session-id"], maxAge: 86400 }));
   app.use("*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
   app.use("*", requestLogger);
   app.use("*", virtualKeyRateLimit);

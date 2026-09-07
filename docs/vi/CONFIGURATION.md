@@ -62,7 +62,7 @@ AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # thường không cần
 ```
 
-Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Real key check cho `hasKey`/`Sync Live Now`: `k.length>20 && !k.includes('xxx') && !k.includes('change-me')`. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
+Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` cho `hasRealKey` `api.ts:27`. **Đổi `.env` phải restart gateway** (`docker compose restart gateway` hoặc `pkill -f "tsx watch"; npm run dev:gateway`) vì `config.ts:22` chỉ đọc lúc boot, sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/live-models.json`. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -105,6 +105,14 @@ npm run sync:freellms -w apps-gateway  # alias
 ```
 
 Gateway `GET /v1/models` đọc `data/live-models.json:1` (live 882) khi `?hasKey=1` với real keys, ngược lại `data/freellms-models-free.json:1` (316 rows), `GET /api/providers` trả `detailed[]` với `free_models`, `hasRealKey` (highlight xanh lá), `limit`, `verified`, pagination LOV 25/50 ở sticky bottom (debounce 400ms).
+
+## UI Filters — hasKeyOnly + hide404/hidePayment/hideInvalid
+
+`apps/web/src/pages/Models.tsx:32,86` 4 toggles trong **Filters** dropdown cạnh `Verified`: `hasKeyOnly` **mặc định tắt** (`localStorage hasKeyOnly:0`, `hasKeyOnly_migrated`), 3 `hide404`/`hidePayment`/`hideInvalid` mặc định bật. `Refresh` `handleRefresh` xóa `q`/`provider`/`verified`, reset `hasKeyOnly:false` + `hide*` true, không tự bật `hasKey`. `Check Live (n)` yêu cầu `qDebounced || providerDebounced` (tooltip khi chưa filter).
+
+## Persisted health — 404/410 và usable 200
+
+`data/model-health.json` lưu cả `404/410` **và** `usable 200` (`api.ts:222 POST /api/models/health/mark` lưu `status:"usable",http_status:200`). `GET /v1/models` `v1/models.ts:153` nếu `h.http_status==200` thì `live_status:"verified_free"` override `deprecated`. Frontend `Models.tsx:160,366` `isRowDisabled`/`isDisabledForHide` ưu tiên `(usage>0) || (live usable 200)` trước khi check `404/410`/`deprecated`/`isInvalidId`, nên `Check` per-row `GET /api/models/health?model=` → `POST /mark usable` sẽ giữ không đỏ sau reload. `GET /api/models/health/persisted` `api.ts:217` list, `DELETE` xóa.
 
 ## Rate Limit config — per-provider (từ freellms, live vẫn dùng)
 

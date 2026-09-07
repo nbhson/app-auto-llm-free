@@ -164,10 +164,10 @@ Không cần auth, trả status gateway + provider pool.
 | `GET` | `/api/models/health?model=` | Probe **1 model** live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models của provider (summary usable/unusable) |
 | `GET` | `/api/models/health/:id` | Probe 1 model full id (vd `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) |
-| `GET` | `/api/models/health/persisted` | List persisted 404/410 (`data/model-health.json`) — giữ strikethrough sau reload |
-| `POST` | `/api/models/health/mark` | Mark 404/410 `{ids:[],http_status:404,error:"model_not_found"}` -> persist + router skip |
+| `GET` | `/api/models/health/persisted` | List persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` giữ không đỏ sau reload |
+| `POST` | `/api/models/health/mark` | Mark health `{ids:[],http_status:404|200,error,status:"usable"|"unusable",latency_ms}` -> persist `data/model-health.json`; `200 usable` override `404` trước nên `GET /v1/models` `live_status:"verified_free"` `v1/models.ts:153` + `isRowDisabled` xóa strikethrough |
 | `DELETE` | `/api/models/health/persisted/:id` | Xóa 1 persisted, `DELETE /api/models/health/persisted` xóa hết |
-| `POST` | `/api/models/live/sync` | **Mới**: Sync live models `{freeOnly:true}` (mặc định true, lọc Permanent Free hoặc `:free` hoặc freellms list) → `data/live-models.json` (2185 total, 882 free) |
+| `POST` | `/api/models/live/sync` | Sync live models `{freeOnly:true}` (mặc định true, lọc Permanent Free hoặc `:free` hoặc freellms list) → `data/live-models.json` (2185 total, 882 free) — cùng endpoint **Sync Live Now** ở cả `/providers` và `/models` `Providers.tsx:37`/`Models.tsx:99` |
 | `GET` | `/api/models/live` | **Mới**: Get live cache `{total, providers, free_only, models[]}` — `/v1/models?hasKey=1` dùng cache này |
 | `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers` |
 | `GET` | `/api/models/sync` | Freellms sync info (source, last_sync, script — lịch sử, disabled) |

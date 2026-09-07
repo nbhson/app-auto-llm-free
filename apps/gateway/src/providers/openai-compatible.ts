@@ -1,4 +1,14 @@
+import crypto from "node:crypto";
 import type { Provider, ChatRequest, ModelInfo } from "./base.js";
+
+function generateSessionId(): string {
+  return `ses_${crypto.randomBytes(12).toString("hex")}`;
+}
+function isOpencodeFreeModel(model: string): boolean {
+  // opencode Zen: all 8 live models are free and session-gated; require X-Session-ID for every chat
+  // previous regex missed deepseek/laguna/longcat/north and still returned 401
+  return true;
+}
 
 export function createOpenAICompatibleProvider(opts: {
   id: string;
@@ -23,6 +33,7 @@ export function createOpenAICompatibleProvider(opts: {
       const url = `${base}/chat/completions`;
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "User-Agent": "opencode-gateway/1.0",
       };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       // Extract model after provider prefix (e.g. nvidia-nim/z-ai/glm-5.2 -> z-ai/glm-5.2)
@@ -93,6 +104,25 @@ export function createOpenAICompatibleProvider(opts: {
       const lower = rawModel.toLowerCase();
       const aliasMap: Record<string, string> = { auto: autoMap[opts.id] || "openai", "gpt-4": autoMap[opts.id] || "openai", "gpt-3.5": autoMap[opts.id] || "openai", llama: autoMap[opts.id] || rawModel, "claude-3": "claude-3-haiku" };
       const model = aliasMap[lower] || rawModel;
+      // Auto session for opencode free tier (and similar session-gated providers)
+      // Priority: req.sessionId > env > auto-generated for free models
+      {
+        const needsSession = opts.id === "opencode" && isOpencodeFreeModel(model);
+        const incomingSid = (req as any).sessionId;
+        const incomingParentSid = (req as any).parentSessionId;
+        if (needsSession || incomingSid) {
+          const sid = incomingSid || process.env.OPENCODE_SESSION_ID || generateSessionId();
+          if (sid) {
+            headers["X-Session-ID"] = sid;
+            headers["x-session-id"] = sid;
+          }
+          const parentSid = incomingParentSid || process.env.OPENCODE_PARENT_SESSION_ID;
+          if (parentSid) {
+            headers["X-Parent-Session-ID"] = parentSid;
+            headers["x-parent-session-id"] = parentSid;
+          }
+        }
+      }
       // Build body filtering undefined/null to avoid provider strict validation (kilo 400, agnes 500)
       const body: any = {
         model,
@@ -110,11 +140,38 @@ export function createOpenAICompatibleProvider(opts: {
       if (req.tools !== undefined && req.tools !== null) body.tools = req.tools;
       if (req.tool_choice !== undefined && req.tool_choice !== null) body.tool_choice = req.tool_choice;
       if (req.user !== undefined && req.user !== null) body.user = req.user;
-      return fetch(url, {
+      // Initial fetch with auto session header if needed
+      let res = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
       });
+      // Generic auto-retry for session-gated providers (opencode free, etc.)
+      // opencode now returns plain 401 Unauthorized without SessionID hint for models like deepseek/laguna/longcat
+      if (!res.ok) {
+        const cloneText = await res.clone().text().catch(() => "");
+        const isOpencode401 = opts.id === "opencode" && res.status === 401;
+        const needsRetry = isOpencode401 || cloneText.includes("MissingSessionID") || cloneText.includes("can only be used in OpenCode") || cloneText.includes("SessionID") || cloneText.includes("Unauthorized");
+        if (needsRetry) {
+          const retrySid = process.env.OPENCODE_SESSION_ID || generateSessionId();
+          const retryHeaders: Record<string, string> = {
+            ...headers,
+            "X-Session-ID": retrySid,
+            "x-session-id": retrySid,
+          };
+          const parentSid = process.env.OPENCODE_PARENT_SESSION_ID;
+          if (parentSid) {
+            retryHeaders["X-Parent-Session-ID"] = parentSid;
+            retryHeaders["x-parent-session-id"] = parentSid;
+          }
+          res = await fetch(url, {
+            method: "POST",
+            headers: retryHeaders,
+            body: JSON.stringify(body),
+          });
+        }
+      }
+      return res;
     },
     async embeddings(req, apiKey: string): Promise<Response> {
       const base = resolveBase();
@@ -149,7 +206,7 @@ export function createOpenAICompatibleProvider(opts: {
     async models(apiKey?: string): Promise<ModelInfo[]> {
       const base = resolveBase();
       const url = `${base}${modelsPath}`;
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       const res = await fetch(url, { headers });
       if (!res.ok) return [];
@@ -166,7 +223,7 @@ export function createOpenAICompatibleProvider(opts: {
       try {
         const base = resolveBase();
         const url = `${base}${modelsPath}`;
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
         if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
         const res = await fetch(url, { headers });
         return res.ok;

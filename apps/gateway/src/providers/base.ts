@@ -20,6 +20,8 @@ export interface ChatRequest {
   presence_penalty?: number;
   frequency_penalty?: number;
   user?: string;
+  sessionId?: string;
+  parentSessionId?: string;
 }
 
 export interface ModelInfo {

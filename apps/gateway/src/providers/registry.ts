@@ -23,7 +23,7 @@ export const providers: Record<string, Provider> = {
 
   // ModelScope, Chutes, SambaNova, SiliconFlow — OpenAI compat
   modelscope: OPENAI({ id: "modelscope", baseUrl: "https://api-inference.modelscope.cn/v1" }), // 43
-  "chutes-ai": OPENAI({ id: "chutes-ai", baseUrl: "https://api.chutes.ai/v1" }), // 2
+  "chutes-ai": OPENAI({ id: "chutes-ai", baseUrl: "https://llm.chutes.ai/v1" }), // 2 (was api.chutes.ai 404)
   chutes: OPENAI({ id: "chutes", baseUrl: "https://llm.chutes.ai/v1" }), // alias legacy
   sambanova: OPENAI({ id: "sambanova", baseUrl: "https://api.sambanova.ai/v1" }), // 4
   siliconflow: OPENAI({ id: "siliconflow", baseUrl: "https://api.siliconflow.cn/v1" }), // 2
@@ -38,7 +38,7 @@ export const providers: Record<string, Provider> = {
   "grok-xai": OPENAI({ id: "grok-xai", baseUrl: "https://api.x.ai/v1" }), // 2, needs card (no free)
   deepseek: OPENAI({ id: "deepseek", baseUrl: "https://api.deepseek.com/v1" }),
   openrouter: OPENAI({ id: "openrouter", baseUrl: "https://openrouter.ai/api/v1" }), // 17 free
-  "ollama-cloud": OPENAI({ id: "ollama-cloud", baseUrl: "https://api.ollama.com" }), // 3 free, stub
+  "ollama-cloud": OPENAI({ id: "ollama-cloud", baseUrl: "https://ollama.com/v1" }), // 6 free: gemma4:31b, gpt-oss:120b/20b, nemotron-3-super, etc. (was api.ollama.com 301)
   "alibaba-cloud-model-studio": OPENAI({ id: "alibaba-cloud-model-studio", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" }),
   nscale: OPENAI({ id: "nscale", baseUrl: "https://api.nscale.com/v1" }),
   nebius: OPENAI({ id: "nebius", baseUrl: "https://api.studio.nebius.com/v1" }),
@@ -48,6 +48,10 @@ export const providers: Record<string, Provider> = {
   orcarouter: OPENAI({ id: "orcarouter", baseUrl: "https://api.orcarouter.ai/v1" }),
   freeai: OPENAI({ id: "freeai", baseUrl: "https://api.free.ai/v1" }),
   cline: OPENAI({ id: "cline", baseUrl: "https://api.cline.bot/api/v1" }),
+
+  // Custom local gateways from user's opencode.json
+  "9router": OPENAI({ id: "9router", baseUrl: "http://localhost:20127/v1" }),
+  omniroute: OPENAI({ id: "omniroute", baseUrl: "http://localhost:20128/v1" }),
 
   // Legacy / extra
   together: OPENAI({ id: "together", baseUrl: "https://api.together.xyz/v1" }),
@@ -92,11 +96,34 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   orcarouter: { name: "OrcaRouter", tier: "Custom", tier_type: "custom", caps: ["text","reasoning"], noCard: true },
   freeai: { name: "FreeAI", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
   cline: { name: "Cline", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
+  "9router": { name: "9Router", tier: "Custom", tier_type: "custom", caps: ["text","reasoning"], noCard: true },
+  omniroute: { name: "OmniRoute", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
 };
 
 // Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback
 // Opencode custom models from user's opencode.json (2026-09-06) — many are :free variants not in freellms
 export const modelAliases: Record<string, string[]> = {
+  "llm-gateway/auto": [
+    "nvidia-nim",
+    "groq",
+    "cerebras",
+    "google-gemini",
+    "cloudflare-workers-ai",
+    "cohere",
+    "sambanova",
+    "siliconflow",
+    "ovhcloud-ai-endpoints",
+    "modelscope",
+    "llm7-io",
+    "hugging-face",
+    "openrouter",
+    "kilo-code",
+    "pollinations",
+    "orcarouter",
+    "freeai",
+    "cline",
+    "agnes-ai",
+  ],
   auto: [
     "nvidia-nim",
     "groq",
@@ -160,9 +187,12 @@ export const modelAliases: Record<string, string[]> = {
   "gemini-3.1-flash-lite": ["google-gemini", "llm7-io"],
   "qwen3-8b": ["freeai", "modelscope"],
   "auto/coding": ["kilo-code", "opencode", "cohere"],
-  "ag/gemini-3.7-flash-high": ["openrouter", "google-gemini"],
-  "kc/minimax/minimax-m3:free": ["openrouter", "kilo-code"],
-  "kr/claude-haiku-4.5": ["openrouter", "cohere"],
+  "ag/gemini-3.7-flash-high": ["9router", "openrouter", "google-gemini"],
+  "kc/minimax/minimax-m3:free": ["9router", "openrouter", "kilo-code"],
+  "kr/claude-haiku-4.5": ["9router", "openrouter", "cohere"],
+  "aion-labs/aion-3.0": ["aion-labs"],
+  "minimax-m2.7": ["llm7-io", "sambanova"],
+  "gpt-oss": ["llm7-io", "cerebras", "hugging-face", "ollama-cloud"],
   "gpt-4": ["groq", "cerebras", "google-gemini", "openrouter", "nvidia-nim"],
   "gpt-3.5": ["groq", "pollinations", "ovhcloud-ai-endpoints", "modelscope"],
   "claude-3": ["cohere", "hugging-face", "openrouter", "mistral-ai"],

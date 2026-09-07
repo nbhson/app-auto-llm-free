@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, X, Check, ChevronDown, Filter } from "lucide-react";
+import { Search, RefreshCw, X, Check, ChevronDown, Filter, Info, Zap } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
@@ -24,16 +24,16 @@ export default function Models() {
   const [verified, setVerified] = useState<string>("all");
   const [live, setLive] = useState<Record<string, any>>({});
   const [checking, setChecking] = useState(false);
+  const [checkingOne, setCheckingOne] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [usage, setUsage] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "score", dir: "desc" });
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
   const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [hasKeyOnly, setHasKeyOnly] = useState(() => {
     const v = localStorage.getItem("hasKeyOnly");
-    if (v === null) { localStorage.setItem("hasKeyOnly", "1"); return true; }
+    const migrated = localStorage.getItem("hasKeyOnly_migrated");
+    if (!migrated) { localStorage.setItem("hasKeyOnly_migrated", "1"); localStorage.setItem("hasKeyOnly", "0"); return false; }
+    if (v === null) { localStorage.setItem("hasKeyOnly", "0"); return false; }
     return v !== "0";
   });
   const [hide404, setHide404] = useState(() => {
@@ -64,22 +64,11 @@ export default function Models() {
     if (qDebounced) params.set("q", qDebounced);
     if (providerDebounced) params.set("provider", providerDebounced);
     if (hasKeyOnly) params.set("hasKey", "1");
-    // When hide filters are on, fetch larger set and do client-side pagination after filtering to ensure each page has full limit visible
-    const needClientSide = hide404 || hidePayment || hideInvalid;
-    const fetchLimit = needClientSide ? 1000 : limit;
-    const fetchPage = needClientSide ? 1 : page;
-    params.set("page", String(fetchPage)); params.set("limit", String(fetchLimit));
+    params.set("limit", "1000");
+    params.set("page", "1");
     fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
-      if (needClientSide) {
-        // For hide filters, backend returns up to 100, we will handle pagination client-side after filtering in visible logic.
-        // Store all fetched for client-side pagination; total will be recalculated after filtering.
-        setModels(d.data || []);
-        // Use backend total as estimate, but visible pagination will be based on filtered length
-        setTotal(d.total ?? d.data?.length ?? 0);
-        setTotalPages(Math.max(1, Math.ceil((d.total ?? 0) / limit)));
-      } else {
-        setModels(d.data || []); setTotal(d.total ?? d.data?.length ?? 0); setTotalPages(d.pagination?.total_pages ?? Math.ceil((d.total ?? 0) / limit) ?? 1);
-      }
+      setModels(d.data || []);
+      setTotal(d.total ?? d.data?.length ?? 0);
     }).catch(() => setModels([]));
   };
   const fetchUsage = () => {
@@ -87,13 +76,25 @@ export default function Models() {
       const map: Record<string, number> = {}; for (const l of d.data || []) { const id = l.model || ""; map[id] = (map[id] || 0) + 1; } setUsage(map);
     }).catch(() => {});
   };
-  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, page, limit, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
+  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
   useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
-  useEffect(() => { setPage(1); }, [qDebounced, providerDebounced, verified, limit, hasKeyOnly, hide404, hidePayment, hideInvalid]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
   useEffect(() => { localStorage.setItem("hidePayment", hidePayment ? "1" : "0"); }, [hidePayment]);
   useEffect(() => { localStorage.setItem("hideInvalid", hideInvalid ? "1" : "0"); }, [hideInvalid]);
   useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
+
+  const handleRefresh = () => {
+    setQ("");
+    setProvider("");
+    setVerified("all");
+    setHasKeyOnly(false);
+    setHide404(true);
+    setHidePayment(true);
+    setHideInvalid(true);
+    setSelected(new Set());
+    // fetchModels will be triggered by useEffect on dependency change, but also call directly to ensure
+    setTimeout(fetchModels, 100);
+  };
 
   const syncLive = async () => {
     if (!confirm("Sync Live sẽ gọi provider.models() bằng key thật trong .env để cập nhật danh sách model mới nhất (có thể mất 10-20s). Tiếp tục?")) return;
@@ -116,27 +117,16 @@ export default function Models() {
     if (sort.col === "status") return (a.live_status || "").localeCompare(b.live_status || "") * dir;
     return 0;
   });
-  const isDisabled = (m: any) => {
-    const h = live[m.id] || (m as any).health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
-  };
-  // For hide filtering, use only persisted health (m.health / persisted_404 / live_status), NOT transient live[m.id] from just-checked Check Live.
-  // This keeps just-checked 404/payment rows visible with strikethrough so user can see the Live result instead of instantly disappearing.
   const isDisabledForHide = (m: any) => {
+    if ((usage[m.id] || 0) > 0) return false;
+    const liveH = live[m.id];
+    if (liveH && (liveH.status === "usable" || liveH.http_status === 200)) return false;
     const h = (m as any).health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
   };
-  const isPaymentError = (m: any) => {
-    const h = live[m.id] || (m as any).health;
-    if (!h) return false;
-    const status = h.http_status;
-    const err = (h.error || h.message || "").toLowerCase();
-    if (status === 402 || status === 429) {
-      if (/out of credits|no payment|payment method|insufficient|quota|billing|payment_required|unpaid|exceeded|balance|credit/i.test(err)) return true;
-      if (status === 402) return true;
-    }
-    if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
-    return false;
-  };
   const isPaymentForHide = (m: any) => {
+    if ((usage[m.id] || 0) > 0) return false;
+    const liveH = live[m.id];
+    if (liveH && (liveH.status === "usable" || liveH.http_status === 200)) return false;
     const h = (m as any).health;
     if (!h) return false;
     const status = h.http_status;
@@ -148,61 +138,110 @@ export default function Models() {
     if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
     return false;
   };
-  const ALIAS_IDS = new Set(["auto","gpt-4","gpt-3.5","claude-3","gemini","gemini-flash","llama","qwen","glm","kimi","code","embedding","rerank","deepseek","mistral","kilo-auto"]);
+  const ALIAS_IDS = new Set(["llm-gateway/auto","auto","gpt-4","gpt-3.5","claude-3","gemini","gemini-flash","llama","qwen","glm","kimi","code","embedding","rerank","deepseek","mistral","kilo-auto"]);
   const isInvalidId = (m: any) => {
     const id: string = (m.id || "").trim();
     if (!id) return true;
     if (ALIAS_IDS.has(id)) return false;
-    if (m.owned_by === "gateway" && id === "auto") return false;
-    // valid: provider/model with slash, no spaces, allowed chars a-z0-9-_.:/ 
+    if (m.owned_by === "gateway" && id === "llm-gateway/auto") return false;
     if (!id.includes("/")) return true;
     if (/\s/.test(id)) return true;
     if (/[^a-zA-Z0-9-_/.:]/.test(id)) return true;
     if (id.startsWith("/") || id.endsWith("/") || id.includes("//")) return true;
     return false;
   };
-  const hideActive = hide404 || hidePayment || hideInvalid;
   let filteredAfterHide = filtered;
   if (hide404) filteredAfterHide = filteredAfterHide.filter((m) => !isDisabledForHide(m));
   if (hidePayment) filteredAfterHide = filteredAfterHide.filter((m) => !isPaymentForHide(m));
   if (hideInvalid) filteredAfterHide = filteredAfterHide.filter((m) => !isInvalidId(m));
-  // When hide filters are active, we fetched 100 and do client-side pagination to ensure each page has full limit visible
-  const totalDisplay = hideActive ? filteredAfterHide.length : total;
-  const totalPagesDisplay = hideActive ? Math.max(1, Math.ceil(filteredAfterHide.length / limit)) : totalPages;
-  const visible = hideActive ? filteredAfterHide.slice((page - 1) * limit, page * limit) : filteredAfterHide;
+  const visible = Array.from(new Map(filteredAfterHide.map((m) => [m.id, m])).values());
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "id" ? "asc" : "desc" }));
   const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
-  const visibleEnabled = visible; // allow 404/payment to be re-checked (only truly deprecated without 404 was previously blocked)
+  const isRowDisabled = (m: any) => {
+    // If model was recently used successfully (via chat logs), don't show as disabled even if health says 404
+    if ((usage[m.id] || 0) > 0) return false;
+    const liveH = live[m.id];
+    if (liveH && (liveH.status === "usable" || liveH.http_status === 200)) return false;
+    const h = liveH || (m as any).health;
+    const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404;
+    const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
+    const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you\'re out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
+    return is404 || isGone || isPayment || isInvalidId(m) || m.live_status === "deprecated";
+  };
+  const isCheckboxDisabled = (m: any) => isInvalidId(m);
+  const visibleEnabled = visible.filter((m) => !isCheckboxDisabled(m));
   const allVisibleSelected = visibleEnabled.length > 0 && visibleEnabled.every((m) => selected.has(m.id));
-  const toggle = (id: string) => { setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
+  const toggle = (id: string) => {
+    const m = visible.find((x) => x.id === id);
+    if (m && isCheckboxDisabled(m)) return;
+    setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  };
   const toggleAll = () => { if (allVisibleSelected) setSelected(new Set()); else setSelected(new Set(visibleEnabled.map((m) => m.id))); };
+  const hasFilter = !!(qDebounced || providerDebounced);
+  const checkSingle = async (id: string) => {
+    const found = visible.find((x) => x.id === id) as any;
+    if (found && isCheckboxDisabled(found)) return;
+    setCheckingOne(id);
+    try {
+      const res = await fetch(`/api/models/health?model=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${mk()}` } });
+      const data = await res.json().catch(() => null);
+      if (data) {
+        setLive((prev) => ({ ...prev, [id]: data }));
+        if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) {
+          await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], http_status: data.http_status, error: data.error }) }).catch(() => {});
+          try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); cur[id] = { http_status: data.http_status, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch {}
+        } else if (data.status === "usable" || data.http_status === 200) {
+          // persist usable to DB so reload keeps non-red (overwrites 404)
+          await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], status: "usable", http_status: 200, latency_ms: (data as any).latency_ms || 0 }) }).catch(() => {});
+          try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch {}
+          try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); cur2[id] = { status: "usable", http_status: data.http_status || 200, latency_ms: data.latency_ms, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch {}
+          // Also clear persisted health in models state so isRowDisabled/isDisabledForHide no longer sees old 404
+          setModels((prev) => prev.map((m) => m.id === id ? { ...m, health: { status: "usable", http_status: 200, latency_ms: (data as any).latency_ms || 0 }, persisted_404: false, live_status: "verified_free" } : m));
+        }
+      }
+    } finally { setCheckingOne(null); }
+  };
   const checkSelected = async () => {
     const ids = Array.from(selected); if (ids.length === 0) { alert("Chọn ít nhất 1 model (tick checkbox)"); return; }
     if (ids.length > 20) { if (!confirm(`Check ${ids.length} models sẽ mất ~${ids.length * 2}s và có thể hit rate limit. Tiếp tục?`)) return; }
     setChecking(true);
     try {
-      const toPersist: string[] = []; const persistPayload: any[] = [];
+      const toPersist: string[] = []; const persistPayload: any[] = []; const toRemove: string[] = [];
       for (const id of ids) {
         const res = await fetch(`/api/models/health?model=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${mk()}` } });
         const data = await res.json().catch(() => null);
-        if (data) { setLive((prev) => ({ ...prev, [id]: data })); if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) { toPersist.push(id); persistPayload.push({ id, http_status: data.http_status, error: data.error }); } }
+        if (data) {
+          setLive((prev) => ({ ...prev, [id]: data }));
+          if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) { toPersist.push(id); persistPayload.push({ id, http_status: data.http_status, error: data.error }); }
+          else if (data.status === "usable" || data.http_status === 200) { toRemove.push(id); }
+        }
       }
       if (toPersist.length > 0) {
         await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: toPersist, http_status: 404, error: "model_not_found", details: persistPayload }) }).catch(() => {});
         try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); for (const id of toPersist) cur[id] = { http_status: 404, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch {}
       }
+      for (const id of toRemove) {
+        const ld = live[id] || {};
+        await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], status: "usable", http_status: 200, latency_ms: ld.latency_ms || 0 }) }).catch(() => {});
+        try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch {}
+        try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); const liveData = live[id] || {}; cur2[id] = { status: "usable", http_status: 200, latency_ms: liveData.latency_ms || 0, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch {}
+      }
+      if (toRemove.length > 0) {
+        setModels((prev) => prev.map((m) => toRemove.includes(m.id) ? { ...m, health: { status: "usable", http_status: 200, latency_ms: live[m.id]?.latency_ms || 0 }, persisted_404: false, live_status: "verified_free" } : m));
+      }
     } finally { setChecking(false); }
   };
   useEffect(() => {
-    fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => { const map: Record<string, any> = {}; for (const row of d.data || []) map[row.id] = row; if (Object.keys(map).length > 0) setLive((prev) => ({ ...map, ...prev })); }).catch(() => {});
-    try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (Object.keys(cur).length > 0) setLive((prev) => ({ ...cur, ...prev })); } catch {}
+    fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => { const map: Record<string, any> = {}; for (const row of d.data || []) map[row.id] = row; if (Object.keys(map).length > 0) setLive((prev) => ({ ...prev, ...map })); }).catch(() => {});
+    try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (Object.keys(cur).length > 0) setLive((prev) => ({ ...prev, ...cur })); } catch {}
+    try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); if (Object.keys(cur2).length > 0) setLive((prev) => ({ ...prev, ...cur2 })); } catch {}
   }, []);
 
   return (
     <div className="space-y-4 pb-12">
       <div className="flex items-baseline gap-3 flex-wrap">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("models.title")} <span className="text-sm font-mono font-semibold bg-white border border-slate-200 px-2.5 py-0.5 rounded-full">{total}</span></h1>
-        <span className="text-xs text-slate-500 font-mono">Page {page}/{totalPages}</span>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("models.title")} <span className="text-sm font-mono font-semibold bg-white border border-slate-200 px-2.5 py-0.5 rounded-full">{visible.length}</span></h1>
+        <span className="text-xs text-slate-500 font-mono">{visible.length} models</span>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
@@ -280,9 +319,15 @@ export default function Models() {
             )}
           </div>
           <div className="ml-auto flex flex-wrap gap-2 items-center">
-            <button onClick={checkSelected} disabled={checking || selected.size === 0} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-xs ${selected.size > 0 ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-white text-slate-400 border border-slate-200"}`}>{checking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}{checking ? t("models.checking") : `${t("models.check_live")} (${selected.size})`}</button>
-            <button onClick={syncLive} disabled={syncing} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${syncing ? "bg-slate-100 text-slate-500 border border-slate-200" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>{syncing ? t("models.syncing") : t("models.sync")}</button>
-            <button onClick={fetchModels} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50"><RefreshCw className="w-3.5 h-3.5" /> {t("models.refresh")}</button>
+            <div className="relative group" title={!hasFilter ? t("models.check_live_tooltip") : ""}>
+              <button onClick={checkSelected} disabled={checking || selected.size === 0 || !hasFilter} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-xs ${!hasFilter ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" : selected.size > 0 ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-white text-slate-400 border border-slate-200"}`}>{checking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}{checking ? t("models.checking") : `${t("models.check_live")} (${selected.size})`}</button>
+              {!hasFilter && <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 hidden group-hover:block bg-slate-900 text-white text-[11px] px-2 py-1 rounded whitespace-nowrap z-10">{t("models.check_live_tooltip")}</span>}
+            </div>
+            <div className="relative group">
+              <button onClick={syncLive} disabled={syncing} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${syncing ? "bg-slate-100 text-slate-500 border border-slate-200" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>{syncing ? t("models.syncing") : t("models.sync")}</button>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 hidden group-hover:block bg-slate-900 text-white text-[11px] px-2 py-1 rounded whitespace-nowrap z-10 max-w-[220px] text-center">{t("models.sync_hint")}</span>
+            </div>
+            <button onClick={handleRefresh} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50"><RefreshCw className="w-3.5 h-3.5" /> {t("models.refresh")}</button>
           </div>
         </div>
         {(qDebounced || providerDebounced || verified !== "all" || hasKeyOnly || hide404 || hidePayment || hideInvalid) && (
@@ -315,15 +360,22 @@ export default function Models() {
                 <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("status")}>{t("models.th_status")} {arrow("status")}</th>
                 <th className="px-3 py-3">{t("models.th_live")}</th>
                 <th className="px-3 py-3 cursor-pointer select-none hover:text-slate-900" onClick={() => toggleSort("used")}>{t("models.th_used")} {arrow("used")}</th>
+                <th className="px-3 py-3 text-center">{t("models.check")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visible.map((m) => {
+              {visible.map((m, idx) => {
                 const h = live[m.id] || (m as any).health || (m.persisted_404 ? { http_status: 404, error: "model_not_found" } : null);
-                const used = usage[m.id] || 0; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || (m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you\'re out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })(); const isInvalid = isInvalidId(m); const disabled = is404 || isGone || isPayment || isInvalid || m.live_status === "deprecated";
+                const used = usage[m.id] || 0;
+                // use centralized logic so Check usable survives reload (live usable + DB 200)
+                const disabled = isRowDisabled(m);
+                const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || (m as any).persisted_404;
+                const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
+                const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you\'re out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
+                const isInvalid = isInvalidId(m);
                 return (
-                  <tr key={m.id} className={`${disabled ? `${isPayment ? "bg-amber-50/60 opacity-60 line-through decoration-amber-400" : isInvalid ? "bg-slate-100/60 opacity-60 line-through decoration-slate-400" : "bg-rose-50/60 opacity-60 line-through decoration-rose-400"}` : selected.has(m.id) ? "bg-blue-50/40" : "hover:bg-slate-50/80"} transition-colors`} title={isInvalid ? "Invalid model ID" : isPayment ? "Out of credits / payment required — click to re-check" : is404 || isGone ? "404/410 — click to re-check" : ""}>
-                    <td className="px-3 py-3 text-center"><input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} className="w-4 h-4 accent-slate-900" /></td>
+                  <tr key={`${m.id}::${idx}`} className={`${disabled ? `${isPayment ? "bg-amber-50/60 opacity-60 line-through decoration-amber-400" : isInvalid ? "bg-slate-100/60 opacity-60 line-through decoration-slate-400" : "bg-rose-50/60 opacity-60 line-through decoration-rose-400"}` : selected.has(m.id) ? "bg-blue-50/40" : "hover:bg-slate-50/80"} transition-colors`} title={isInvalid ? "Invalid model ID" : isPayment ? "Out of credits / payment required" : is404 || isGone ? "404/410" : ""}>
+                    <td className="px-3 py-3 text-center"><input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} disabled={isInvalid} className="w-4 h-4 accent-slate-900 disabled:opacity-30 disabled:cursor-not-allowed" /></td>
                     <td className="px-3 py-3"><code className={`text-xs font-mono px-2 py-0.5 rounded border font-semibold ${disabled ? (isInvalid ? "bg-slate-200 text-slate-600 border-slate-300 line-through" : isPayment ? "bg-amber-100 text-amber-700 border-amber-200 line-through" : "bg-rose-100 text-rose-700 border-rose-200 line-through") : "bg-slate-100 text-slate-800 border-slate-200"}`}>{m.id}</code></td>
                     <td className="px-3 py-3 font-medium text-slate-700">{m.owned_by || m.provider}</td>
                     <td className="px-3 py-3 font-mono text-slate-600">{m.context_length ? (m.context_length >= 1000000 ? (m.context_length/1000000)+"M" : m.context_length >= 1000 ? Math.round(m.context_length/1000)+"K" : m.context_length) : "-"}</td>
@@ -331,20 +383,20 @@ export default function Models() {
                     <td className="px-3 py-3">{badge(m.live_status)}</td>
                     <td className="px-3 py-3 text-xs">{h ? (isPayment ? <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold text-[11px]">out of credits {h.http_status ? ` ${h.http_status}` : ""}</span> : h.status === "usable" ? <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold text-[11px]"><Check className="w-3 h-3" /> usable {h.latency_ms}ms</span> : h.status === "no-key" ? <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-[11px] font-semibold">no-key</span> : <span className="text-rose-700 font-semibold">{h.status}{h.http_status ? ` ${h.http_status}` : ""}</span>) : <span className="text-slate-400">—</span>}</td>
                     <td className="px-3 py-3 font-mono text-slate-600"><span className={used>0 ? "font-bold text-slate-800" : ""}>{used}</span> / {parseLimit(m.limit)}</td>
+                    <td className="px-3 py-3 text-center">
+                      <button onClick={() => checkSingle(m.id)} disabled={isInvalid || checkingOne === m.id} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border ${isInvalid ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-white text-blue-700 border-blue-200 hover:bg-blue-50"}`} title={isInvalid ? "Invalid model ID — disabled" : t("models.check")}>
+                        {checkingOne === m.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />} {t("models.check")}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && <div className="p-8 text-center text-sm text-slate-400">{t("models.no_match")}</div>}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/70 border-t border-slate-200 text-xs font-semibold text-slate-600 sticky bottom-0 z-10 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md shadow-2xs disabled:opacity-40 hover:bg-slate-50">‹ {t("common.prev")}</button>
-            <span className="font-mono text-slate-600">Page {page} / {totalPagesDisplay} • {hideActive ? `${filteredAfterHide.length} total • ${visible.length} visible` : `${total} models`} {`• ${limit}/page`}</span>
-            <button onClick={() => setPage((p) => Math.min(totalPagesDisplay, p + 1))} disabled={page >= totalPagesDisplay} className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md shadow-2xs disabled:opacity-40 hover:bg-slate-50">{t("common.next")} ›</button>
-          </div>
-          <label className="flex items-center gap-2 ml-auto">Rows: <select value={limit} onChange={(e) => { const v=parseInt(e.target.value); setLimit(v); setPage(1); }} className="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold"><option value={25}>25</option><option value={50}>50</option></select></label>
+        {visible.length === 0 && <div className="p-8 text-center text-sm text-slate-400">{t("models.no_match")}</div>}
+        <div className="px-5 py-3 bg-slate-50/70 border-t border-slate-200 text-xs font-mono text-slate-600">
+          {visible.length} models • {selected.size} selected
         </div>
       </div>
     </div>

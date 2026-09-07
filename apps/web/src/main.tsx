@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom";
 import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown } from "lucide-react";
-import { motion } from "motion/react";
 import Dashboard from "./pages/Dashboard.tsx";
 import Models from "./pages/Models.tsx";
 import Providers from "./pages/Providers.tsx";
@@ -21,6 +20,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const [showKey, setShowKey] = React.useState(false);
   const [copiedKey, setCopiedKey] = React.useState(false);
   const [langMenuOpen, setLangMenuOpen] = React.useState(false);
+  const [headerStats, setHeaderStats] = React.useState<any>(null);
   const { lang, setLang, t } = useLang();
 
   React.useEffect(() => {
@@ -33,6 +33,8 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     fetch("/v1/health").then((r) => (r.ok ? setHealth("ok") : setHealth("down"))).catch(() => setHealth("down"));
+    const key = getMasterKey();
+    fetch("/api/stats", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.json()).then(setHeaderStats).catch(() => {});
   }, []);
 
   const handleCopyMasterKey = () => {
@@ -41,10 +43,12 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
+  const providersBadge = headerStats ? String(headerStats.providers ?? headerStats.count ?? 40) : "—";
+  const modelsBadge = headerStats ? String(headerStats.free_models ?? 316) : "—";
   const navItems = [
     { to: "/", label: t("nav.dashboard"), icon: <LayoutDashboard className="w-4 h-4" />, end: true as const },
-    { to: "/providers", label: t("nav.providers"), icon: <Server className="w-4 h-4" />, badge: "43" },
-    { to: "/models", label: t("nav.models"), icon: <Cpu className="w-4 h-4" />, badge: "316" },
+    { to: "/providers", label: t("nav.providers"), icon: <Server className="w-4 h-4" />, badge: providersBadge },
+    { to: "/models", label: t("nav.models"), icon: <Cpu className="w-4 h-4" />, badge: modelsBadge },
     { to: "/keys", label: t("nav.keys"), icon: <Key className="w-4 h-4" /> },
     { to: "/logs", label: t("nav.logs"), icon: <ScrollText className="w-4 h-4" /> },
   ];
@@ -60,7 +64,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                   <Zap className="w-4 h-4 fill-white stroke-white" />
                 </div>
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors">Free LLM Gateway</span>
-                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.3.0</span>
+                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.4.0</span>
               </NavLink>
 
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs ${health === "ok" ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" : health === "down" ? "bg-rose-50 text-rose-700 border-rose-200/80" : "bg-slate-100 text-slate-600 border-slate-200/80"}`}>
@@ -72,10 +76,10 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/80 shadow-2xs">
-                <span className="font-semibold text-slate-800">30</span>
+                <span className="font-semibold text-slate-800">{headerStats?.providers ?? headerStats?.count ?? "—"}</span>
                 <span>providers</span>
                 <span className="text-slate-300">•</span>
-                <span className="font-semibold text-amber-700">316</span>
+                <span className="font-semibold text-amber-700">{headerStats?.free_models ?? "—"}</span>
                 <span>free</span>
               </div>
             </div>
@@ -149,7 +153,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                         </span>
                       )}
                       {isActive && (
-                        <motion.div layoutId="activeTabBadge" className="absolute inset-0 rounded-lg -z-10 bg-slate-900" transition={{ type: "spring", stiffness: 450, damping: 35 }} />
+                        <div className="absolute inset-0 rounded-lg -z-10 bg-slate-900" />
                       )}
                     </>
                   )}
