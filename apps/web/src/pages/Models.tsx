@@ -54,9 +54,17 @@ export default function Models() {
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [allProviders, setAllProviders] = useState<any[]>([]);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
   useEffect(() => { const id = setTimeout(() => setProviderDebounced(provider.trim()), 400); return () => clearTimeout(id); }, [provider]);
+  useEffect(() => {
+    fetch(`/api/providers?limit=50`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
+      const list = d.detailed || [];
+      list.sort((a: any, b: any) => a.id.localeCompare(b.id));
+      setAllProviders(list);
+    }).catch(() => {});
+  }, []);
 
   const fetchModels = () => {
     const params = new URLSearchParams();
@@ -252,32 +260,16 @@ export default function Models() {
             {q && <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full"><X className="w-3 h-3 text-slate-400" /></button>}
           </div>
           <div className="relative flex-1 min-w-[160px] max-w-[220px]">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input list="provider-list" placeholder="Filter by provider..." value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 placeholder:text-slate-400" />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 appearance-none">
+              <option value="">All providers</option>
+              {allProviders.map((p) => (
+                <option key={p.id} value={p.id} disabled={!p.hasRealKey} title={!p.hasRealKey ? "no key" : "has key"}>
+                  {p.id}{!p.hasRealKey ? " (no key)" : ""}
+                </option>
+              ))}
+            </select>
             {provider && <button onClick={() => setProvider("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full"><X className="w-3 h-3 text-slate-400" /></button>}
-            <datalist id="provider-list">
-              <option value="nvidia-nim" />
-              <option value="openrouter" />
-              <option value="kilo-code" />
-              <option value="opencode" />
-              <option value="google-gemini" />
-              <option value="groq" />
-              <option value="cerebras" />
-              <option value="modelscope" />
-              <option value="cloudflare-workers-ai" />
-              <option value="cohere" />
-              <option value="mistral-ai" />
-              <option value="hugging-face" />
-              <option value="agnes-ai" />
-              <option value="sambanova" />
-              <option value="chutes-ai" />
-              <option value="llm7-io" />
-              <option value="ovhcloud-ai-endpoints" />
-              <option value="ollama-cloud" />
-              <option value="z-ai-zhipu-ai" />
-              <option value="aion-labs" />
-              <option value="pollinations" />
-            </datalist>
           </div>
           <select value={verified} onChange={(e) => setVerified(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold">
             <option value="all">{t("models.verified_all")} ({total})</option>

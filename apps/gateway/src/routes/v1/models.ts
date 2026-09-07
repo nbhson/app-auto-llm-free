@@ -85,6 +85,75 @@ function loadLiveModels(): any[] {
 
 const freellmsModels = loadFreellmsModels();
 
+// Supplement from user's opencode.json (https://freellms.org/?free=1 + custom gateways)
+// Ensures models like deepseek/deepseek-v4-flash-free and qwen/qwen3.8-27b-free are displayed even if live sync missed them
+const opencodeSupplement: any[] = [
+  // agnes-custom -> agnes-ai
+  { id: "agnes-ai/agnes-2.5-flash", owned_by: "agnes-ai", provider: "agnes-ai", display_name: "agnes-2.5-flash", context_length: 256000, score: 82, tier: "permanent", live_status: "alias", capabilities: ["text","vision"], limit: "30 RPM" },
+  // openrouter-custom -> openrouter
+  { id: "openrouter/free", owned_by: "openrouter", provider: "openrouter", display_name: "openrouter/free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day" },
+  { id: "z-ai/glm-5.2:free", owned_by: "openrouter", provider: "openrouter", display_name: "z-ai/glm-5.2:free", context_length: 262144, score: 75, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "200 req/day" },
+  { id: "nvidia/nemotron-3-ultra-550b-a55b:free", owned_by: "openrouter", provider: "openrouter", display_name: "nvidia/nemotron-3-ultra-550b-a55b:free", context_length: 1000000, score: 74, tier: "permanent", live_status: "alias", capabilities: ["reasoning"], limit: "200 req/day" },
+  { id: "minimax/minimax-m3:free", owned_by: "openrouter", provider: "openrouter", display_name: "minimax/minimax-m3:free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day" },
+  { id: "inclusionai/ling-3.0-flash-fin:free", owned_by: "openrouter", provider: "openrouter", display_name: "inclusionai/ling-3.0-flash-fin:free", context_length: 262144, score: 68, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day" },
+  { id: "minimax/minimax-m2.7:free", owned_by: "openrouter", provider: "openrouter", display_name: "minimax/minimax-m2.7:free", context_length: 262144, score: 68, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day" },
+  { id: "nvidia/nemotron-3.5-lightning:free", owned_by: "openrouter", provider: "openrouter", display_name: "nvidia/nemotron-3.5-lightning:free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "200 req/day" },
+  { id: "anthropic/claude-fable-5.1", owned_by: "openrouter", provider: "openrouter", display_name: "anthropic/claude-fable-5.1", context_length: 200000, score: 72, tier: "quota", live_status: "alias", capabilities: ["text","reasoning"], limit: "200 req/day" },
+  // ollama-custom -> ollama-cloud
+  { id: "ollama-cloud/gemma4:31b-cloud", owned_by: "ollama-cloud", provider: "ollama-cloud", display_name: "gemma4:31b-cloud", context_length: 262000, score: 72, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "cloud" },
+  { id: "ollama-cloud/gpt-oss:120b", owned_by: "ollama-cloud", provider: "ollama-cloud", display_name: "gpt-oss:120b", context_length: 131072, score: 71, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "cloud" },
+  { id: "ollama-cloud/nemotron-3-super:cloud", owned_by: "ollama-cloud", provider: "ollama-cloud", display_name: "nemotron-3-super:cloud", context_length: 262000, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "cloud" },
+  // kilo-custom -> kilo-code
+  { id: "kilo-code/stepfun/step-3.7-flash:free", owned_by: "kilo-code", provider: "kilo-code", display_name: "stepfun/step-3.7-flash:free", context_length: 262000, score: 76, tier: "quota", live_status: "alias", capabilities: ["text","reasoning"], limit: "200 req/hour" },
+  { id: "kilo-code/poolside/laguna-s-2.1:free", owned_by: "kilo-code", provider: "kilo-code", display_name: "poolside/laguna-s-2.1:free", context_length: 262000, score: 68, tier: "quota", live_status: "alias", capabilities: ["text","reasoning"], limit: "200 req/hour" },
+  // nvidia-custom -> nvidia-nim
+  { id: "nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b", owned_by: "nvidia-nim", provider: "nvidia-nim", display_name: "nvidia/nemotron-3-ultra-550b-a55b", context_length: 1000000, score: 74, tier: "permanent", live_status: "alias", capabilities: ["reasoning"], limit: "40 RPM" },
+  { id: "nvidia-nim/deepseek-ai/deepseek-v4-flash-0731", owned_by: "nvidia-nim", provider: "nvidia-nim", display_name: "deepseek-ai/deepseek-v4-flash-0731", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "40 RPM" },
+  { id: "nvidia-nim/deepseek-ai/deepseek-v4-pro-0813", owned_by: "nvidia-nim", provider: "nvidia-nim", display_name: "deepseek-ai/deepseek-v4-pro-0813", context_length: 262144, score: 72, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "40 RPM" },
+  { id: "nvidia-nim/moonshotai/kimi-k3", owned_by: "nvidia-nim", provider: "nvidia-nim", display_name: "moonshotai/kimi-k3", context_length: 262144, score: 75, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "40 RPM" },
+  // orcaRouter-custom -> orcarouter (missing on UI)
+  { id: "orcarouter/deepseek/deepseek-v4-flash-free", owned_by: "orcarouter", provider: "orcarouter", display_name: "deepseek/deepseek-v4-flash-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "deepseek/deepseek-v4-flash-free", owned_by: "orcarouter", provider: "orcarouter", display_name: "deepseek/deepseek-v4-flash-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "orcarouter/qwen/qwen3.8-27b-free", owned_by: "orcarouter", provider: "orcarouter", display_name: "qwen/qwen3.8-27b-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
+  { id: "qwen/qwen3.8-27b-free", owned_by: "orcarouter", provider: "orcarouter", display_name: "qwen/qwen3.8-27b-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
+  // aionlabs-custom -> aion-labs
+  { id: "aion-labs/aion-3.0", owned_by: "aion-labs", provider: "aion-labs", display_name: "aion-3.0", context_length: 128000, score: 58, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "15 RPM" },
+  // llm7-custom -> llm7-io
+  { id: "llm7-io/minimax-m2.7", owned_by: "llm7-io", provider: "llm7-io", display_name: "minimax-m2.7", context_length: 128000, score: 69, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "llm7 free" },
+  { id: "llm7-io/gpt-oss", owned_by: "llm7-io", provider: "llm7-io", display_name: "gpt-oss", context_length: 131072, score: 65, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "llm7 free" },
+  { id: "llm7-io/gemini-3.1-flash-lite", owned_by: "llm7-io", provider: "llm7-io", display_name: "gemini-3.1-flash-lite", context_length: 1048576, score: 59, tier: "permanent", live_status: "alias", capabilities: ["text","image","video","audio"], limit: "llm7 free" },
+  // 9router-custom -> 9router
+  { id: "9router/ag/gemini-3.7-flash-high", owned_by: "9router", provider: "9router", display_name: "ag/gemini-3.7-flash-high", context_length: 1048576, score: 75, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
+  { id: "9router/kc/minimax/minimax-m3:free", owned_by: "9router", provider: "9router", display_name: "kc/minimax/minimax-m3:free", context_length: 262144, score: 88, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
+  { id: "9router/kr/claude-haiku-4.5", owned_by: "9router", provider: "9router", display_name: "kr/claude-haiku-4.5", context_length: 200000, score: 72, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "custom" },
+  { id: "ag/gemini-3.7-flash-high", owned_by: "9router", provider: "9router", display_name: "ag/gemini-3.7-flash-high", context_length: 1048576, score: 75, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
+  { id: "kc/minimax/minimax-m3:free", owned_by: "9router", provider: "9router", display_name: "kc/minimax/minimax-m3:free", context_length: 262144, score: 88, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
+  { id: "kr/claude-haiku-4.5", owned_by: "9router", provider: "9router", display_name: "kr/claude-haiku-4.5", context_length: 200000, score: 72, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "custom" },
+  // freeai-custom -> freeai
+  { id: "freeai/qwen3-8b", owned_by: "freeai", provider: "freeai", display_name: "qwen3-8b", context_length: 131072, score: 60, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "free" },
+  { id: "qwen3-8b", owned_by: "freeai", provider: "freeai", display_name: "qwen3-8b", context_length: 131072, score: 60, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "free" },
+  // omniroute-custom -> omniroute
+  { id: "omniroute/auto/coding", owned_by: "omniroute", provider: "omniroute", display_name: "auto/coding", context_length: 262144, score: 65, tier: "custom", live_status: "alias", capabilities: ["text","code"], limit: "custom" },
+  { id: "auto/coding", owned_by: "omniroute", provider: "omniroute", display_name: "auto/coding", context_length: 262144, score: 65, tier: "custom", live_status: "alias", capabilities: ["text","code"], limit: "custom" },
+  // myOpenCodeZen-custom -> opencode
+  { id: "opencode/nemotron-3.5-lightning-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3.5-lightning-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
+  { id: "opencode/nemotron-3-ultra-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3-ultra-free", context_length: 1000000, score: 74, tier: "permanent", live_status: "alias", capabilities: ["reasoning"], limit: "free" },
+  { id: "opencode/mimo-v2.5-free", owned_by: "opencode", provider: "opencode", display_name: "mimo-v2.5-free", context_length: 262144, score: 68, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
+  { id: "opencode/ling-3.0-flash-fin-free", owned_by: "opencode", provider: "opencode", display_name: "ling-3.0-flash-fin-free", context_length: 262144, score: 68, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
+  { id: "nemotron-3.5-lightning-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3.5-lightning-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
+  { id: "nemotron-3-ultra-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3-ultra-free", context_length: 1000000, score: 74, tier: "permanent", live_status: "alias", capabilities: ["reasoning"], limit: "free" },
+  // cline-custom -> cline
+  { id: "cline/deepseek-v4-flash", owned_by: "cline", provider: "cline", display_name: "deepseek-v4-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "cline/glm-5.3-flash", owned_by: "cline", provider: "cline", display_name: "glm-5.3-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "deepseek-v4-flash", owned_by: "cline", provider: "cline", display_name: "deepseek-v4-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "glm-5.3-flash", owned_by: "cline", provider: "cline", display_name: "glm-5.3-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  // google-custom -> google-gemini
+  { id: "google-gemini/gemini-3.5-flash-lite", owned_by: "google-gemini", provider: "google-gemini", display_name: "gemini-3.5-flash-lite", context_length: 1048576, score: 87, tier: "permanent", live_status: "alias", capabilities: ["text","image","video","audio"], limit: "15 RPM" },
+  { id: "google-gemini/gemini-3.1-flash-lite-preview", owned_by: "google-gemini", provider: "google-gemini", display_name: "gemini-3.1-flash-lite-preview", context_length: 1048576, score: 59, tier: "permanent", live_status: "alias", capabilities: ["text","image"], limit: "30 RPM" },
+  { id: "google-gemini/gemini-3.7-flash", owned_by: "google-gemini", provider: "google-gemini", display_name: "gemini-3.7-flash", context_length: 1048576, score: 85, tier: "permanent", live_status: "alias", capabilities: ["text","image"], limit: "15 RPM" },
+  { id: "google-gemini/gemini-3.6-flash", owned_by: "google-gemini", provider: "google-gemini", display_name: "gemini-3.6-flash", context_length: 1048576, score: 91, tier: "permanent", live_status: "alias", capabilities: ["text","image","video"], limit: "15 RPM" },
+].map(m => ({ ...m, object: "model", created: 1715433600 }));
+
 // GET /v1/models and /v1/models/:id
 modelsRoute.get("/", async (c) => {
   const providerFilter = c.req.query("provider");
@@ -130,11 +199,23 @@ modelsRoute.get("/", async (c) => {
     ];
     for (const em of extraModels) {
       if (providerFilter && em.owned_by !== providerFilter) continue;
+      if (!matchesQ(em.id)) continue;
       const keys = config.providerKeys[em.owned_by] || [];
       const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
       if (!hasRealKey) continue;
       const exists = all.some((m) => m.id === em.id);
       if (!exists) all.push(em as any);
+    }
+    for (const em of opencodeSupplement) {
+      if (providerFilter && em.owned_by !== providerFilter) continue;
+      if (!matchesQ(em.id)) continue;
+      const keys = config.providerKeys[em.owned_by] || [];
+      const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
+      if (!hasRealKey) continue;
+      const h = healthMap.get(em.id);
+      if (h && (h.http_status === 404 || h.http_status === 410)) continue;
+      const exists = all.some((m) => m.id === em.id);
+      if (!exists) all.push({ ...em, health: h, persisted_404: false });
     }
     if (!providerFilter || providerFilter === "gateway") {
         all.unshift(
@@ -198,6 +279,7 @@ modelsRoute.get("/", async (c) => {
       ];
       for (const em of extraModels) {
         if (providerFilter && em.owned_by !== providerFilter) continue;
+        if (!matchesQ(em.id)) continue;
         if (hasKeyOnly) {
           const keys = config.providerKeys[em.owned_by] || [];
           const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
@@ -206,6 +288,27 @@ modelsRoute.get("/", async (c) => {
         if (verifiedFilter && verifiedFilter !== "free" && em.live_status !== verifiedFilter) continue;
         const exists = all.some((m) => m.id === em.id);
         if (!exists) all.push(em as any);
+      }
+      for (const em of opencodeSupplement) {
+        if (providerFilter && em.owned_by !== providerFilter) continue;
+        if (!matchesQ(em.id)) continue;
+        if (hasKeyOnly) {
+          const keys = config.providerKeys[em.owned_by] || [];
+          const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
+          if (!hasRealKey) continue;
+        }
+        const h = healthMap.get(em.id);
+        let live_status: string = (em as any).live_status;
+        let persisted404: any = null;
+        if (h && (h.http_status === 404 || h.http_status === 410)) { live_status = "deprecated"; persisted404 = h; }
+        else if (h && (h.http_status === 200 || h.status === "usable")) { live_status = "verified_free"; persisted404 = null; }
+        if (verifiedFilter) {
+          if (verifiedFilter === "free" && live_status !== "verified_free" && live_status !== "alias" && live_status !== "live") continue;
+          if (verifiedFilter === "deprecated" && live_status !== "deprecated") continue;
+          if (verifiedFilter === "unverified" && !["unverified_no_key","unverified_no_data","error"].includes(live_status) && live_status !== "alias") continue;
+        }
+        const exists = all.some((m) => m.id === em.id);
+        if (!exists) all.push({ ...em, live_status, persisted_404: !!persisted404, health: h });
       }
       if (!providerFilter || providerFilter === "gateway") {
         all.unshift(
