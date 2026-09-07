@@ -52,7 +52,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/60">
       <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-100/80">
             <div className="flex items-center gap-3">
               <NavLink to="/" className="group flex items-center gap-2.5 text-left focus:outline-none transition-transform active:scale-[0.98]">
@@ -60,7 +60,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                   <Zap className="w-4 h-4 fill-white stroke-white" />
                 </div>
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors">Free LLM Gateway</span>
-                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.1.0</span>
+                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.2.0</span>
               </NavLink>
 
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs ${health === "ok" ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" : health === "down" ? "bg-rose-50 text-rose-700 border-rose-200/80" : "bg-slate-100 text-slate-600 border-slate-200/80"}`}>
@@ -112,23 +112,18 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 bg-slate-50/90 border border-slate-200/90 rounded-lg px-2.5 py-1 shadow-2xs hover:border-slate-300 focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500/50 transition-all">
-                <div className="flex items-center gap-1 text-slate-500 select-none">
+              <div className="flex items-center gap-1.5 bg-slate-50/90 border border-slate-200/90 rounded-lg px-2.5 py-1 shadow-2xs">
+                <div className="flex items-center gap-1 text-slate-500 select-none" title="Auto-generated admin key (read-only)">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 hidden sm:inline">{t("header.master")}</span>
                 </div>
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={masterKey}
-                  onChange={(e) => { setMasterKey(e.target.value); localStorage.setItem("masterKey", e.target.value); }}
-                  className="font-mono text-xs text-slate-800 bg-transparent w-32 sm:w-56 focus:outline-none placeholder-slate-400 font-medium"
-                  placeholder="fgk-master-..."
-                  title="Master key for /api (admin)"
-                />
-                <button type="button" onClick={() => setShowKey(!showKey)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                <code className="font-mono text-xs text-slate-700 bg-transparent max-w-[160px] sm:max-w-[220px] truncate select-all" title={masterKey}>
+                  {showKey ? masterKey : `${masterKey.slice(0, 12)}${masterKey.length > 12 ? "••••" + masterKey.slice(-4) : ""}`}
+                </code>
+                <button type="button" onClick={() => setShowKey(!showKey)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors" title={showKey ? "Hide" : "Show"}>
                   {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
-                <button type="button" onClick={handleCopyMasterKey} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors">
+                <button type="button" onClick={handleCopyMasterKey} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors" title="Copy">
                   {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
@@ -165,7 +160,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">{children}</main>
+      <main className="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-4 lg:px-6 pt-6 pb-12">{children}</main>
     </div>
   );
 }
