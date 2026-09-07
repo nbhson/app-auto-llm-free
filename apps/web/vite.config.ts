@@ -8,8 +8,8 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   server: {
     proxy: {
-      "/v1": "http://localhost:8080",
-      "/api": "http://localhost:8080",
+      "/v1": "http://localhost:7373",
+      "/api": "http://localhost:7373",
     },
   },
   build: { outDir: "dist" },

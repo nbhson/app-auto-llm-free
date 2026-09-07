@@ -24,10 +24,10 @@ cp .env.example .env
 
 # 3. Chạy
 docker compose up -d --build
-docker compose logs -f gateway   # đợi thấy "🚀 Gateway listening on http://localhost:8080" + "Auto-generated MASTER_KEY=fgk-master-..."
+docker compose logs -f gateway   # đợi thấy "🚀 Gateway listening on http://localhost:7373" + "Auto-generated MASTER_KEY=fgk-master-..."
 
 # Kiểm tra
-curl http://localhost:8080/v1/health
+curl http://localhost:7373/v1/health
 # Lấy MASTER_KEY đã sinh (dùng cho mọi endpoint /v1/* + /api/*)
 grep MASTER_KEY .env
 # hoặc: docker compose logs gateway | grep MASTER_KEY
@@ -46,7 +46,7 @@ cp .env.example .env
 # không cần sửa MASTER_KEY/ENCRYPTION_KEY — sẽ tự sinh
 npm install
 npm run build
-npm run dev:gateway   # http://localhost:8080 — xem log Auto-generated MASTER_KEY
+npm run dev:gateway   # http://localhost:7373 — xem log Auto-generated MASTER_KEY
 npm run dev:web       # http://localhost:5173 (mở tab khác)
 # Lấy key: grep MASTER_KEY .env
 ```
@@ -59,7 +59,7 @@ npm run dev:web       # http://localhost:5173 (mở tab khác)
 
 ```bash
 MASTER=$(grep MASTER_KEY .env | cut -d= -f2) # hoặc từ docker logs
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $MASTER" \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
@@ -73,7 +73,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```bash
 MASTER=fgk-master-xxx... # lấy từ .env
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:7373/api/keys \
   -H "Authorization: Bearer $MASTER" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
@@ -87,35 +87,35 @@ curl -X POST http://localhost:8080/api/keys \
 
 ```bash
 KEY=fgk-... # vừa tạo
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
 
 # Pin provider (không cần key provider nếu là public)
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $KEY" -H "x-router: pollinations" \
   -H "Content-Type: application/json" \
   -d '{"model":"pollinations/openai","messages":[{"role":"user","content":"Hi"}],"stream":false}'
 
 # Streaming
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"haiku"}],"stream":true}'
 
 # Models thực sự còn free — live cache (không phải freellms)
-curl "http://localhost:8080/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
+curl "http://localhost:7373/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
 # Freellms snapshot (lịch sử)
-curl "http://localhost:8080/v1/models?verified=free&q=gemma&page=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
+curl "http://localhost:7373/v1/models?verified=free&q=gemma&page=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
 # Providers có real key
-curl "http://localhost:8080/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER" | jq
+curl "http://localhost:7373/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER" | jq
 ```
 
 ### b) OpenAI SDK (Node)
 
 ```ts
 import OpenAI from "openai";
-const client = new OpenAI({ baseURL:"http://localhost:8080/v1", apiKey:"fgk-..." });
+const client = new OpenAI({ baseURL:"http://localhost:7373/v1", apiKey:"fgk-..." });
 const r = await client.chat.completions.create({ model:"auto", messages:[{role:"user",content:"Hello"}] });
 console.log(r.choices[0].message.content);
 // Streaming
@@ -129,7 +129,7 @@ const models = await (client as any).models.list({ hasKey: 1, limit: 25 });
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="fgk-...")
+client = OpenAI(base_url="http://localhost:7373/v1", api_key="fgk-...")
 print(client.chat.completions.create(model="auto", messages=[{"role":"user","content":"hi"}]).choices[0].message.content)
 ```
 
@@ -170,40 +170,40 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 | `verified 0/316` | Chưa có provider keys thật, scheduler chưa chạy | Đợi 5s sau khi start gateway (scheduler tự verify + syncLiveModels dry-run) hoặc `POST /api/verify` / `POST /api/models/live/sync` với `{"freeOnly":true}` — `ENCRYPTION_KEY` đã tự sinh, không cần nhập tay |
 | `npm i` lỗi `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + `better-sqlite3@9` cũ không có prebuild (ABI 147) | Đã fix ở `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. Nếu vẫn lỗi, dùng Node 22 LTS (`brew install node@22`) hoặc `npm i --build-from-source` với Xcode CLT `xcode-select --install` |
 | `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` | Sau corporate proxy SSL inspection (Zscaler) | Dev tạm uncomment `NODE_TLS_REJECT_UNAUTHORIZED=0` trong `.env` (mặc định comment), prod dùng `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` để giữ verify |
-| `EADDRINUSE :::8080` khi `npm run dev` | Gateway cũ vẫn chạy (`nohup npm run dev:gateway` hoặc `tsx watch` chưa kill) | `pkill -f "tsx watch"; lsof -ti:8080 \| xargs kill -9; sleep 2; lsof -i :8080` (trống) rồi `npm run dev` lại |
+| `EADDRINUSE :::7373` khi `npm run dev` | Gateway cũ vẫn chạy (`nohup npm run dev:gateway` hoặc `tsx watch` chưa kill) | `pkill -f "tsx watch"; lsof -ti:7373 \| xargs kill -9; sleep 2; lsof -i :7373` (trống) rồi `npm run dev` lại |
 
 ## 9. Lệnh hữu ích
 
 ```bash
-# Kill gateway cũ nếu EADDRINUSE :::8080
-pkill -f "tsx watch"; lsof -ti:8080 | xargs kill -9; sleep 2; lsof -i :8080
+# Kill gateway cũ nếu EADDRINUSE :::7373
+pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; sleep 2; lsof -i :7373
 
 # Health
-curl http://localhost:8080/v1/health
-curl http://localhost:8080/api/providers/health -H "Authorization: Bearer $MASTER"
-curl "http://localhost:8080/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER"
+curl http://localhost:7373/v1/health
+curl http://localhost:7373/api/providers/health -H "Authorization: Bearer $MASTER"
+curl "http://localhost:7373/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER"
 
 # Verify 24h + Live sync (source of truth mới)
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER"
-curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER" -d '{"dryRun":true}'
-curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total'
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}' | jq
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER"
+curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer $MASTER" -d '{"dryRun":true}'
+curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}' | jq
 
 # Models live vs freellms
-curl "http://localhost:8080/v1/models?hasKey=1&limit=25&q=gemma" -H "Authorization: Bearer $MASTER" | jq '.pagination'
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer $KEY" | head -c 500
+curl "http://localhost:7373/v1/models?hasKey=1&limit=25&q=gemma" -H "Authorization: Bearer $MASTER" | jq '.pagination'
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer $KEY" | head -c 500
 
 # Logs & stats
-curl "http://localhost:8080/api/logs?limit=5" -H "Authorization: Bearer $MASTER"
-curl http://localhost:8080/api/stats -H "Authorization: Bearer $MASTER"
+curl "http://localhost:7373/api/logs?limit=5" -H "Authorization: Bearer $MASTER"
+curl http://localhost:7373/api/stats -H "Authorization: Bearer $MASTER"
 
 # Persisted 404
-curl http://localhost:8080/api/models/health/persisted -H "Authorization: Bearer $MASTER" | jq
+curl http://localhost:7373/api/models/health/persisted -H "Authorization: Bearer $MASTER" | jq
 
 # Sync freellms (lịch sử, disabled — dùng live sync thay)
 python scripts/sync-freellms.py
 npm run verify:free:dry -w apps-gateway
-npx tsx scripts/benchmark.ts --gateway http://localhost:8080 --key $MASTER
+npx tsx scripts/benchmark.ts --gateway http://localhost:7373 --key $MASTER
 
 # Đổi MASTER_KEY / ENCRYPTION_KEY (tùy chọn — đã tự sinh, chỉ rotate khi cần)
 grep MASTER_KEY .env

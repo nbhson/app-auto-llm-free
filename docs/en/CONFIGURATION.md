@@ -10,7 +10,7 @@ See the full `.env.example` (30 providers from freellms.org, live sync is now so
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `8080` | Gateway port |
+| `PORT` | `7373` | Gateway port |
 | `NODE_ENV` | `development` | `development`/`production` |
 | `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) or `postgres://user:pass@host/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis for rate limiting; falls back to in-memory if empty |
@@ -98,7 +98,7 @@ Sync job **new** (live source of truth):
 
 ```bash
 npx tsx apps/gateway/src/jobs/sync-live-models.ts        # fetch live -> data/live-models.json (2185 total, 882 free, freeOnly)
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
 # Historical
 python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml (disabled)
 npm run sync:freellms -w apps-gateway  # alias

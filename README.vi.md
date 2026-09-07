@@ -81,16 +81,16 @@ cp .env.example .env
 
 ```bash
 docker compose up -d
-# Gateway: http://localhost:8080
+# Gateway: http://localhost:7373
 # Dashboard: http://localhost:3000
-# Docs: http://localhost:8080/docs
+# Docs: http://localhost:7373/docs
 ```
 
 ### 3. Chạy dev local
 
 ```bash
 bun install
-bun run dev:gateway   # Hono @ http://localhost:8080
+bun run dev:gateway   # Hono @ http://localhost:7373
 bun run dev:web       # Vite @ http://localhost:5173
 ```
 
@@ -100,7 +100,7 @@ bun run dev:web       # Vite @ http://localhost:5173
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: "http://localhost:8080/v1",
+  baseURL: "http://localhost:7373/v1",
   apiKey: "fgk-master-xxx", // MASTER_KEY tự sinh trong .env/logs — dùng 1 key cho mọi endpoint, hoặc tạo fgk-... riêng ở /keys
 });
 
@@ -125,15 +125,15 @@ for await (const chunk of stream) {
 Hoặc `curl`:
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer fgk-xxx" \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":false}'
 
 # Models: lọc theo provider / verified tier thực sự còn free (24h probe)
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/v1/models?provider=nvidia-nim&verified=free" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/api/verify/summary" -H "Authorization: Bearer fgk-master-xxx"
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?provider=nvidia-nim&verified=free" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/api/verify/summary" -H "Authorization: Bearer fgk-master-xxx"
 ```
 
 ## ⚙️ Cấu hình
@@ -141,7 +141,7 @@ curl "http://localhost:8080/api/verify/summary" -H "Authorization: Bearer fgk-ma
 Xem [.env.example](.env.example) và [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Sync 24h xem [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ```env
-PORT=8080
+PORT=7373
 DATABASE_URL=file:./data.db          # hoặc postgres://...
 REDIS_URL=redis://localhost:6379
 # MASTER_KEY / ENCRYPTION_KEY tự sinh nếu thiếu/placeholder — không bắt buộc nhập tay
@@ -161,7 +161,7 @@ NVIDIA_API_KEYS=nvapi-xxx
 Tạo virtual key có scope (tùy chọn — MASTER_KEY đã dùng được cho /v1/*):
 
 ```bash
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:7373/api/keys \
   -H "Authorization: Bearer fgk-master-xxx" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'

@@ -126,15 +126,15 @@ Examples:
 
 ```bash
 # Live source of truth
-curl "http://localhost:8080/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer fgk-xxx" | jq '.total, .pagination'
-curl "http://localhost:8080/api/models/live" -H "Authorization: Bearer fgk-master-xxx" | jq
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer fgk-master-xxx" -d '{"freeOnly":true}' | jq '.total, .free_only'
-curl "http://localhost:8080/api/providers?hasKey=1" -H "Authorization: Bearer fgk-master-xxx" | jq '.detailed[].hasRealKey'
+curl "http://localhost:7373/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer fgk-xxx" | jq '.total, .pagination'
+curl "http://localhost:7373/api/models/live" -H "Authorization: Bearer fgk-master-xxx" | jq
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer fgk-master-xxx" -d '{"freeOnly":true}' | jq '.total, .free_only'
+curl "http://localhost:7373/api/providers?hasKey=1" -H "Authorization: Bearer fgk-master-xxx" | jq '.detailed[].hasRealKey'
 
 # Freellms snapshot
-curl http://localhost:8080/v1/models?verified=free -H "Authorization: Bearer fgk-xxx" | jq '.total'
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer fgk-master-xxx" | jq
-curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer fgk-master-xxx" -d '{"dryRun":false}' | jq '.total_verified_free'
+curl http://localhost:7373/v1/models?verified=free -H "Authorization: Bearer fgk-xxx" | jq '.total'
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer fgk-master-xxx" | jq
+curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer fgk-master-xxx" -d '{"dryRun":false}' | jq '.total_verified_free'
 ```
 
 ## CLI

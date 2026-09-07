@@ -87,9 +87,9 @@ DISABLE_SCHEDULER=0   # đặt 1 để tắt
 Ví dụ:
 
 ```bash
-curl http://localhost:8080/v1/models?verified=free -H "Authorization: Bearer fgk-xxx" | jq '.total'
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer fgk-master-xxx" | jq
-curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer fgk-master-xxx" -d '{"dryRun":false}' | jq '.total_verified_free'
+curl http://localhost:7373/v1/models?verified=free -H "Authorization: Bearer fgk-xxx" | jq '.total'
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer fgk-master-xxx" | jq
+curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer fgk-master-xxx" -d '{"dryRun":false}' | jq '.total_verified_free'
 ```
 
 ## CLI

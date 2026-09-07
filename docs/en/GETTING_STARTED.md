@@ -24,10 +24,10 @@ cp .env.example .env
 
 # 3. Run
 docker compose up -d --build
-docker compose logs -f gateway   # wait for "🚀 Gateway listening on http://localhost:8080" + "Auto-generated MASTER_KEY=fgk-master-..."
+docker compose logs -f gateway   # wait for "🚀 Gateway listening on http://localhost:7373" + "Auto-generated MASTER_KEY=fgk-master-..."
 
 # Verify
-curl http://localhost:8080/v1/health
+curl http://localhost:7373/v1/health
 # Get the auto-generated MASTER_KEY (single key for /v1/* + /api/*)
 grep MASTER_KEY .env
 # or: docker compose logs gateway | grep MASTER_KEY
@@ -46,7 +46,7 @@ cp .env.example .env
 # no need to edit MASTER_KEY/ENCRYPTION_KEY — auto-generated
 npm install
 npm run build
-npm run dev:gateway   # http://localhost:8080 — check log Auto-generated MASTER_KEY
+npm run dev:gateway   # http://localhost:7373 — check log Auto-generated MASTER_KEY
 npm run dev:web       # http://localhost:5173 (in another tab)
 # Get key: grep MASTER_KEY .env
 ```
@@ -59,7 +59,7 @@ npm run dev:web       # http://localhost:5173 (in another tab)
 
 ```bash
 MASTER=$(grep MASTER_KEY .env | cut -d= -f2) # or from docker logs
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $MASTER" \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
@@ -73,7 +73,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```bash
 MASTER=fgk-master-xxx... # from .env
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:7373/api/keys \
   -H "Authorization: Bearer $MASTER" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'
@@ -93,35 +93,35 @@ Narrow scope example — pollinations only:
 
 ```bash
 KEY=fgk-... # just created
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
 
 # Pin a provider (no provider key needed if it is public)
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $KEY" -H "x-router: pollinations" \
   -H "Content-Type: application/json" \
   -d '{"model":"pollinations/openai","messages":[{"role":"user","content":"Hi"}],"stream":false}'
 
 # Streaming
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"haiku"}],"stream":true}'
 
 # Models that are still actually free — live cache (not freellms)
-curl "http://localhost:8080/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
+curl "http://localhost:7373/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
 # Freellms snapshot (historical)
-curl "http://localhost:8080/v1/models?verified=free&q=gemma&page=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
+curl "http://localhost:7373/v1/models?verified=free&q=gemma&page=1&limit=25" -H "Authorization: Bearer $KEY" | head -c 500
 # Providers with real keys
-curl "http://localhost:8080/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER" | jq
+curl "http://localhost:7373/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER" | jq
 ```
 
 ### b) OpenAI SDK (Node)
 
 ```ts
 import OpenAI from "openai";
-const client = new OpenAI({ baseURL:"http://localhost:8080/v1", apiKey:"fgk-..." });
+const client = new OpenAI({ baseURL:"http://localhost:7373/v1", apiKey:"fgk-..." });
 const r = await client.chat.completions.create({ model:"auto", messages:[{role:"user",content:"Hello"}] });
 console.log(r.choices[0].message.content);
 // Streaming
@@ -135,7 +135,7 @@ const models = await (client as any).models.list({ hasKey: 1, limit: 25 });
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="fgk-...")
+client = OpenAI(base_url="http://localhost:7373/v1", api_key="fgk-...")
 print(client.chat.completions.create(model="auto", messages=[{"role":"user","content":"hi"}]).choices[0].message.content)
 ```
 
@@ -176,40 +176,40 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 | `verified 0/316` | Missing real provider keys, scheduler not yet run | Wait 5s after starting the gateway (scheduler auto-verifies + syncLiveModels dry-run) or `POST /api/verify` / `POST /api/models/live/sync` with `{"freeOnly":true}` — `ENCRYPTION_KEY` is auto-generated, no manual step |
 | `npm i` fails `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + old `better-sqlite3@9` has no prebuild (ABI 147) | Fixed at `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. If still fails, use Node 22 LTS (`brew install node@22`) or `npm i --build-from-source` with Xcode CLT `xcode-select --install` |
 | `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` | Behind corporate SSL-inspection proxy (Zscaler) | Dev: uncomment `NODE_TLS_REJECT_UNAUTHORIZED=0` in `.env` (commented by default), prod: use `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` to keep verification |
-| `EADDRINUSE :::8080` on `npm run dev` | Old gateway still running (`nohup npm run dev:gateway` or `tsx watch` not killed) | `pkill -f "tsx watch"; lsof -ti:8080 \| xargs kill -9; sleep 2; lsof -i :8080` (empty) then `npm run dev` |
+| `EADDRINUSE :::7373` on `npm run dev` | Old gateway still running (`nohup npm run dev:gateway` or `tsx watch` not killed) | `pkill -f "tsx watch"; lsof -ti:7373 \| xargs kill -9; sleep 2; lsof -i :7373` (empty) then `npm run dev` |
 
 ## 9. Useful Commands
 
 ```bash
-# Kill old gateway if EADDRINUSE :::8080
-pkill -f "tsx watch"; lsof -ti:8080 | xargs kill -9; sleep 2; lsof -i :8080
+# Kill old gateway if EADDRINUSE :::7373
+pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; sleep 2; lsof -i :7373
 
 # Health
-curl http://localhost:8080/v1/health
-curl http://localhost:8080/api/providers/health -H "Authorization: Bearer $MASTER"
-curl "http://localhost:8080/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER"
+curl http://localhost:7373/v1/health
+curl http://localhost:7373/api/providers/health -H "Authorization: Bearer $MASTER"
+curl "http://localhost:7373/api/providers?hasKey=1&q=nvidia" -H "Authorization: Bearer $MASTER"
 
 # Verify 24h + Live sync (new source of truth)
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER"
-curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER" -d '{"dryRun":true}'
-curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total'
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}' | jq
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER"
+curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer $MASTER" -d '{"dryRun":true}'
+curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}' | jq
 
 # Models live vs freellms
-curl "http://localhost:8080/v1/models?hasKey=1&limit=25&q=gemma" -H "Authorization: Bearer $MASTER" | jq '.pagination'
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer $fgk" | head -c 500
+curl "http://localhost:7373/v1/models?hasKey=1&limit=25&q=gemma" -H "Authorization: Bearer $MASTER" | jq '.pagination'
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer $fgk" | head -c 500
 
 # Logs & stats
-curl "http://localhost:8080/api/logs?limit=5" -H "Authorization: Bearer $MASTER"
-curl http://localhost:8080/api/stats -H "Authorization: Bearer $MASTER"
+curl "http://localhost:7373/api/logs?limit=5" -H "Authorization: Bearer $MASTER"
+curl http://localhost:7373/api/stats -H "Authorization: Bearer $MASTER"
 
 # Persisted 404
-curl http://localhost:8080/api/models/health/persisted -H "Authorization: Bearer $MASTER" | jq
+curl http://localhost:7373/api/models/health/persisted -H "Authorization: Bearer $MASTER" | jq
 
 # Manual freellms sync (historical, disabled — use live sync instead)
 python scripts/sync-freellms.py
 npm run verify:free:dry -w apps-gateway
-npx tsx scripts/benchmark.ts --gateway http://localhost:8080 --key $MASTER
+npx tsx scripts/benchmark.ts --gateway http://localhost:7373 --key $MASTER
 
 # Rotate MASTER_KEY / ENCRYPTION_KEY (optional — auto-generated, only when needed)
 grep MASTER_KEY .env

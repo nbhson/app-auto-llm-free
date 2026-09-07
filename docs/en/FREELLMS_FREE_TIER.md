@@ -137,8 +137,8 @@ Used to:
 
 ```bash
 # Live current (source of truth)
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
-curl http://localhost:8080/api/models/live | jq '.total, .providers, .free_only'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+curl http://localhost:7373/api/models/live | jq '.total, .providers, .free_only'
 npx tsx apps/gateway/src/jobs/sync-live-models.ts
 
 # Historical freellms (disabled)

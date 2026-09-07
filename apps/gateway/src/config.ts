@@ -142,7 +142,7 @@ function parseKeys(env: string | undefined): string[] {
 }
 
 export const config = {
-  port: parseInt(process.env.PORT || "8080", 10),
+  port: parseInt(process.env.PORT || "7373", 10),
   nodeEnv: process.env.NODE_ENV || "development",
   logLevel: process.env.LOG_LEVEL || "info",
   corsOrigin: process.env.CORS_ORIGIN || "*",

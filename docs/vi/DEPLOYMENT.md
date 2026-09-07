@@ -13,7 +13,7 @@ Production-ready, gồm gateway + postgres + redis, kèm 24h verify + live sync 
 services:
   gateway:
     build: ./apps/gateway
-    ports: ["8080:8080"]
+    ports: ["7373:7373"]
     env_file: .env
     environment:
       DATABASE_URL: postgres://gateway:gateway@postgres:5432/gateway
@@ -26,7 +26,7 @@ services:
     build: ./apps/web
     ports: ["3000:80"]
     environment:
-      VITE_GATEWAY_URL: http://gateway:8080
+      VITE_GATEWAY_URL: http://gateway:7373
   postgres:
     image: postgres:16-alpine
     environment: { POSTGRES_DB: gateway, POSTGRES_PASSWORD: gateway }
@@ -43,11 +43,11 @@ docker compose up -d --build
 docker compose logs -f gateway
 ```
 
-Health check: `curl http://localhost:8080/v1/health` → `providers:43`, `tiers` 4-tier freellms  
-Verify check: `curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER_KEY"`  
-Live sync: `curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER_KEY"` (2185 total) + `curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -d '{"freeOnly":true}'`  
-Live models: `curl "http://localhost:8080/v1/models?hasKey=1" -H "Authorization: Bearer $MASTER_KEY"` → 2190 total  
-Sync trigger (freellms lịch sử, disabled): `curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER_KEY" -d '{"dryRun":false}'`
+Health check: `curl http://localhost:7373/v1/health` → `providers:43`, `tiers` 4-tier freellms  
+Verify check: `curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER_KEY"`  
+Live sync: `curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER_KEY"` (2185 total) + `curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -d '{"freeOnly":true}'`  
+Live models: `curl "http://localhost:7373/v1/models?hasKey=1" -H "Authorization: Bearer $MASTER_KEY"` → 2190 total  
+Sync trigger (freellms lịch sử, disabled): `curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer $MASTER_KEY" -d '{"dryRun":false}'`
 
 ## 2. Bare Metal / VPS
 
@@ -65,7 +65,7 @@ Live sync thủ công:
 
 ```bash
 npx tsx apps/gateway/src/jobs/sync-live-models.ts          # live fetch -> data/live-models.json (882 free, freeOnly)
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
 # Freellms (lịch sử, disabled)
 python scripts/sync-freellms.py          # 30 providers, 316 free -> data/*.json + models.yaml
 npm run verify:free:dry -w apps-gateway  # dry-run không cần keys
@@ -78,14 +78,14 @@ Nginx reverse proxy:
 server {
   listen 80;
   server_name api.yourdomain.com;
-  location / { proxy_pass http://127.0.0.1:8080; proxy_set_header Host $host; }
+  location / { proxy_pass http://127.0.0.1:7373; proxy_set_header Host $host; }
   location /v1/chat/completions {
-    proxy_pass http://127.0.0.1:8080;
+    proxy_pass http://127.0.0.1:7373;
     proxy_buffering off;
     proxy_read_timeout 300s;
   }
-  location /api/verify { proxy_pass http://127.0.0.1:8080; }
-  location /api/models/live { proxy_pass http://127.0.0.1:8080; }
+  location /api/verify { proxy_pass http://127.0.0.1:7373; }
+  location /api/models/live { proxy_pass http://127.0.0.1:7373; }
 }
 ```
 

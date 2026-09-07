@@ -85,16 +85,16 @@ cp .env.example .env
 
 ```bash
 docker compose up -d
-# Gateway: http://localhost:8080
+# Gateway: http://localhost:7373
 # Dashboard: http://localhost:3000
-# Docs: http://localhost:8080/docs
+# Docs: http://localhost:7373/docs
 ```
 
 ### 3. Run dev locally
 
 ```bash
 bun install
-bun run dev:gateway   # Hono @ http://localhost:8080
+bun run dev:gateway   # Hono @ http://localhost:7373
 bun run dev:web       # Vite @ http://localhost:5173
 ```
 
@@ -104,7 +104,7 @@ bun run dev:web       # Vite @ http://localhost:5173
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: "http://localhost:8080/v1",
+  baseURL: "http://localhost:7373/v1",
   apiKey: "fgk-master-xxx", // auto-generated MASTER_KEY from .env/logs — also works for /v1/* single-key usage
   // or create scoped fgk-... in Dashboard /keys for per-app keys
 });
@@ -130,14 +130,14 @@ for await (const chunk of stream) {
 Or `curl`:
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer fgk-xxx" \
   -H "Content-Type: application/json" \
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":false}'
 
 # Models: filter by provider / verified tier (live, not freellms)
-curl "http://localhost:8080/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/api/models/live/sync" -X POST -H "Authorization: Bearer fgk-master-xxx"
+curl "http://localhost:7373/v1/models?hasKey=1&limit=25" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/api/models/live/sync" -X POST -H "Authorization: Bearer fgk-master-xxx"
 ```
 
 ## ⚙️ Configuration
@@ -145,7 +145,7 @@ curl "http://localhost:8080/api/models/live/sync" -X POST -H "Authorization: Bea
 See [.env.example](.env.example) and [docs/en/CONFIGURATION.md](docs/en/CONFIGURATION.md). Live sync see [docs/en/OPERATIONS.md](docs/en/OPERATIONS.md).
 
 ```env
-PORT=8080
+PORT=7373
 DATABASE_URL=file:./data.db          # or postgres://...
 REDIS_URL=redis://localhost:6379
 # MASTER_KEY / ENCRYPTION_KEY are optional — auto-generated on first boot if missing/placeholder
@@ -165,7 +165,7 @@ NVIDIA_API_KEYS=nvapi-xxx
 Create scoped virtual key (optional — MASTER_KEY already works for /v1/*):
 
 ```bash
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:7373/api/keys \
   -H "Authorization: Bearer fgk-master-xxx" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-app","scopes":{"models":["*"],"providers":["*"]},"rpmLimit":60}'

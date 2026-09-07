@@ -73,8 +73,8 @@
 ```bash
 python scripts/sync-freellms.py   # fetch freellms.org -> data/*.json + models.yaml (disabled, not latest)
 # Live current (source of truth)
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
-curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total, .free_only'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER" | jq '.total, .free_only'
 ```
 
 Each freellms entry:
@@ -130,7 +130,7 @@ export const providers = { ..., myProvider };
 5. Test:
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:7373/v1/chat/completions \
   -H "Authorization: Bearer fgk-xxx" \
   -H "x-router: my-provider" \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'

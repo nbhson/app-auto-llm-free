@@ -1,10 +1,10 @@
 #!/usr/bin/env npx tsx
 // Benchmark 30 providers: health latency + (optional) chat latency if keys present
-// Usage: npx tsx scripts/benchmark.ts [--gateway http://localhost:8080 --key fgk-master-...]
+// Usage: npx tsx scripts/benchmark.ts [--gateway http://localhost:7373 --key fgk-master-...]
 
 import fs from "node:fs";
 
-const GATEWAY = process.env.GATEWAY_URL || process.argv.find((a) => a.startsWith("--gateway="))?.split("=")[1] || "http://localhost:8080";
+const GATEWAY = process.env.GATEWAY_URL || process.argv.find((a) => a.startsWith("--gateway="))?.split("=")[1] || "http://localhost:7373";
 const MASTER = process.env.MASTER_KEY || process.argv.find((a) => a.startsWith("--key="))?.split("=")[1] || "fgk-master-change-me-please-generate-a-secure-random-key";
 
 async function fetchJson(url: string, init?: RequestInit) {

@@ -19,10 +19,10 @@ services:
     build:
       context: .
       dockerfile: apps/gateway/Dockerfile
-    ports: ["8080:8080"]
+    ports: ["7373:7373"]
     env_file: .env
     environment:
-      PORT: 8080
+      PORT: 7373
       # override DATABASE_URL to postgres when using compose
       DATABASE_URL: postgres://gateway:gateway@postgres:5432/gateway
       REDIS_URL: redis://redis:6379

@@ -58,8 +58,8 @@ MASTER_KEY=$NEW_MASTER npx tsx -e "import('./apps/gateway/dist/lib/virtual-keys.
 ### Kiểm tra sau rotate
 
 ```bash
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $NEW_MASTER" | jq
-curl http://localhost:8080/api/keys -H "Authorization: Bearer $NEW_MASTER" | jq
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $NEW_MASTER" | jq
+curl http://localhost:7373/api/keys -H "Authorization: Bearer $NEW_MASTER" | jq
 npm run verify:free:dry -w apps-gateway
 ```
 

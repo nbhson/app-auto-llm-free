@@ -4,7 +4,7 @@
 
 OpenAI-compatible API của gateway (43 provider ids — 30 freellms + 13 alias; freellms snapshot 324 models — 316 free + alias, **live sync hiện 2185 total / 882 free / 853 hasKey, `?hasKey=1` trả 2190 total từ live cache**). Dùng trực tiếp với `openai` SDK hoặc `curl`.
 
-Base URL: `http://localhost:8080/v1` (kèm dashboard tại `http://localhost:3000` — header 2 hàng, i18n VI/EN)
+Base URL: `http://localhost:7373/v1` (kèm dashboard tại `http://localhost:3000` — header 2 hàng, i18n VI/EN)
 
 Auth: `Authorization: Bearer fgk-master-...` (MASTER_KEY tự sinh — 1 key duy nhất cho `/v1/*` + `/api/*`) hoặc `fgk-...` scoped tạo trong Dashboard. Health không cần auth.
 
@@ -78,21 +78,21 @@ Mid-stream error sẽ emit `data: {"error": {"message": "...", "type": "provider
 Liệt kê models — **live là source of truth khi `?hasKey=1`**: nếu có `data/live-models.json` (2185 total, 882 free, 853 hasKey) và `hasKey=1`, gateway trả live cache 2190 total (kèm alias). Ngược lại trả freellms snapshot 324 (316 free). Hỗ trợ lọc live verify + persisted 404 + pagination **LOV 25/50 ở sticky bottom** (không còn trên top filter bar), debounce 400ms cho `q` + `provider` (filter theo provider, datalist 20, `?provider=` exact).
 
 ```bash
-curl http://localhost:8080/v1/models -H "Authorization: Bearer fgk-xxx"
+curl http://localhost:7373/v1/models -H "Authorization: Bearer fgk-xxx"
 # Live source of truth (khuyến nghị)
-curl "http://localhost:8080/v1/models?hasKey=1" -H "Authorization: Bearer fgk-xxx" # 2190 total
-curl "http://localhost:8080/v1/models?hasKey=1&q=gemma" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?hasKey=1" -H "Authorization: Bearer fgk-xxx" # 2190 total
+curl "http://localhost:7373/v1/models?hasKey=1&q=gemma" -H "Authorization: Bearer fgk-xxx"
 # Pagination LOV 25/50 — giờ ở sticky bottom pagination (Page X/Y + LOV selector)
-curl "http://localhost:8080/v1/models?page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/v1/models?page=2&limit=50&q=gemma&hasKey=1" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?page=2&limit=50&q=gemma&hasKey=1" -H "Authorization: Bearer fgk-xxx"
 # Chỉ verified_free (thực sự còn free sau probe 24h) — dùng với freellms snapshot
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
 # Deprecated (freellms nói free nhưng live không còn, gồm persisted 404/410)
-curl "http://localhost:8080/v1/models?verified=deprecated" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?verified=deprecated" -H "Authorization: Bearer fgk-xxx"
 # Filter theo provider
-curl "http://localhost:8080/v1/models?provider=nvidia-nim&hasKey=1" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?provider=nvidia-nim&hasKey=1" -H "Authorization: Bearer fgk-xxx"
 # Kết hợp + search (debounce 400ms)
-curl "http://localhost:8080/v1/models?provider=groq&verified=free&q=llama&page=1&limit=25&hasKey=1" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?provider=groq&verified=free&q=llama&page=1&limit=25&hasKey=1" -H "Authorization: Bearer fgk-xxx"
 ```
 
 **Response**:
@@ -180,7 +180,7 @@ Không cần auth, trả status gateway + provider pool.
 **Tạo key**:
 
 ```bash
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:7373/api/keys \
   -H "Authorization: Bearer $MASTER_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -196,18 +196,18 @@ curl -X POST http://localhost:8080/api/keys \
 
 ```bash
 # Xem summary
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER_KEY" | jq
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER_KEY" | jq
 
 # Trigger live probe (cần keys trong .env, nếu không sẽ dry-run)
-curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"dryRun":false}' | jq '.total_verified_free'
+curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"dryRun":false}' | jq '.total_verified_free'
 
 # Live sync (source of truth mới)
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"freeOnly":true}' | jq
-curl http://localhost:8080/api/models/live -H "Authorization: Bearer $MASTER_KEY" | jq '.total'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"freeOnly":true}' | jq
+curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER_KEY" | jq '.total'
 
 # Chỉ lấy models thực sự còn free sau probe (live)
-curl "http://localhost:8080/v1/models?hasKey=1" -H "Authorization: Bearer fgk-xxx" | jq '.total' # 2190
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx" | jq '.total' # freellms snapshot
+curl "http://localhost:7373/v1/models?hasKey=1" -H "Authorization: Bearer fgk-xxx" | jq '.total' # 2190
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx" | jq '.total' # freellms snapshot
 ```
 
 ## Model Aliases (freellms-aware)
@@ -257,7 +257,7 @@ Frontend đã debounce search `q` 400ms (Models/Providers) để tránh bắn nh
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="fgk-xxx")
+client = OpenAI(base_url="http://localhost:7373/v1", api_key="fgk-xxx")
 print(client.chat.completions.create(model="auto", messages=[{"role":"user","content":"hi"}]).choices[0].message.content)
 # Verified only (freellms snapshot)
 print(client.models.list(extra_query={"verified":"free"}))
@@ -269,12 +269,12 @@ print(client.models.list(extra_query={"hasKey":1, "limit":25}))
 
 ```ts
 import { createOpenAI } from "@ai-sdk/openai";
-const openai = createOpenAI({ baseURL: "http://localhost:8080/v1", apiKey: "fgk-xxx" });
+const openai = createOpenAI({ baseURL: "http://localhost:7373/v1", apiKey: "fgk-xxx" });
 ```
 
 **LangChain**:
 
 ```ts
 import { ChatOpenAI } from "@langchain/openai";
-const llm = new ChatOpenAI({ configuration: { baseURL: "http://localhost:8080/v1" }, apiKey: "fgk-xxx", model: "nvidia-nim/z-ai/glm-5.2" });
+const llm = new ChatOpenAI({ configuration: { baseURL: "http://localhost:7373/v1" }, apiKey: "fgk-xxx", model: "nvidia-nim/z-ai/glm-5.2" });
 ```

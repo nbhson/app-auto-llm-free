@@ -2,7 +2,7 @@
 
 OpenAI-compatible API của gateway (43 provider ids — 30 freellms + 13 alias, 324 models — 316 freellms + 8 alias/persisted). Dùng trực tiếp với `openai` SDK hoặc `curl`.
 
-Base URL: `http://localhost:8080/v1` (kèm dashboard tại `http://localhost:3000`)
+Base URL: `http://localhost:7373/v1` (kèm dashboard tại `http://localhost:3000`)
 
 Auth: `Authorization: Bearer fgk-master-...` (MASTER_KEY tự sinh — 1 key duy nhất cho `/v1/*` + `/api/*`) hoặc `fgk-...` scoped tạo trong Dashboard. Health không cần auth.
 
@@ -76,18 +76,18 @@ Mid-stream error sẽ emit `data: {"error": {"message": "...", "type": "provider
 Liệt kê models (324 — 316 freellms + 8 alias/persisted, pagination 25/50 sticky, filter `q` + `provider` datalist 20 debounce 400ms). Hỗ trợ lọc live verify (xem `docs/OPERATIONS.md`). Vừa `Check Live` 404 vẫn hiện (hide chỉ với `m.health` persisted).
 
 ```bash
-curl http://localhost:8080/v1/models -H "Authorization: Bearer fgk-xxx"
+curl http://localhost:7373/v1/models -H "Authorization: Bearer fgk-xxx"
 # Pagination LOV 25/50
-curl "http://localhost:8080/v1/models?page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
-curl "http://localhost:8080/v1/models?page=2&limit=50&q=gemma" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?page=2&limit=50&q=gemma" -H "Authorization: Bearer fgk-xxx"
 # Chỉ verified_free (thực sự còn free sau probe 24h)
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx"
 # Deprecated (freellms nói free nhưng live không còn, gồm persisted 404/410)
-curl "http://localhost:8080/v1/models?verified=deprecated" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?verified=deprecated" -H "Authorization: Bearer fgk-xxx"
 # Filter theo provider
-curl "http://localhost:8080/v1/models?provider=nvidia-nim" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?provider=nvidia-nim" -H "Authorization: Bearer fgk-xxx"
 # Kết hợp + search
-curl "http://localhost:8080/v1/models?provider=groq&verified=free&q=llama&page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
+curl "http://localhost:7373/v1/models?provider=groq&verified=free&q=llama&page=1&limit=25" -H "Authorization: Bearer fgk-xxx"
 ```
 
 **Response**:
@@ -170,7 +170,7 @@ Không cần auth, trả status gateway + provider pool.
 **Tạo key**:
 
 ```bash
-curl -X POST http://localhost:8080/api/keys \
+curl -X POST http://localhost:7373/api/keys \
   -H "Authorization: Bearer $MASTER_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -186,13 +186,13 @@ curl -X POST http://localhost:8080/api/keys \
 
 ```bash
 # Xem summary
-curl http://localhost:8080/api/verify/summary -H "Authorization: Bearer $MASTER_KEY" | jq
+curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER_KEY" | jq
 
 # Trigger live probe (cần keys trong .env, nếu không sẽ dry-run)
-curl -X POST http://localhost:8080/api/verify -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"dryRun":false}' | jq '.total_verified_free'
+curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" -d '{"dryRun":false}' | jq '.total_verified_free'
 
 # Chỉ lấy models thực sự còn free sau probe
-curl "http://localhost:8080/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx" | jq '.total'
+curl "http://localhost:7373/v1/models?verified=free" -H "Authorization: Bearer fgk-xxx" | jq '.total'
 ```
 
 ## Model Aliases (freellms-aware)
@@ -240,7 +240,7 @@ x-provider: nvidia-nim
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="fgk-xxx")
+client = OpenAI(base_url="http://localhost:7373/v1", api_key="fgk-xxx")
 print(client.chat.completions.create(model="auto", messages=[{"role":"user","content":"hi"}]).choices[0].message.content)
 # Verified only
 print(client.models.list(extra_query={"verified":"free"}))
@@ -250,12 +250,12 @@ print(client.models.list(extra_query={"verified":"free"}))
 
 ```ts
 import { createOpenAI } from "@ai-sdk/openai";
-const openai = createOpenAI({ baseURL: "http://localhost:8080/v1", apiKey: "fgk-xxx" });
+const openai = createOpenAI({ baseURL: "http://localhost:7373/v1", apiKey: "fgk-xxx" });
 ```
 
 **LangChain**:
 
 ```ts
 import { ChatOpenAI } from "@langchain/openai";
-const llm = new ChatOpenAI({ configuration: { baseURL: "http://localhost:8080/v1" }, apiKey: "fgk-xxx", model: "nvidia-nim/z-ai/glm-5.2" });
+const llm = new ChatOpenAI({ configuration: { baseURL: "http://localhost:7373/v1" }, apiKey: "fgk-xxx", model: "nvidia-nim/z-ai/glm-5.2" });
 ```

@@ -8,7 +8,7 @@ Xem `.env.example` đầy đủ (30 providers freellms.org). Dưới đây là n
 
 | Biến | Mặc định | Mô tả |
 |------|----------|-------|
-| `PORT` | `8080` | Port gateway |
+| `PORT` | `7373` | Port gateway |
 | `NODE_ENV` | `development` | `development`/`production` |
 | `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) hoặc `postgres://user:pass@host/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis cho rate limit; nếu trống fallback in-memory |

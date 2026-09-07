@@ -10,7 +10,7 @@ Xem `.env.example` đầy đủ (30 providers freellms.org, live sync là source
 
 | Biến | Mặc định | Mô tả |
 |------|----------|-------|
-| `PORT` | `8080` | Port gateway |
+| `PORT` | `7373` | Port gateway |
 | `NODE_ENV` | `development` | `development`/`production` |
 | `DATABASE_URL` | `file:./data.db` | Drizzle DB — `file:./data.db` (SQLite) hoặc `postgres://user:pass@host/db` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis cho rate limit; nếu trống fallback in-memory |
@@ -98,7 +98,7 @@ Sync job **mới** (live source of truth):
 
 ```bash
 npx tsx apps/gateway/src/jobs/sync-live-models.ts        # fetch live -> data/live-models.json (2185 total, 882 free, freeOnly)
-curl -X POST http://localhost:8080/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
+curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'
 # Lịch sử
 python scripts/sync-freellms.py        # fetch freellms.org -> data/*.json + models.yaml (disabled)
 npm run sync:freellms -w apps-gateway  # alias
