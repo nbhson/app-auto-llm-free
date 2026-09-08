@@ -61,6 +61,8 @@ export const providers: Record<string, Provider> = {
   gemini: geminiProvider, // alias
   pollinations: pollinationsProvider,
   anthropic: anthropicProvider,
+  "claude-code": { ...anthropicProvider, id: "claude-code" } as Provider,
+  codex: OPENAI({ id: "codex", baseUrl: "https://api.openai.com/v1" }),
 };
 
 export const providerIds = Object.keys(providers);
@@ -95,6 +97,8 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   freeai: { name: "FreeAI", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
   cline: { name: "Cline", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
   anthropic: { name: "Anthropic", tier: "Custom", tier_type: "custom", caps: ["text","reasoning","vision"], noCard: false },
+  "claude-code": { name: "Claude Code", tier: "Custom", tier_type: "custom", caps: ["text","reasoning","code","vision"], noCard: false },
+  codex: { name: "Codex (OpenAI)", tier: "Custom", tier_type: "custom", caps: ["text","code","reasoning"], noCard: false },
 };
 
 // Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback

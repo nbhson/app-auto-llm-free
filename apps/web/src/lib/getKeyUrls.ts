@@ -42,6 +42,9 @@ export const getKeyUrls: Record<string, string> = {
   orcarouter: "https://api.orcarouter.ai",
   freeai: "https://api.free.ai",
   cline: "https://api.cline.bot",
+  anthropic: "https://console.anthropic.com/settings/keys",
+  "claude-code": "https://console.anthropic.com/settings/keys",
+  codex: "https://platform.openai.com/api-keys",
 };
 
 export function getKeyUrl(slug: string): string {

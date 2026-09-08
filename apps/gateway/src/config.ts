@@ -122,7 +122,7 @@ function parseTiers(): string[][] {
         ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
         ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
         ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
-        ["agnes-ai"],
+        ["anthropic", "claude-code", "codex", "agnes-ai"],
       ];
     return JSON.parse(raw);
   } catch {
@@ -131,7 +131,7 @@ function parseTiers(): string[][] {
       ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
       ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
       ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
-      ["agnes-ai"],
+      ["anthropic", "claude-code", "codex", "agnes-ai"],
     ];
   }
 }
@@ -203,6 +203,8 @@ export const config = {
     freeai: parseKeys(process.env.FREEAI_API_KEYS),
     cline: parseKeys(process.env.CLINE_API_KEYS),
     anthropic: parseKeys(process.env.ANTHROPIC_API_KEYS || process.env.CLAUDE_API_KEYS),
+    "claude-code": parseKeys(process.env.CLAUDE_CODE_API_KEYS || process.env.ANTHROPIC_API_KEYS || process.env.CLAUDE_API_KEYS),
+    codex: parseKeys(process.env.CODEX_API_KEYS || process.env.OPENAI_API_KEYS),
     // legacy / scraped
     nvidia: parseKeys(process.env.NVIDIA_API_KEYS),
     together: parseKeys(process.env.TOGETHER_API_KEYS),
