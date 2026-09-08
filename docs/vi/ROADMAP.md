@@ -65,13 +65,26 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 
 ## Sau MVP (Backlog)
 
-- [ ] `/v1/embeddings` (Cohere, NVIDIA), `/v1/images/generations` (Pollinations), `/v1/audio/*`
-- [ ] `/responses` + `/conversations` (Hebo style, Open Responses API)
-- [ ] Anthropic-compatible `/messages` (đã có interface `anthropic` stub)
+- [x] `/v1/audio/*` (transcriptions/translations/speech)
+- [x] `/responses` + `/conversations` (Hebo style)
+- [x] Anthropic-compatible `/messages`
+- [x] Token compression (history/tools minify)
+- [x] Admin analytics: cost tracking, savings, per-key billing (add costByProvider, cacheHitRate, p95)
 - [ ] BYOK public self-serve (user tự add key qua Dashboard)
 - [ ] OAuth providers (Copilot/Cursor/Kiro) như OmniRoute embedded services
-- [ ] Token compression (12 engines như OmniRoute) để giảm cost
-- [ ] Admin analytics: cost tracking, savings, per-key billing
+- [ ] `/v1/embeddings` (Cohere, NVIDIA), `/v1/images/generations` (Pollinations) — đã live, còn polish
+
+## P6 — Vector 1+2 (2026-09-08) ✅ Done 2026-09-08
+
+- [x] `/v1/audio/*` — `transcriptions`/`translations` (Whisper) + `speech` (TTS) qua Groq/Cerebras/OpenAI, multipart/form-data, `POST /v1/audio/transcriptions`…
+- [x] `/responses` + `/conversations` (Hebo style, Open Responses API) — `POST /v1/responses`, `GET /v1/responses/:id`, `POST /v1/conversations`, `GET /v1/conversations/:id/messages`
+- [x] Anthropic-compatible `/v1/messages` — `POST /v1/messages` với dịch Anthropic ↔ OpenAI, streaming SSE, `tool_use` ↔ `tool_calls`, pool `ANTHROPIC_API_KEYS`
+- [x] Semantic cache — `SEMANTIC_CACHE_ENABLED` (0), `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL=cohere/embed-english-v3.0` (Cohere embeddings), cosine similarity, Redis + in-memory fallback
+- [x] Token compression — `COMPRESSION_ENABLED` (0), cắt history + minify tools, `lib/compression.ts` (pattern 12-engine như OmniRoute)
+- [x] Cost routing — `COST_ROUTING_ENABLED` (0), rẻ nhất trước, `lib/cost-router.ts`, hòa thì xét latency/verified
+- [x] Admin analytics — cost tracking, savings, per-key billing, `costByProvider`, `cacheHitRate`, `p95` latency, `ANALYTICS_RETENTION_DAYS=30`, `GET /api/analytics/*`
+- [x] Provider keys — `ANTHROPIC_API_KEYS` (phân tách dấu phẩy) cho upstream Anthropic trực tiếp của `/v1/messages`
+- [x] Tests + docs — e2e Vector 1+2, `CONFIGURATION.md` flags Vector 2, `ROADMAP.md` P6/M6, `README.vi.md` bảng tính năng
 
 ## Milestones
 
@@ -82,5 +95,6 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 | M3 | 2026-09-06 | P3 done: key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health live 40 (online 13), rate-limit 4x + debounce 400ms |
 | M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE (Live ON) + Dashboard 5 routes (hasKey/hide404, hasRealKey highlight, sticky bottom LOV) |
 | M5 | 2026-09-06 | P5 done: wrangler + Dockerfile prod + OTel + benchmark + SECURITY rotate + PROVIDER_TEST_RESULTS + live sync 2185/882 |
+| M6 | 2026-09-08 | P6 Vector 1+2 done: `/v1/audio/*` + `/responses`/`/conversations` + `/v1/messages` (Anthropic) + semantic cache + compression + cost routing + analytics (`costByProvider`/`cacheHitRate`/`p95`) |
 
 Gantt tham khảo trong `docs/ARCHITECTURE.md:1`.

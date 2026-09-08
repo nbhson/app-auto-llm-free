@@ -1,6 +1,7 @@
 import { createOpenAICompatibleProvider } from "./openai-compatible.js";
 import { geminiProvider } from "./gemini.js";
 import { pollinationsProvider } from "./pollinations.js";
+import { anthropicProvider } from "./anthropic.js";
 import type { Provider } from "./base.js";
 
 // === Base URLs from freellms.org (2026-09-06 scan) ===
@@ -59,6 +60,7 @@ export const providers: Record<string, Provider> = {
   "google-gemini": geminiProvider,
   gemini: geminiProvider, // alias
   pollinations: pollinationsProvider,
+  anthropic: anthropicProvider,
 };
 
 export const providerIds = Object.keys(providers);
@@ -92,6 +94,7 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   orcarouter: { name: "OrcaRouter", tier: "Custom", tier_type: "custom", caps: ["text","reasoning"], noCard: true },
   freeai: { name: "FreeAI", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
   cline: { name: "Cline", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
+  anthropic: { name: "Anthropic", tier: "Custom", tier_type: "custom", caps: ["text","reasoning","vision"], noCard: false },
 };
 
 // Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback

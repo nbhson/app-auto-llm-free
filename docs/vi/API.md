@@ -6,6 +6,8 @@ OpenAI-compatible API của gateway (41 provider ids — 30 freellms + 11 alias;
 
 Base URL: `http://localhost:7373/v1` (kèm dashboard tại `http://localhost:3000` — header 2 hàng, i18n VI/EN)
 
+Endpoints: `POST /v1/chat/completions` · `GET /v1/models` · `POST /v1/embeddings` · `POST /v1/images/generations` · `GET /v1/health` · `POST /v1/audio/transcriptions` · `POST /v1/audio/translations` · `POST /v1/audio/speech` · `POST /v1/responses` · `GET /v1/responses/:id` · `POST /v1/conversations` · `POST /v1/messages` · `POST /v1/messages/count_tokens` + Admin `/api/*`
+
 Auth: `Authorization: Bearer fgk-master-...` (MASTER_KEY tự sinh — 1 key duy nhất cho `/v1/*` + `/api/*`) hoặc `fgk-...` scoped tạo trong Dashboard. Health không cần auth.
 
 ## Endpoints
@@ -144,6 +146,156 @@ Dùng Pollinations hoặc provider hỗ trợ images.
 { "model": "pollinations/flux", "prompt": "a cat", "n": 1, "size": "1024x1024" }
 ```
 
+### POST /v1/audio/transcriptions (và translations)
+
+Chuyển audio thành text qua `multipart/form-data`. `file` (bắt buộc), `model` mặc định `whisper-large-v3`, `language` tùy chọn (ISO-639-1). Thử theo thứ tự `groq` → `openrouter`; fallback mock trong dev (không có key).
+
+```bash
+curl -X POST http://localhost:7373/v1/audio/transcriptions \
+  -H "Authorization: Bearer fgk-xxx" \
+  -F file=@audio.mp3 \
+  -F model=whisper-large-v3 \
+  -F language=en
+# translations: cùng cú pháp
+curl -X POST http://localhost:7373/v1/audio/translations \
+  -H "Authorization: Bearer fgk-xxx" \
+  -F file=@audio.mp3 \
+  -F model=whisper-large-v3
+```
+
+**Response**:
+
+```json
+{ "text": "Hello world", "model": "whisper-large-v3", "language": "en" }
+```
+
+Dev mock trả `{ "text": "[mock transcription]", "_mock": true }` khi chưa cấu hình key STT.
+
+### POST /v1/audio/speech
+
+Tạo speech từ text. Body JSON `{model, input, voice, response_format, speed}` → `audio/mpeg`. Trả `501` nếu không có TTS provider free.
+
+```bash
+curl -X POST http://localhost:7373/v1/audio/speech \
+  -H "Authorization: Bearer fgk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"tts-1","input":"Hello world","voice":"alloy","response_format":"mp3","speed":1.0}' \
+  --output speech.mp3
+```
+
+**Request**:
+
+```json
+{
+  "model": "tts-1",
+  "input": "Hello world",
+  "voice": "alloy",
+  "response_format": "mp3",
+  "speed": 1.0
+}
+```
+
+**Headers**: thành công `Content-Type: audio/mpeg`. Lỗi `501 { "error": { "message": "No TTS provider available", "type": "no_tts_provider" } }`.
+
+### POST /v1/responses và GET /v1/responses/:id và POST /v1/conversations
+
+Alias Responses API trên chat completions. `POST /v1/responses` tạo response, `GET /v1/responses/:id` lấy lại, `POST /v1/conversations` là alias cũng tạo response qua conversation.
+
+**Request** (`POST /v1/responses` / `POST /v1/conversations`):
+
+```json
+{
+  "model": "auto",
+  "input": "Hello",
+  "instructions": "You are helpful.",
+  "previous_response_id": "resp_xxx",
+  "stream": false,
+  "temperature": 0.7,
+  "max_output_tokens": 1024,
+  "tools": [{ "type": "function", "function": { "name": "get_weather", "parameters": { "type": "object", "properties": { "city": { "type": "string" } } } } }]
+}
+```
+
+`input` chấp nhận `string` hoặc mảng messages (`[{role:"user",content:"Hello"}]`). Khi `stream: true` trả SSE `data: {...}\n\n` với `data: [DONE]`.
+
+**Response**:
+
+```json
+{
+  "id": "resp_xxx",
+  "object": "response",
+  "created_at": 1715433600,
+  "model": "nvidia-nim/z-ai/glm-5.2",
+  "output": [
+    { "type": "message", "role": "assistant", "content": [{ "type": "output_text", "text": "Hi!" }] }
+  ],
+  "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 }
+}
+```
+
+**Lấy lại**:
+
+```bash
+curl http://localhost:7373/v1/responses/resp_xxx -H "Authorization: Bearer fgk-xxx"
+curl -X POST http://localhost:7373/v1/conversations \
+  -H "Authorization: Bearer fgk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","input":"Hello"}'
+```
+
+### POST /v1/messages (tương thích Anthropic) và POST /v1/messages/count_tokens
+
+Endpoint tương thích Anthropic Messages API. Yêu cầu headers `anthropic-version: 2023-06-01` và `x-api-key: fgk-xxx` (hoặc `Authorization: Bearer fgk-xxx` cũng được chấp nhận).
+
+**Request**:
+
+```json
+{
+  "model": "auto",
+  "messages": [{ "role": "user", "content": "Hello" }],
+  "max_tokens": 1024,
+  "system": "You are helpful.",
+  "temperature": 0.7,
+  "top_p": 1,
+  "top_k": 40,
+  "stream": false,
+  "tools": [{ "name": "get_weather", "description": "Get weather", "input_schema": { "type": "object", "properties": { "city": { "type": "string" } } } }]
+}
+```
+
+`messages[].content` chấp nhận `string` hoặc content blocks Anthropic (`[{type:"text",text:"Hello"}]`). `max_tokens` bắt buộc. `system` có thể là `string` hoặc blocks.
+
+```bash
+curl -X POST http://localhost:7373/v1/messages \
+  -H "x-api-key: fgk-xxx" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+
+curl -X POST http://localhost:7373/v1/messages/count_tokens \
+  -H "x-api-key: fgk-xxx" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
+# -> { "input_tokens": 5 }
+```
+
+**Response** (`POST /v1/messages`):
+
+```json
+{
+  "id": "msg_xxx",
+  "type": "message",
+  "role": "assistant",
+  "content": [{ "type": "text", "text": "Hi!" }],
+  "model": "auto",
+  "stop_reason": "end_turn",
+  "usage": { "input_tokens": 10, "output_tokens": 5 }
+}
+```
+
+Streaming (`stream: true`) emit SSE events Anthropic `event: message_start` / `content_block_delta` / `message_stop`.
+
 ### GET /v1/health
 
 Không cần auth, trả status gateway + provider pool.
@@ -178,6 +330,10 @@ Không cần auth, trả status gateway + provider pool.
 | `POST` | `/api/verify` | Trigger verify `{dryRun:false}` — scheduler cũng gọi syncLiveModels kèm |
 | `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
 | `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, đã bỏ Auto sync 5s duplicate |
+| `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Thống kê tổng hợp (tokens, requests theo provider/key/model, interval `hour`/`day`) |
+| `GET` | `/api/cache/stats` | Thống kê cache (hits, misses, size) |
+| `DELETE` | `/api/cache` | Xóa cache gateway |
+| `POST` | `/api/compression/preview` | Preview nén prompt (ước tính tiết kiệm tokens) |
 
 **Tạo key**:
 

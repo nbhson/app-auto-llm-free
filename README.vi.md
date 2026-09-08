@@ -43,6 +43,7 @@
 | **Resilience** | Auto fallback 15 providers, circuit breaker 5/30s half-open, TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight |
 | **Key Pool** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, `rotate-keys.ts` |
 | **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (sticky, `providers` trước `models`), **Dashboard** 4 cards + 3 charts (byProvider/latency/verify) + tokens, **Providers** `Get Key ↗` + live health, **Models** 316 checkbox + `Check Live` + `Used/Limit`, **Keys** `fgk-...` CRUD + Key Generator (thay openssl) + Quick Test, **Logs** charts + SSE |
+| **Vector 1+2 (2026-09-08)** | **Audio** `POST /v1/audio/transcriptions`/`translations`/`speech` (Groq/Cerebras/OpenAI, multipart) • **Responses** `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API) • **Anthropic** `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls`, `ANTHROPIC_API_KEYS`) • **Semantic Cache** (`SEMANTIC_CACHE_ENABLED=0`, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL=cohere/embed-english-v3.0`, cosine, Redis/in-memory) • **Compression** (`COMPRESSION_ENABLED=0`, history/tools minify, 12-engine) • **Cost Routing** (`COST_ROUTING_ENABLED=0`, rẻ nhất trước) • **Analytics** (`ANALYTICS_RETENTION_DAYS=30`, `costByProvider`/`cacheHitRate`/`p95`, `GET /api/analytics/*`) |
 | **Observability** | Pino pretty, OTel GenAI (`gen_ai.*`), token estimator, `request-log` 1000 + `X-Verified`, `PROVIDER_TEST_RESULTS` benchmark |
 
 ## 🏗️ Kiến trúc
@@ -57,6 +58,24 @@ Client (OpenAI SDK / Vercel AI SDK)
     → Normalizer → OpenAI SSE/JSON
   → Dashboard (Vite + React) → /api/* → Drizzle ORM → SQLite/Postgres + Redis
 ```
+
+**Pipeline Request (Vector 2) — `apps/gateway/src/routes/v1/chat.ts:105`:**
+```
+Client Request
+  ↓
+[Cost Routing?] — config.ts:163 COST_ROUTING_ENABLED=1 → lib/cost-router.ts:99 rankProvidersByCostAndLatency (FREELLMS_COST $/1M + latency EMA + quota headroom)
+  ↓
+[Semantic Cache?] — config.ts:158 SEMANTIC_CACHE_ENABLED=1 && !stream → lib/semantic-cache.ts:29 get(semantic:${model}:${sha256}) → hit → trả cache (200, X-Cache: HIT) + addLog cacheHit
+  ↓
+[Token Compression?] — config.ts:162 COMPRESSION_ENABLED=1 → lib/compression.ts:103 compressMessages (toolsMinify/historySummarize/codeDedup, ratio <0.95) → messagesToSend
+  ↓
+Gửi lên Upstream (Anthropic/OpenAI/Gemini...) → Fallback tiered + Circuit Breaker isOpen + checkQuota RPM/TPM/RPD/TPD
+  ↓
+Lưu kết quả vào cache (lib/semantic-cache.ts:58 set EX CACHE_TTL_S) + ghi analytics (request-log.ts:7 cost/cacheHit/compressedTokens, lib/analytics.ts:53)
+  ↓
+Trả về Client (OpenAI SSE/JSON + X-Provider/X-Verified + logGenAI otel.ts:10)
+```
+> Flow đúng như bạn mô tả: `Cost Routing → Semantic Cache → Compression → Upstream → Cache store + Analytics`. Code đã re-order `chat.ts:114` để cache check trước compression (chỉ nén khi miss). Toggle qua `Settings` `/settings` (localStorage `gatewaySettings`, default `.env` `GET /api/config`).
 
 Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -228,6 +247,7 @@ curl -X POST http://localhost:7373/api/keys \
 - [x] **P3 Resilience** ✅ Done 2026-09-06 — key-manager AES-GCM, quota RPM/TPM (NVIDIA 40/Groq 30/Cerebras 15/1M), breaker 5/30s, `GET /api/providers/health` live 41, `X-Verified` + deprecated skip
 - [x] **P4 Auth + Dashboard** ✅ Done 2026-09-06 — `fgk-...` CRUD (hash SHA256, scopes, RPM), `rate-limit` virtual key, `request-log` SSE, Dashboard 5 routes (Dashboard verify, Models badges, Providers health, Keys CRUD, Logs live)
 - [x] **P5 Hardening** ✅ Done 2026-09-06 — `wrangler.jsonc` Cloudflare, Dockerfile prod non-root + HEALTHCHECK, `otel.ts` GenAI, `secureHeaders` + `bodyLimit`, `benchmark.ts` + `PROVIDER_TEST_RESULTS.md` (online 13/40, chat 1539ms), `rotate-keys.ts` AES rotation, `SECURITY.md` hardening checklist
+- [x] **P6 Vector 1+2** ✅ Done 2026-09-08 — `/v1/audio/*` (transcriptions/translations/speech) + `/responses`/`/conversations` (Hebo) + `/v1/messages` (Anthropic) + semantic cache (`SEMANTIC_CACHE_ENABLED`/`SEMANTIC_THRESHOLD=0.92`/`CACHE_TTL_S=3600`/`cohere/embed-english-v3.0`) + compression (`COMPRESSION_ENABLED`) + cost routing (`COST_ROUTING_ENABLED`) + analytics (`costByProvider`/`cacheHitRate`/`p95`, `ANALYTICS_RETENTION_DAYS=30`)
 
 Chi tiết [docs/ROADMAP.md](docs/ROADMAP.md).
 

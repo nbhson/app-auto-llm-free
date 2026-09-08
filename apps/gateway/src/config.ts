@@ -154,6 +154,16 @@ export const config = {
   fallbackTiers: parseTiers(),
   circuitBreakerThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || "5", 10),
   circuitBreakerCooldownMs: parseInt(process.env.CIRCUIT_BREAKER_COOLDOWN_MS || "30000", 10),
+  // Vector 2 flags
+  semanticCacheEnabled: process.env.SEMANTIC_CACHE_ENABLED === "1" || process.env.SEMANTIC_CACHE_ENABLED === "true",
+  semanticCacheThreshold: parseFloat(process.env.SEMANTIC_THRESHOLD || "0.92"),
+  semanticCacheTtlSec: parseInt(process.env.CACHE_TTL_S || "3600", 10),
+  embeddingModel: (process.env.EMBEDDING_MODEL || "cohere/embed-english-v3.0").split(",")[0].trim(),
+  embeddingModels: (process.env.EMBEDDING_MODEL || "cohere/embed-english-v3.0").split(",").map((s) => s.trim()).filter(Boolean),
+  embeddingFallbacks: (process.env.EMBEDDING_FALLBACKS || "nvidia-nim/nvidia/nv-embed-v1,cloudflare-workers-ai/@cf/baai/bge-large-en-v1.5").split(",").map((s) => s.trim()).filter(Boolean),
+  compressionEnabled: process.env.COMPRESSION_ENABLED === "1" || process.env.COMPRESSION_ENABLED === "true",
+  costRoutingEnabled: process.env.COST_ROUTING_ENABLED === "1" || process.env.COST_ROUTING_ENABLED === "true",
+  analyticsRetentionDays: parseInt(process.env.ANALYTICS_RETENTION_DAYS || "30", 10),
   providerKeys: {
     // freellms ids use hyphen, config keys use same slug
     "nvidia-nim": parseKeys(process.env.NVIDIA_API_KEYS),
@@ -192,6 +202,7 @@ export const config = {
     orcarouter: parseKeys(process.env.ORCAROUTER_API_KEYS),
     freeai: parseKeys(process.env.FREEAI_API_KEYS),
     cline: parseKeys(process.env.CLINE_API_KEYS),
+    anthropic: parseKeys(process.env.ANTHROPIC_API_KEYS || process.env.CLAUDE_API_KEYS),
     // legacy / scraped
     nvidia: parseKeys(process.env.NVIDIA_API_KEYS),
     together: parseKeys(process.env.TOGETHER_API_KEYS),

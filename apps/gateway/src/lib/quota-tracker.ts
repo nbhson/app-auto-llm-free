@@ -25,6 +25,8 @@ type Window = { count: number; resetAt: number };
 
 const rpmWindows = new Map<string, Window>(); // key: provider or virtualKey
 const tpmWindows = new Map<string, Window>();
+const rpdWindows = new Map<string, Window>(); // 24h
+const tpdWindows = new Map<string, Window>();
 
 function windowKey(provider: string, keyPrefix: string) {
   return `${provider}:${keyPrefix}`;
@@ -54,6 +56,26 @@ export function checkQuota(provider: string, key: string, estimatedTokens: numbe
     }
   }
 
+  // RPD check (24h)
+  if (limits.rpd) {
+    let w = rpdWindows.get(k);
+    if (!w || w.resetAt <= now) w = { count: 0, resetAt: now + 86400000 };
+    if (w.count >= limits.rpd) {
+      return { allowed: false, reason: `RPD limit ${limits.rpd} exceeded`, retryAfterMs: w.resetAt - now };
+    }
+  }
+
+  // TPD check (24h)
+  if (limits.tpd) {
+    let w = tpdWindows.get(k);
+    if (!w || w.resetAt <= now) w = { count: 0, resetAt: now + 86400000 };
+    if (w.count + estimatedTokens > limits.tpd) {
+      return { allowed: false, reason: `TPD limit ${limits.tpd} exceeded`, retryAfterMs: w.resetAt - now };
+    }
+  }
+
+  // Try Redis if available for distributed quota (fallback to in-memory if not)
+  // Note: Redis path is async but checkQuota is sync for now; we keep in-memory as primary and rely on key-manager cooldown for distributed 429
   return { allowed: true };
 }
 
@@ -73,6 +95,29 @@ export function recordUsage(provider: string, key: string, tokens: number) {
     w.count += tokens;
     tpmWindows.set(k, w);
   }
+  if (limits?.rpd) {
+    let w = rpdWindows.get(k);
+    if (!w || w.resetAt <= now) w = { count: 0, resetAt: now + 86400000 };
+    w.count++;
+    rpdWindows.set(k, w);
+  }
+  if (limits?.tpd) {
+    let w = tpdWindows.get(k);
+    if (!w || w.resetAt <= now) w = { count: 0, resetAt: now + 86400000 };
+    w.count += tokens;
+    tpdWindows.set(k, w);
+  }
+  // Also try to increment Redis counters if available (best-effort, async)
+  try {
+    // dynamic import to avoid circular dep
+    import("./redis.js").then(({ getRedis }) => {
+      const r: any = getRedis?.();
+      if (!r) return;
+      const dayKey = `quota:${k}:${Math.floor(now / 86400000)}`;
+      r.incr(dayKey).catch(() => {});
+      r.expire(dayKey, 86400).catch(() => {});
+    }).catch(() => {});
+  } catch {}
   logger.debug({ provider, tokens, k }, "quota usage recorded");
 }
 
@@ -84,5 +129,18 @@ export function getQuotaState(provider: string, key: string) {
     limits,
     rpm: rpmWindows.get(k),
     tpm: tpmWindows.get(k),
+    rpd: rpdWindows.get(k),
+    tpd: tpdWindows.get(k),
   };
+}
+export function getQuotaHeadroom(provider: string, key: string): number {
+  const limits = FREELLMS_LIMITS[provider];
+  if (!limits) return 1;
+  const st = getQuotaState(provider, key);
+  let headroom = 1;
+  if (limits.rpm && st.rpm) headroom = Math.min(headroom, 1 - st.rpm.count / limits.rpm);
+  if (limits.tpm && st.tpm) headroom = Math.min(headroom, 1 - st.tpm.count / limits.tpm);
+  if (limits.rpd && st.rpd) headroom = Math.min(headroom, 1 - st.rpd.count / limits.rpd);
+  if (limits.tpd && st.tpd) headroom = Math.min(headroom, 1 - st.tpd.count / limits.tpd);
+  return Math.max(0, headroom);
 }

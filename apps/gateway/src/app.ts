@@ -10,16 +10,27 @@ import { modelsRoute } from "./routes/v1/models.js";
 import { chatRoute } from "./routes/v1/chat.js";
 import { embeddingsRoute } from "./routes/v1/embeddings.js";
 import { imagesRoute } from "./routes/v1/images.js";
+import { audioRoute } from "./routes/v1/audio.js";
+import { responsesRoute } from "./routes/v1/responses.js";
+import { anthropicRoute } from "./routes/v1/anthropic.js";
 import { apiRoute } from "./routes/api.js";
 import { extractBearer } from "./lib/auth.js";
 import { isValidVirtualKeyLive } from "./lib/virtual-keys.js";
+import { initRedis } from "./lib/redis.js";
 
 export function createApp() {
   const app = new Hono();
 
+  // Init Redis lazily for Vector 2 features
+  try { initRedis(); } catch {}
+
   app.use("*", secureHeaders());
-  app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id", "X-Session-ID", "X-Parent-Session-ID", "x-session-id", "x-parent-session-id"], maxAge: 86400 }));
-  app.use("*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
+  app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id", "X-Session-ID", "X-Parent-Session-ID", "x-session-id", "x-parent-session-id", "anthropic-version", "x-api-key"], maxAge: 86400 }));
+  app.use("*", async (c, next) => {
+    // Skip bodyLimit for multipart audio (needs larger)
+    if (c.req.path.startsWith("/v1/audio/")) return next();
+    return bodyLimit({ maxSize: 10 * 1024 * 1024 })(c, next);
+  });
   app.use("*", requestLogger);
   app.use("*", virtualKeyRateLimit);
 
@@ -41,9 +52,9 @@ export function createApp() {
   });
 
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.5.1", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.6.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
-  app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nGET /v1/health</pre></body></html>`));
+  app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nPOST /v1/audio/transcriptions\nPOST /v1/audio/speech\nPOST /v1/responses\nPOST /v1/messages (Anthropic)\nGET /v1/health</pre></body></html>`));
 
   // Auth middleware for /v1/* (except health) — uses virtual-keys + master
   app.use("/v1/*", async (c, next) => {
@@ -73,6 +84,11 @@ export function createApp() {
   app.route("/v1/chat", chatRoute);
   app.route("/v1/embeddings", embeddingsRoute);
   app.route("/v1/images", imagesRoute);
+  app.route("/v1/audio", audioRoute);
+  app.route("/v1/responses", responsesRoute);
+  app.route("/v1/messages", anthropicRoute);
+  // Alias: /v1/conversations -> responses
+  app.route("/v1/conversations", responsesRoute);
 
   // Legacy compat: /v1/chat/completions is at /v1/chat/completions via chatRoute
   // Also support /v1/completions stub

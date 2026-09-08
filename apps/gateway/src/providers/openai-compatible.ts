@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import type { Provider, ChatRequest, ModelInfo } from "./base.js";
+import type { Provider, ChatRequest, ModelInfo, AudioTranscriptionRequest, AudioSpeechRequest, ResponsesRequest } from "./base.js";
+import { translateResponsesToChat } from "../lib/responses-translator.js";
 
 function generateSessionId(): string {
   return `ses_${crypto.randomBytes(12).toString("hex")}`;
@@ -218,6 +219,48 @@ export function createOpenAICompatibleProvider(opts: {
         displayName: m.id || m.name,
         ownedBy: opts.id,
       }));
+    },
+    async transcriptions(req: AudioTranscriptionRequest, apiKey: string): Promise<Response> {
+      const base = resolveBase();
+      const url = `${base}/audio/transcriptions`;
+      const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const form = new FormData();
+      const blob = req.file instanceof Blob ? req.file : new Blob([req.file as any]);
+      form.append("file", blob, req.filename || "audio.wav");
+      form.append("model", req.model);
+      if (req.language) form.append("language", req.language);
+      if (req.prompt) form.append("prompt", req.prompt);
+      if (req.response_format) form.append("response_format", req.response_format);
+      if (req.temperature !== undefined) form.append("temperature", String(req.temperature));
+      return fetch(url, { method: "POST", headers, body: form as any });
+    },
+    async speech(req: AudioSpeechRequest, apiKey: string): Promise<Response> {
+      const base = resolveBase();
+      const url = `${base}/audio/speech`;
+      const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": "opencode-gateway/1.0" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      let model = req.model;
+      if (model.includes("/")) model = model.split("/").slice(1).join("/");
+      return fetch(url, { method: "POST", headers, body: JSON.stringify({ model, input: req.input, voice: req.voice, response_format: req.response_format, speed: req.speed }) });
+    },
+    async responses(req: ResponsesRequest, apiKey: string): Promise<Response> {
+      // Prefer native /responses if provider supports, else fallback to /chat/completions via translation
+      const base = resolveBase();
+      const url = `${base}/responses`;
+      const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": "opencode-gateway/1.0" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const chat = translateResponsesToChat(req);
+      // try native responses endpoint first
+      try {
+        const native = await fetch(url, { method: "POST", headers, body: JSON.stringify(req) });
+        if (native.ok || native.status < 500) return native;
+      } catch {}
+      // fallback to chat completions
+      const chatUrl = `${base}/chat/completions`;
+      let model = chat.model;
+      if (model.includes("/")) model = model.split("/").slice(1).join("/");
+      return fetch(chatUrl, { method: "POST", headers, body: JSON.stringify({ model, messages: chat.messages, temperature: chat.temperature, max_tokens: chat.max_tokens, stream: chat.stream, tools: chat.tools }) });
     },
     async health(apiKey: string): Promise<boolean> {
       try {

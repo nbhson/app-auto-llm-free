@@ -25,6 +25,10 @@ Xem `.env.example` đầy đủ (30 providers freellms.org, live sync là source
 
 ### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers, live via real keys
 
+| Biến | Mặc định | Mô tả |
+|------|----------|-------|
+| `ANTHROPIC_API_KEYS` | _(trống)_ | Key Anthropic cho `/v1/messages` (phân tách dấu phẩy, round-robin). Chỉ cần nếu proxy trực tiếp tới Anthropic; ngược lại adapter OpenAI tự dịch. |
+
 ```env
 # Core
 GROQ_API_KEYS=gsk_xxx
@@ -35,6 +39,9 @@ OPENROUTER_API_KEYS=sk-or-xxx
 GEMINI_API_KEYS=AIza_xxx
 CLOUDFLARE_API_TOKEN=cf_xxx
 CLOUDFLARE_ACCOUNT_ID=acc_xxx
+
+# Anthropic (Vector 1+2 — /v1/messages)
+ANTHROPIC_API_KEYS=sk-ant-xxx
 
 # Cohere / Mistral / SiliconFlow / SambaNova / Chutes / HuggingFace
 COHERE_API_KEYS=co_xxx
@@ -79,6 +86,21 @@ sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/
 | `FALLBACK_TIERS` | `[[...]]` | JSON tiers freellms: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | fails để open |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | — |
+
+### Vector 1+2 — Audio / Responses / Anthropic / Semantic Cache / Compression / Cost Routing / Analytics (2026-09-08)
+
+| Biến | Mặc định | Mô tả |
+|------|----------|-------|
+| `ANTHROPIC_API_KEYS` | _(trống)_ | Danh sách key Anthropic cho upstream `/v1/messages` (phân tách dấu phẩy, round-robin như các provider khác) |
+| `SEMANTIC_CACHE_ENABLED` | `0` | Bật cache ngữ nghĩa cho `/v1/chat/completions` + `/v1/messages`. `1` bật, `0` tắt |
+| `SEMANTIC_THRESHOLD` | `0.92` | Ngưỡng cosine similarity để cache hit (0.0–1.0, càng cao càng chặt). Tối ưu cho `cohere/embed-english-v3.0` |
+| `CACHE_TTL_S` | `3600` | TTL (giây) cho cache completions (1 giờ). Xóa qua Redis TTL hoặc sweep in-memory |
+| `EMBEDDING_MODEL` | `cohere/embed-english-v3.0` | Model embedding cho semantic cache. Mặc định Cohere; có thể đổi endpoint tương thích |
+| `COMPRESSION_ENABLED` | `0` | Bật nén token (cắt history + minify tools, pattern 12-engine như OmniRoute) để giảm chi phí |
+| `COST_ROUTING_ENABLED` | `0` | Bật routing theo chi phí — ưu tiên provider free rẻ nhất trước (hòa thì xét latency/verified) |
+| `ANALYTICS_RETENTION_DAYS` | `30` | Số ngày giữ rollup analytics admin (theo dõi chi phí, tiết kiệm, billing per-key, `costByProvider`, `cacheHitRate`, `p95`) |
+
+Các flag mặc định tắt (`0`) để tương thích ngược. Bật riêng lẻ qua `.env` và restart gateway (xem hướng dẫn kill/restart ở trên).
 
 ### Rate limit
 

@@ -6,7 +6,7 @@ Tài liệu này mô tả kiến trúc chi tiết của `app-auto-llm-free` — 
 
 ```mermaid
 flowchart LR
-  Client -->|OpenAI SDK| Gateway
+  Client -->|OpenAI/Anthropic SDK| Gateway
   Gateway --> Router
   Router --> PA[Provider Adapters]
   PA -->|fetch| Upstream
@@ -14,20 +14,24 @@ flowchart LR
   PA --> Normalizer --> Gateway --> Client
   Gateway --> Dashboard
   Dashboard --> DB[(SQLite/Postgres)]
-  Gateway --> Redis
+  Gateway --> Redis[(Redis<br/>semantic cache)]
   Gateway -.-> Scheduler[24h Verify]
   Scheduler -.-> PA
   freellms.org -.-> Sync[scripts/sync-freellms.py]
-  Sync -.-> Data[(data/*.json + models.yaml)]
+  Sync -.-> Data[(data/*.json<br/>+ models.yaml<br/>+ provider-stats.json)]
+  Data -.-> Cost[(LiteLLM CDN<br/>cost pricing)]
+  Gateway --> Routes[/v1/chat<br/>/v1/embeddings<br/>/v1/images<br/>/v1/audio<br/>/v1/responses<br/>/v1/messages/]
+  Gateway --> Libs[lib/redis<br/>lib/semantic-cache<br/>lib/compression<br/>lib/cost-router<br/>lib/analytics]
 ```
 
-* **Gateway**: Hono app chạy trên Bun/Node/Cloudflare Workers (WinterCG). Multi-runtime, ultrafast RegExpRouter.
-* **Router**: Chọn provider pool dựa trên `model`, alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`), header `x-router`, tier fallback 4-tier freellms, sanitize `gemini 3.6 flash`/`nvidia: nemotron` (`openai-compatible.ts:31`).
-* **Adapters**: Mỗi provider implement `Provider` interface. 41 ids (30 freellms NVIDIA 97, ModelScope 43, Cloudflare 35... + 11 alias) qua `createOpenAICompatibleProvider`, Gemini `gemini-3.6-flash` (`gemini.ts:5`), Pollinations scraped. `nvidia-nim auto: nvidia/nemotron-3-ultra-550b-a55b` (đã fix 410).
+* **Gateway**: Hono app chạy trên Bun/Node/Cloudflare Workers (WinterCG). Multi-runtime, ultrafast RegExpRouter. Vector 1+2 routes: `/v1/chat/completions`, `/v1/embeddings`, `/v1/images/generations`, **mới** `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/responses` (+ alias `/v1/conversations`), `/v1/messages` (Anthropic) — xem `app.ts:14` + `routes/v1/audio.ts`, `routes/v1/responses.ts`, `routes/v1/anthropic.ts`. Middleware: `secureHeaders` + `cors` + `bodyLimit` 10MB **skip cho `multipart/form-data` audio** (`app.ts:29` `if path startsWith /v1/audio`) + `traceparent` propagation qua `requestLogger`/`otel` + `virtualKeyRateLimit`.
+* **Router**: Chọn provider pool dựa trên `model`, alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`), header `x-router`, tier fallback 4-tier freellms, sanitize `gemini 3.6 flash`/`nvidia: nemotron` (`openai-compatible.ts:31`). Khi `COST_ROUTING_ENABLED=1` sẽ re-rank qua `rankProvidersByCostAndLatency` (`lib/cost-router.ts:99`).
+* **Adapters**: Mỗi provider implement `Provider` interface. 41 ids (30 freellms NVIDIA 97, ModelScope 43, Cloudflare 35... + 11 alias) qua `createOpenAICompatibleProvider`, Gemini `gemini-3.6-flash` (`gemini.ts:5`), Pollinations scraped, **Anthropic** (`providers/anthropic.ts`) qua `anthropic-translator`. `nvidia-nim auto: nvidia/nemotron-3-ultra-550b-a55b` (đã fix 410).
+* **Vector 2 libs**: `lib/redis.ts` singleton lazy `initRedis()`/`getRedis()` (ioredis, fallback in-memory), `lib/semantic-cache.ts` SHA256 `semantic:{model}:{hash}` + Redis + mem + `hitRate`, `lib/compression.ts` (`toolsMinify`/`historySummarize`/`codeDedup` + `compressMessages` trả `savedTokens`/`ratio`), `lib/cost-router.ts` (`FREELLMS_COST` $/1M + `rankProvidersByCostAndLatency` + `syncPricing` CDN LiteLLM), `lib/analytics.ts` (`getAnalytics` interval/groupBy + `calculateSavings` + `costBreakdown`), `lib/anthropic-translator.ts` + `lib/responses-translator.ts`.
 * **Dashboard**: Vite + React (recharts), 5 routes `Dashboard→Providers→Models→Keys→Logs` (header 2 hàng `max-w-[1440px]` + Master **editable input** hàng 1 (password/text toggle, auto-filled from `GET /api/bootstrap`), nav giữa hàng 2), `Dashboard` 4 cards + 3 charts + tokens, `Models` **filter bar 1 hàng**: `q` + `provider` + `verified` + **Filters** dropdown (4 toggles `hasKey` **mặc định tắt** + `hide404`/`Hide credits`/`Hide invalid ID` mặc định bật) + **top-right 3 nút** `Check Live (n)`/`Sync Live Now`/`Refresh` (`Refresh` reset `hasKeyOnly:false`, `Check` yêu cầu filter `q`/`provider`), pagination 25/50 sticky bottom + checkbox (`isRowDisabled` ưu tiên `live usable 200`/`usage>0` trước `deprecated`/`404/410`) + `Used/Limit` + strikethrough persist (`200 usable` giữ không đỏ sau reload), `Providers` pagination 25/50 + `Get Key ↗` + health + **Sync Live Now** (chung `POST /api/models/live/sync`), `Keys` Generator (collapsed) + CRUD `fgk-...`, `Logs` charts + SSE.
-* **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify), `data/model-health.json` (persisted `404/410` + `200 usable` — `POST /api/models/health/mark` `200` override `404`, `GET /v1/models` `verified_free` sau `Check`), `data/live-models.json` (live sync 882 free, `POST /api/models/live/sync {freeOnly:true}` ở cả 2 pages), `data/request-log.json` (1000 logs), `lib/paths.ts` resolve `data/` cho cả `cwd=root` và `cwd=apps/gateway`.
+* **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify), `data/model-health.json` (persisted `404/410` + `200 usable` — `POST /api/models/health/mark` `200` override `404`, `GET /v1/models` `verified_free` sau `Check`), `data/live-models.json` (live sync 882 free, `POST /api/models/live/sync {freeOnly:true}` ở cả 2 pages), `data/request-log.json` (1000 logs), **mới** `data/provider-stats.json` (latency EMA per provider cho cost-router), **Redis semantic cache** (`semantic:*` keys, TTL `CACHE_TTL_S`), **cost pricing** sync từ LiteLLM CDN (`model_prices_and_context_window.json` → `FREELLMS_COST`), `lib/paths.ts` resolve `data/` cho cả `cwd=root` và `cwd=apps/gateway`.
 * **Scheduler**: `jobs/scheduler.ts` 24h (`SYNC_INTERVAL_MS`), so sánh freellms FREE vs live `/models` + `jobs/probe-models.ts` chat probe per-model (`/api/models/health` `usable/402/404/410`) + `jobs/sync-live-models.ts` live sync 882 free. Đổi `.env` phải **restart gateway** `config.ts:22` mới nạp `hasRealKey`.
-* **Token**: `lib/token-estimator.ts` char/4, `lib/request-log.ts` aggregation `allTimeTokens` + `tokensByProvider` cho Dashboard/Logs charts.
+* **Token & Vector 2 flags**: `lib/token-estimator.ts` char/4, `lib/request-log.ts` aggregation `allTimeTokens` + `tokensByProvider` cho Dashboard/Logs charts. Flags: `SEMANTIC_CACHE_ENABLED` (default 0, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL`), `COMPRESSION_ENABLED` (default 0), `COST_ROUTING_ENABLED` (default 0) — `config.ts:158`.
 
 Tham khảo: `free-llm-gateway` (24+ providers) và `OmniRoute` (271 providers, 90 free).
 
@@ -59,18 +63,68 @@ Tham khảo: `free-llm-gateway` (24+ providers) và `OmniRoute` (271 providers, 
 ```ts
 export interface ChatRequest {
   model: string;
-  messages: Array<{ role: string; content: string | Part[] }>;
+  messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
-  tools?: Tool[];
-  tool_choice?: string | object;
+  tools?: unknown[];
+  tool_choice?: unknown;
+  top_p?: number;
+  top_k?: number;
+  // ... n, stop, presence_penalty, frequency_penalty, user, sessionId
+}
+
+export interface AudioTranscriptionRequest {
+  file: File | Buffer | Blob;
+  filename?: string;
+  model: string;
+  language?: string;
+  prompt?: string;
+  response_format?: string;
+  temperature?: number;
+}
+
+export interface AudioSpeechRequest {
+  model: string;
+  input: string;
+  voice?: string;
+  response_format?: string;
+  speed?: number;
+}
+
+export interface ResponsesRequest {
+  model: string;
+  input: string | ChatMessage[] | Array<{ role: string; content: string }>;
+  instructions?: string;
+  previous_response_id?: string;
+  stream?: boolean;
+  temperature?: number;
+  max_output_tokens?: number;
+  tools?: unknown[];
+  tool_choice?: unknown;
+}
+
+export interface AnthropicRequest {
+  model: string;
+  messages: Array<{ role: "user" | "assistant"; content: string | Array<{ type: string; text?: string }> }>;
+  max_tokens: number;
+  system?: string;
+  temperature?: number;
+  stream?: boolean;
+  tools?: unknown[];
+  stop_sequences?: string[];
 }
 
 export interface Provider {
-  id: string; // 'nvidia-nim' | 'groq' | 'google-gemini' | 'pollinations'
+  id: string; // 'nvidia-nim' | 'groq' | 'google-gemini' | 'pollinations' | 'anthropic'
   type: 'openai-compatible' | 'gemini' | 'anthropic' | 'scraped';
   chat(req: ChatRequest, apiKey: string): Promise<Response>;
+  embeddings?(req: EmbeddingsRequest, apiKey: string): Promise<Response>;
+  images?(req: ImagesRequest, apiKey: string): Promise<Response>;
+  transcriptions?(req: AudioTranscriptionRequest, apiKey: string): Promise<Response>;
+  speech?(req: AudioSpeechRequest, apiKey: string): Promise<Response>;
+  responses?(req: ResponsesRequest, apiKey: string): Promise<Response>;
+  anthropic?(req: AnthropicRequest, apiKey: string): Promise<Response>;
   models(apiKey?: string): Promise<ModelInfo[]>; // GET {baseUrl}/models
   health(apiKey: string): Promise<boolean>;
 }
@@ -93,8 +147,9 @@ Học `smart_router.py` + OmniRoute 19 strategies, thực tế freellms tier:
 | `latency` | Chọn p50 thấp nhất (P3) |
 | `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (xem `registry.ts:42`) |
 | `verified` | Nếu có `data/verified-models.json` + `data/model-health.json` (persisted 404/410), `GET /v1/models?verified=free` loại `deprecated` khỏi pool |
+| `cost-aware` | Khi `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-rank pool theo `FREELLMS_COST` ($/1M tokens) + latency EMA từ `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*1 + latency*0.01 - headroom*0.2`, sort asc; `syncPricing()` sync từ LiteLLM CDN `model_prices_and_context_window.json` |
 
-Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config.ts:30`). Mid-stream SSE error → emit `data: {"error": ...}\n\n` rồi close. Persisted `model-health.json` được `chat.ts:22` merge để skip `deprecated` ngay cả khi chưa `verify`.
+Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config.ts:30`). Mid-stream SSE error → emit `data: {"error": ...}\n\n` rồi close. Persisted `model-health.json` được `chat.ts:22` merge để skip `deprecated` ngay cả khi chưa `verify`. Với cost-routing, pool đã sort sẽ được duyệt theo thứ tự tiết kiệm + nhanh nhất.
 
 ## 5. Key Management & Security
 
@@ -119,6 +174,9 @@ Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config
 | `models.yaml` | `scripts/sync-freellms.py` | 316 entries, `id: nvidia-nim/z-ai/glm-5.2`, `score`, `limit` |
 | `data/verified-models.json` | `jobs/verify-free.ts` live probe | `status: verified_free / deprecated / unverified_no_key / error`, `last_verified` |
 | `data/verified-summary.json` | `jobs/verify-free.ts` | Tổng hợp per-provider |
+| `data/provider-stats.json` | `lib/cost-router.ts` + `lib/analytics.ts` | Latency EMA per provider (`emaLatencyMs`/`latency`), quota headroom — dùng cho `rankProvidersByCostAndLatency` |
+| `Redis semantic cache` | `lib/redis.ts` singleton + `lib/semantic-cache.ts` | `semantic:{model}:{sha256}` keys, TTL `CACHE_TTL_S` (3600), `hits`/`misses`/`hitRate` (scan+del clear) — fallback in-memory Map |
+| `cost pricing CDN` | `lib/cost-router.ts` `syncPricing()` | LiteLLM CDN `model_prices_and_context_window.json` → `FREELLMS_COST` ($ per 1M tokens, free=0, groq 0.05, openrouter 0.1...) |
 
 Luồng sync: `scripts/sync-freellms.py` (Layer 1) → `jobs/verify-free.ts` probe `provider.models()` mỗi 24h (Layer 2, scheduler + `POST /api/verify`) → `GET /v1/models?verified=free` chỉ trả `verified_free` + `?provider=` exact filter (frontend `provider` datalist 20). Xem `docs/OPERATIONS.md:1`.
 
@@ -142,24 +200,35 @@ providers_cache(provider, models JSON, synced_at)
 .
 ├── apps/gateway/src/
 │   ├── index.ts              # serve + startScheduler()
-│   ├── app.ts                # Hono + secureHeaders + cors + auth + virtualKeyRateLimit
-│   ├── config.ts             # 30 providers keys + 4-tier fallback + SYNC_INTERVAL_MS
+│   ├── app.ts                # Hono + secureHeaders + cors + bodyLimit skip audio + traceparent + auth + virtualKeyRateLimit
+│   ├── config.ts             # 30 providers keys + 4-tier fallback + SYNC_INTERVAL_MS + Vector 2 flags
 │   ├── lib/paths.ts          # resolveDataPath (fix 7 vs 316 bug)
+│   ├── lib/redis.ts          # singleton ioredis lazyConnect + isRedisAvailable + pipeline (Vector 2)
+│   ├── lib/semantic-cache.ts # SHA256 semantic cache Redis+mem + hitRate (Vector 2)
+│   ├── lib/compression.ts    # toolsMinify/historySummarize/codeDedup + compressMessages (Vector 2)
+│   ├── lib/cost-router.ts    # FREELLMS_COST + rankProvidersByCostAndLatency + syncPricing CDN (Vector 2)
+│   ├── lib/analytics.ts      # getAnalytics/calculateSavings/costBreakdown (Vector 2)
+│   ├── lib/anthropic-translator.ts # Anthropic → OpenAI translate (Vector 2)
+│   ├── lib/responses-translator.ts # Responses API translate (Vector 2)
 │   ├── lib/key-manager.ts    # AES-GCM + round-robin + markRateLimited
 │   ├── lib/quota-tracker.ts  # FREELLMS_LIMITS RPM/TPM
 │   ├── lib/circuit-breaker.ts# 5/30s half-open
 │   ├── lib/token-estimator.ts# char/4
 │   ├── lib/virtual-keys.ts   # fgk- CRUD + hasScope
 │   ├── lib/request-log.ts    # 1000 logs + tokens aggregation
-│   ├── lib/otel.ts           # GenAI OTel
+│   ├── lib/otel.ts           # GenAI OTel + traceparent
 │   ├── lib/gemini-stream.ts  # Gemini SSE → OpenAI
 │   ├── providers/registry.ts # 40 ids, providerMeta, auto 15-tier (real key → public)
+│   ├── providers/anthropic.ts# Anthropic provider adapter (Vector 2)
 │   ├── jobs/verify-free.ts   # freellms vs live /models
 │   ├── jobs/probe-models.ts  # chat probe per-model usable
 │   ├── jobs/scheduler.ts     # 24h
 │   ├── routes/v1/models.ts   # freellms 316 + checkbox + Used/Limit + pollinations fallback
-│   ├── routes/v1/chat.ts     # quota/breaker/verified/log + X-Verified
-│   └── routes/api.ts         # /providers/health live, /models/health, /verify, /keys, /logs/stream, /stats
+│   ├── routes/v1/chat.ts     # quota/breaker/verified/log + X-Verified + cost-routing re-rank
+│   ├── routes/v1/audio.ts    # POST /v1/audio/transcriptions + /v1/audio/speech multipart (Vector 2)
+│   ├── routes/v1/responses.ts# POST /v1/responses + /v1/conversations (Vector 2)
+│   ├── routes/v1/anthropic.ts# POST /v1/messages Anthropic compat (Vector 2)
+│   └── routes/api.ts         # /providers/health live, /models/health, /verify, /keys, /logs/stream, /stats + analytics
 ├── apps/web/src/
 │   ├── main.tsx              # sticky nav Dashboard→Providers→Models→Keys→Logs
 │   ├── pages/Dashboard.tsx   # 4 cards + 3 charts + tokens
@@ -177,6 +246,7 @@ providers_cache(provider, models JSON, synced_at)
 
 ## 10. Observability & Deploy
 
-* `pino` pretty dev / JSON prod, OTel GenAI (`lib/otel.ts`), `secureHeaders`, `bodyLimit` 10MB.
-* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens` + `GET /api/verify/summary` + `GET /api/models/health` chat probe.
+* `pino` pretty dev / JSON prod, OTel GenAI (`lib/otel.ts` + traceparent propagation), `secureHeaders`, `bodyLimit` 10MB (skip `/v1/audio` multipart).
+* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, **p95 latency**, `cacheHitRate`, `compressedSavedTokens` + `GET /api/verify/summary` + `GET /api/models/health` chat probe. `GET /api/analytics?interval=hour|day&groupBy=provider|model|key` (`lib/analytics.ts:53`).
+* Vector 2 flags (`config.ts:158`): `SEMANTIC_CACHE_ENABLED` (semantic-cache hitRate), `COMPRESSION_ENABLED` (ratio/savedTokens), `COST_ROUTING_ENABLED` (costBreakdown/savings) — expose qua `GET /api/stats` flags + `GET /api/analytics` `savings.hitRate`.
 * Docker prod non-root + HEALTHCHECK, Wrangler `wrangler.jsonc` Cloudflare. Xem `docs/DEPLOYMENT.md:1`.

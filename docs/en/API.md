@@ -6,6 +6,8 @@ OpenAI-compatible gateway API (41 provider IDs — 30 freellms + 11 aliases; fre
 
 Base URL: `http://localhost:7373/v1` (with dashboard at `http://localhost:3000` — 2-row header, i18n VI/EN)
 
+Endpoints: `POST /v1/chat/completions` · `GET /v1/models` · `POST /v1/embeddings` · `POST /v1/images/generations` · `GET /v1/health` · `POST /v1/audio/transcriptions` · `POST /v1/audio/translations` · `POST /v1/audio/speech` · `POST /v1/responses` · `GET /v1/responses/:id` · `POST /v1/conversations` · `POST /v1/messages` · `POST /v1/messages/count_tokens` + Admin `/api/*`
+
 Auth: `Authorization: Bearer fgk-master-...` (auto-generated MASTER_KEY — single key for `/v1/*` + `/api/*`) or scoped `fgk-...` created in Dashboard. Health check requires no auth.
 
 ## Endpoints
@@ -144,6 +146,156 @@ Uses Pollinations or any provider that supports images.
 { "model": "pollinations/flux", "prompt": "a cat", "n": 1, "size": "1024x1024" }
 ```
 
+### POST /v1/audio/transcriptions (and translations)
+
+Transcribe audio via `multipart/form-data`. `file` (required), `model` defaults to `whisper-large-v3`, `language` optional (ISO-639-1). Tries `groq` → `openrouter` providers; fallback mock in dev (no key).
+
+```bash
+curl -X POST http://localhost:7373/v1/audio/transcriptions \
+  -H "Authorization: Bearer fgk-xxx" \
+  -F file=@audio.mp3 \
+  -F model=whisper-large-v3 \
+  -F language=en
+# translations: same shape
+curl -X POST http://localhost:7373/v1/audio/translations \
+  -H "Authorization: Bearer fgk-xxx" \
+  -F file=@audio.mp3 \
+  -F model=whisper-large-v3
+```
+
+**Response**:
+
+```json
+{ "text": "Hello world", "model": "whisper-large-v3", "language": "en" }
+```
+
+Dev mock returns `{ "text": "[mock transcription]", "_mock": true }` when no STT provider key is configured.
+
+### POST /v1/audio/speech
+
+Generate speech from text. JSON body `{model, input, voice, response_format, speed}` → `audio/mpeg`. Returns `501` if no TTS provider is free (no free TTS upstream configured).
+
+```bash
+curl -X POST http://localhost:7373/v1/audio/speech \
+  -H "Authorization: Bearer fgk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"tts-1","input":"Hello world","voice":"alloy","response_format":"mp3","speed":1.0}' \
+  --output speech.mp3
+```
+
+**Request**:
+
+```json
+{
+  "model": "tts-1",
+  "input": "Hello world",
+  "voice": "alloy",
+  "response_format": "mp3",
+  "speed": 1.0
+}
+```
+
+**Headers**: `Content-Type: audio/mpeg` on success. Error `501 { "error": { "message": "No TTS provider available", "type": "no_tts_provider" } }`.
+
+### POST /v1/responses and GET /v1/responses/:id and POST /v1/conversations
+
+OpenAI Responses API alias over chat completions. `POST /v1/responses` creates a response, `GET /v1/responses/:id` retrieves it, `POST /v1/conversations` is an alias that also creates a response via conversation.
+
+**Request** (`POST /v1/responses` / `POST /v1/conversations`):
+
+```json
+{
+  "model": "auto",
+  "input": "Hello",
+  "instructions": "You are helpful.",
+  "previous_response_id": "resp_xxx",
+  "stream": false,
+  "temperature": 0.7,
+  "max_output_tokens": 1024,
+  "tools": [{ "type": "function", "function": { "name": "get_weather", "parameters": { "type": "object", "properties": { "city": { "type": "string" } } } } }]
+}
+```
+
+`input` accepts `string` or `messages` array (`[{role:"user",content:"Hello"}]`). When `stream: true` returns SSE `data: {...}\n\n` with `data: [DONE]`.
+
+**Response**:
+
+```json
+{
+  "id": "resp_xxx",
+  "object": "response",
+  "created_at": 1715433600,
+  "model": "nvidia-nim/z-ai/glm-5.2",
+  "output": [
+    { "type": "message", "role": "assistant", "content": [{ "type": "output_text", "text": "Hi!" }] }
+  ],
+  "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 }
+}
+```
+
+**Retrieve**:
+
+```bash
+curl http://localhost:7373/v1/responses/resp_xxx -H "Authorization: Bearer fgk-xxx"
+curl -X POST http://localhost:7373/v1/conversations \
+  -H "Authorization: Bearer fgk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","input":"Hello"}'
+```
+
+### POST /v1/messages (Anthropic compatible) and POST /v1/messages/count_tokens
+
+Anthropic Messages API compatible endpoint. Requires headers `anthropic-version: 2023-06-01` and `x-api-key: fgk-xxx` (or `Authorization: Bearer fgk-xxx` also accepted).
+
+**Request**:
+
+```json
+{
+  "model": "auto",
+  "messages": [{ "role": "user", "content": "Hello" }],
+  "max_tokens": 1024,
+  "system": "You are helpful.",
+  "temperature": 0.7,
+  "top_p": 1,
+  "top_k": 40,
+  "stream": false,
+  "tools": [{ "name": "get_weather", "description": "Get weather", "input_schema": { "type": "object", "properties": { "city": { "type": "string" } } } }]
+}
+```
+
+`messages[].content` accepts `string` or Anthropic content blocks (`[{type:"text",text:"Hello"}]`). `max_tokens` is required. `system` can be `string` or blocks.
+
+```bash
+curl -X POST http://localhost:7373/v1/messages \
+  -H "x-api-key: fgk-xxx" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'
+
+curl -X POST http://localhost:7373/v1/messages/count_tokens \
+  -H "x-api-key: fgk-xxx" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'
+# -> { "input_tokens": 5 }
+```
+
+**Response** (`POST /v1/messages`):
+
+```json
+{
+  "id": "msg_xxx",
+  "type": "message",
+  "role": "assistant",
+  "content": [{ "type": "text", "text": "Hi!" }],
+  "model": "auto",
+  "stop_reason": "end_turn",
+  "usage": { "input_tokens": 10, "output_tokens": 5 }
+}
+```
+
+Streaming (`stream: true`) emits Anthropic SSE events `event: message_start` / `content_block_delta` / `message_stop`.
+
 ### GET /v1/health
 
 No auth required; returns gateway status and provider pool.
@@ -178,6 +330,10 @@ No auth required; returns gateway status and provider pool.
 | `POST` | `/api/verify` | Trigger verify `{dryRun:false}` — scheduler also calls syncLiveModels together |
 | `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
 | `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, duplicate Auto sync 5s removed |
+| `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Aggregated analytics (tokens, requests grouped by provider/key/model, interval `hour`/`day`) |
+| `GET` | `/api/cache/stats` | Cache stats (hits, misses, size) |
+| `DELETE` | `/api/cache` | Clear gateway cache |
+| `POST` | `/api/compression/preview` | Preview compression for a prompt (estimate token savings) |
 
 **Create a key**:
 

@@ -47,6 +47,7 @@
 | **Resilience** | Auto fallback, circuit breaker 5/30s half-open, TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
 | **Key Pool** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, `rotate-keys.ts` |
 | **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (header 2 rows, centered nav), **Dashboard** 4 cards + 3 charts + tokens, **Providers** pagination 25/50 sticky + `hasKey` filter (**default OFF**, `hasKeyOnly:0`) + `Sync Live Now` (shared `POST /api/models/live/sync` with Models) + `Get Key ↗` + live health, **Models** pagination 25/50 sticky + **Filters** dropdown (`hasKey` default OFF + `Hide 404`/`Hide credits`/`Hide invalid` default ON) + `Check Live (n)`/`Sync Live Now`/`Refresh` (Refresh resets `hasKeyOnly:false`, Check requires filter) + `Used/Limit` + strikethrough persist (`200 usable` keeps non-red after reload via `POST /api/models/health/mark`), **Keys** `fgk-...` CRUD + Key Generator + Quick Test, **Logs** charts + SSE |
+| **Vector 1+2 (2026-09-08)** | **Audio** `POST /v1/audio/transcriptions`/`translations`/`speech` (Groq/Cerebras/OpenAI, multipart) • **Responses** `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API) • **Anthropic** `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls`, `ANTHROPIC_API_KEYS`) • **Semantic Cache** (`SEMANTIC_CACHE_ENABLED=0`, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL=cohere/embed-english-v3.0`, cosine, Redis/in-memory) • **Compression** (`COMPRESSION_ENABLED=0`, history/tools minify, 12-engine) • **Cost Routing** (`COST_ROUTING_ENABLED=0`, cheapest-free-first) • **Analytics** (`ANALYTICS_RETENTION_DAYS=30`, `costByProvider`/`cacheHitRate`/`p95`, `GET /api/analytics/*`) |
 | **Observability** | Pino pretty, OTel GenAI (`gen_ai.*`), token estimator, `request-log` 1000 + `X-Verified`, `PROVIDER_TEST_RESULTS` benchmark |
 
 ## 🏗️ Architecture
@@ -61,6 +62,24 @@ Client (OpenAI SDK / Vercel AI SDK)
     → Normalizer → OpenAI SSE/JSON
   → Dashboard (Vite + React, i18n VI/EN) → /api/* → Drizzle ORM → SQLite/Postgres + Redis
 ```
+
+**Request Pipeline (Vector 2) — `apps/gateway/src/routes/v1/chat.ts:105`:**
+```
+Client Request
+  ↓
+[Cost Routing?] — config.ts:163 COST_ROUTING_ENABLED=1 → lib/cost-router.ts:99 rankProvidersByCostAndLatency (FREELLMS_COST $/1M + latency EMA data/provider-stats.json + quota headroom)
+  ↓
+[Semantic Cache?] — config.ts:158 SEMANTIC_CACHE_ENABLED=1 && !stream → lib/semantic-cache.ts:29 get(semantic:${model}:${sha256}) → hit → return cache (200, X-Cache: HIT) + addLog cacheHit
+  ↓
+[Token Compression?] — config.ts:162 COMPRESSION_ENABLED=1 → lib/compression.ts:103 compressMessages (toolsMinify/historySummarize/codeDedup, ratio <0.95) → messagesToSend
+  ↓
+Gửi lên Upstream (Anthropic/OpenAI/Gemini...) → Fallback tiered + Circuit Breaker isOpen + checkQuota RPM/TPM/RPD/TPD
+  ↓
+Lưu kết quả vào cache (lib/semantic-cache.ts:58 set EX CACHE_TTL_S) + ghi analytics (request-log.ts:7 cost/cacheHit/compressedTokens, lib/analytics.ts:53)
+  ↓
+Trả về Client (OpenAI SSE/JSON + X-Provider/X-Verified + logGenAI otel.ts:10)
+```
+> Flow đúng như bạn mô tả: `Cost Routing → Semantic Cache → Compression → Upstream → Cache store + Analytics`. Code đã re-order `chat.ts:114` để cache check trước compression (chỉ nén khi cache miss, tiết kiệm compute). Toggle qua `Settings` `/settings` (localStorage `gatewaySettings`, default `.env` `GET /api/config`).
 
 See [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md)
 
@@ -234,6 +253,7 @@ curl -X POST http://localhost:7373/api/keys \
 - [x] **P3 Resilience** ✅ Done — key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health 41, persisted 404 strikethrough + disable
 - [x] **P4 Auth + Dashboard** ✅ Done — `fgk-...` CRUD, rate-limit, request-log SSE, Dashboard 5 routes with hasKey + Hide 404 + Sync Live
 - [x] **P5 Hardening** ✅ Done — `wrangler.jsonc`, Dockerfile prod, OTel, i18n VI/EN (UI + docs/vi docs/en)
+- [x] **P6 Vector 1+2** ✅ Done 2026-09-08 — `/v1/audio/*` (transcriptions/translations/speech) + `/responses`/`/conversations` (Hebo) + `/v1/messages` (Anthropic) + semantic cache (`SEMANTIC_CACHE_ENABLED`/`SEMANTIC_THRESHOLD=0.92`/`CACHE_TTL_S=3600`/`cohere/embed-english-v3.0`) + compression (`COMPRESSION_ENABLED`) + cost routing (`COST_ROUTING_ENABLED`) + analytics (`costByProvider`/`cacheHitRate`/`p95`, `ANALYTICS_RETENTION_DAYS=30`)
 
 See [docs/en/ROADMAP.md](docs/en/ROADMAP.md).
 

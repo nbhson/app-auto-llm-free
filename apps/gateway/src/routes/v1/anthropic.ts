@@ -1,0 +1,456 @@
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { config } from "../../config.js";
+import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
+import { providers } from "../../providers/registry.js";
+import { anthropicProvider } from "../../providers/anthropic.js";
+import { translateOpenAIToAnthropic, translateAnthropicToOpenAI, anthropicStreamToOpenAIChunk } from "../../lib/anthropic-translator.js";
+import { createOpenAIChunk } from "../../lib/format-translator.js";
+import { logger } from "../../middleware/logger.js";
+import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
+import { estimateTokens, estimateMessagesTokens } from "../../lib/token-estimator.js";
+import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
+import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { addLog } from "../../lib/request-log.js";
+import { hasScope } from "../../lib/virtual-keys.js";
+import fs from "node:fs";
+import path from "node:path";
+
+const anthropicSchema = z.object({
+  model: z.string().min(1),
+  messages: z.array(
+    z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.union([z.string(), z.array(z.any())]),
+    })
+  ),
+  max_tokens: z.number().int().positive(),
+  system: z.string().optional(),
+  temperature: z.number().optional(),
+  top_p: z.number().optional(),
+  top_k: z.number().optional(),
+  stream: z.boolean().optional(),
+  tools: z.array(z.any()).optional(),
+  tool_choice: z.any().optional(),
+  stop_sequences: z.array(z.string()).optional(),
+});
+
+function loadVerifiedMap(): Map<string, string> {
+  try {
+    const p = path.resolve("data/verified-models.json");
+    if (!fs.existsSync(p)) return new Map();
+    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    const m = new Map<string, string>();
+    for (const row of data.models || []) m.set(row.id, row.status);
+    try {
+      const hp = path.resolve("data/model-health.json");
+      if (fs.existsSync(hp)) {
+        const hdata = JSON.parse(fs.readFileSync(hp, "utf-8"));
+        for (const [id, v] of Object.entries(hdata as any)) {
+          const hv = v as any;
+          if (hv.http_status === 404 || hv.http_status === 410) m.set(id, "deprecated");
+        }
+      }
+    } catch {}
+    return m;
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Convert OpenAI SSE stream to Anthropic SSE events.
+ * OpenAI chunk: data: {"choices":[{"delta":{"content":"..."},"finish_reason":null}]}
+ * Anthropic event: event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"..."}}
+ */
+function openAIStreamToAnthropicStream(openAIStream: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+  let messageId = `msg_${Date.now()}`;
+  let started = false;
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = openAIStream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (!trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === "[DONE]") {
+              controller.enqueue(encoder.encode(`event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 0 } })}\n\n`));
+              controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`));
+              continue;
+            }
+            try {
+              const json = JSON.parse(dataStr);
+              if (!started) {
+                started = true;
+                controller.enqueue(
+                  encoder.encode(
+                    `event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { id: messageId, type: "message", role: "assistant", content: [], model, stop_reason: null, stop_sequence: null, usage: { input_tokens: 0, output_tokens: 0 } } })}\n\n`
+                  )
+                );
+                controller.enqueue(encoder.encode(`event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } })}\n\n`));
+              }
+              const content = json.choices?.[0]?.delta?.content || json.choices?.[0]?.message?.content || "";
+              if (content) {
+                controller.enqueue(
+                  encoder.encode(`event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: content } })}\n\n`)
+                );
+              }
+              const finish = json.choices?.[0]?.finish_reason;
+              if (finish) {
+                const reasonMap: Record<string, string> = { stop: "end_turn", length: "max_tokens", tool_calls: "tool_use" };
+                const anthropicReason = reasonMap[finish] || "end_turn";
+                controller.enqueue(encoder.encode(`event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: 0 })}\n\n`));
+                controller.enqueue(
+                  encoder.encode(`event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: anthropicReason, stop_sequence: null }, usage: { output_tokens: 0 } })}\n\n`)
+                );
+                controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`));
+              }
+            } catch {}
+          }
+        }
+        // Ensure stop if not already
+        if (started) {
+          // already handled via [DONE]
+        } else {
+          // No content case
+          controller.enqueue(
+            encoder.encode(`event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { id: messageId, type: "message", role: "assistant", content: [], model, stop_reason: null, stop_sequence: null, usage: { input_tokens: 0, output_tokens: 0 } } })}\n\n`)
+          );
+          controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`));
+        }
+        controller.close();
+      } catch (e) {
+        controller.error(e);
+      }
+    },
+  });
+}
+
+export const anthropicRoute = new Hono();
+
+anthropicRoute.post("/messages", zValidator("json", anthropicSchema), async (c) => {
+  const body = c.req.valid("json");
+  const model = body.model || config.defaultModel;
+  const vk = (c as any).get("vk") as any;
+
+  if (vk && !hasScope(vk, model, undefined)) {
+    return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
+  }
+
+  const pinned = c.req.header("x-router")?.trim();
+  let providerOrder: string[];
+  if (pinned && providers[pinned]) {
+    if (vk && !hasScope(vk, undefined, pinned)) {
+      return c.json({ error: { message: `Key not allowed for provider ${pinned}`, type: "insufficient_scope" } }, 403);
+    }
+    providerOrder = [pinned, ...getProvidersForRequest(model, "tiered").filter((p) => p !== pinned)];
+    logger.info({ pinned, model }, "x-router pinned (anthropic)");
+  } else {
+    providerOrder = getProvidersForRequest(model, "tiered");
+    // If model includes claude, ensure anthropic provider is tried first
+    if (model.toLowerCase().includes("claude") && !providerOrder.includes("anthropic")) {
+      providerOrder = ["anthropic", ...providerOrder];
+    }
+  }
+
+  // Also inject anthropic provider if not in registry but imported directly
+  const allProviders: Record<string, any> = { ...providers };
+  if (!allProviders["anthropic"]) allProviders["anthropic"] = anthropicProvider;
+  if (model.toLowerCase().includes("claude") && !providerOrder.includes("anthropic")) {
+    providerOrder.unshift("anthropic");
+  }
+
+  const verifiedMap = loadVerifiedMap();
+  if (model.includes("/") && verifiedMap.get(model) === "deprecated") {
+    logger.warn({ model }, "anthropic: requested model is deprecated, will fallback");
+    const prefix = model.split("/")[0];
+    providerOrder = providerOrder.filter((p) => p !== prefix);
+  }
+
+  const estimated = estimateMessagesTokens(body.messages as any) + (body.max_tokens || 0);
+  const startAll = Date.now();
+  const errors: any[] = [];
+
+  for (const pid of providerOrder) {
+    const provider = allProviders[pid];
+    if (!provider) continue;
+
+    if (isOpen(pid)) {
+      errors.push({ provider: pid, error: "circuit open (cooldown)" });
+      continue;
+    }
+
+    const key = getNextKeyManaged(pid);
+    if (key === null) {
+      errors.push({ provider: pid, error: "no key configured (set " + pid.toUpperCase().replace(/-/g, "_") + "_API_KEYS)" });
+      continue;
+    }
+    if (!key && !isPublicProvider(pid)) {
+      errors.push({ provider: pid, error: "missing key" });
+      continue;
+    }
+
+    const quota = checkQuota(pid, key, estimated);
+    if (!quota.allowed) {
+      errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
+      if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
+      continue;
+    }
+
+    const fullId = model.includes("/") ? model : `${pid}/${model}`;
+    if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
+      errors.push({ provider: pid, error: "model deprecated per verified-models.json" });
+      continue;
+    }
+
+    try {
+      // Build AnthropicRequest
+      const anthReq = {
+        model,
+        messages: body.messages as any,
+        max_tokens: body.max_tokens,
+        system: body.system,
+        temperature: body.temperature,
+        top_p: body.top_p,
+        top_k: body.top_k,
+        stream: body.stream,
+        tools: body.tools,
+        tool_choice: body.tool_choice,
+        stop_sequences: body.stop_sequences,
+      };
+
+      let res: Response;
+      let isAnthropicUpstream = false;
+
+      if (provider.anthropic) {
+        isAnthropicUpstream = true;
+        res = await provider.anthropic(anthReq, key);
+      } else if (provider.chat) {
+        // Translate Anthropic -> OpenAI ChatRequest
+        const chatReq = {
+          model,
+          messages: [
+            ...(body.system ? [{ role: "system" as const, content: body.system }] : []),
+            ...body.messages.map((m: any) => ({ role: m.role, content: m.content })),
+          ],
+          temperature: body.temperature,
+          max_tokens: body.max_tokens,
+          stream: body.stream,
+          tools: body.tools ? (body.tools as any[]).map((t: any) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })) : undefined,
+          tool_choice: body.tool_choice,
+          top_p: body.top_p,
+          top_k: body.top_k,
+          stop: body.stop_sequences,
+        };
+        res = await provider.chat(chatReq as any, key);
+        isAnthropicUpstream = false;
+      } else {
+        errors.push({ provider: pid, error: "provider has no anthropic or chat method" });
+        continue;
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
+        recordFailure(pid);
+        if (res.status === 429) {
+          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
+          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
+        }
+        continue;
+      }
+
+      recordSuccess(pid);
+      markSuccess(pid, key);
+      recordUsage(pid, key, estimated);
+      const latency = Date.now() - startAll;
+      const vStatus = verifiedMap.get(fullId) || "unknown";
+
+      if (body.stream) {
+        const contentType = res.headers.get("content-type") || "text/event-stream";
+        addLog({
+          id: `req-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          virtualKeyId: vk?.id,
+          virtualKeyName: vk?.name,
+          provider: pid,
+          model,
+          promptTokens: estimateMessagesTokens(body.messages as any),
+          totalTokens: estimated,
+          latencyMs: latency,
+          status: 200,
+          verifiedStatus: vStatus,
+        });
+
+        // Stream translation
+        if (isAnthropicUpstream) {
+          // Passthrough Anthropic SSE
+          return new Response(res.body, {
+            status: 200,
+            headers: {
+              "Content-Type": contentType,
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "X-Provider": pid,
+              "X-Model": model,
+              "X-Verified": vStatus,
+            },
+          });
+        } else {
+          // Convert OpenAI SSE to Anthropic SSE
+          const openAIStream = res.body as ReadableStream<Uint8Array>;
+          const anthStream = openAIStreamToAnthropicStream(openAIStream, model);
+          return new Response(anthStream, {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "X-Provider": pid,
+              "X-Model": model,
+              "X-Verified": vStatus,
+            },
+          });
+        }
+      }
+
+      // Non-stream: translate back to Anthropic format
+      if (isAnthropicUpstream) {
+        const data: any = await res.json().catch(async () => ({ text: await res.text() }));
+        addLog({
+          id: `req-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          virtualKeyId: vk?.id,
+          virtualKeyName: vk?.name,
+          provider: pid,
+          model,
+          promptTokens: data.usage?.input_tokens ?? estimateMessagesTokens(body.messages as any),
+          completionTokens: data.usage?.output_tokens ?? 0,
+          totalTokens: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0) || estimated,
+          latencyMs: latency,
+          status: 200,
+          verifiedStatus: vStatus,
+        });
+        c.header("X-Provider", pid);
+        c.header("X-Verified", vStatus);
+        return c.json(data);
+      } else {
+        const data: any = await res.json().catch(async () => ({ text: await res.text() }));
+        let anthData: any;
+        if (data.choices) {
+          // OpenAI format -> Anthropic format
+          const text = data.choices?.[0]?.message?.content || data.choices?.[0]?.delta?.content || "";
+          const finish = data.choices?.[0]?.finish_reason || "stop";
+          const finishMap: Record<string, string> = { stop: "end_turn", length: "max_tokens", tool_calls: "tool_use" };
+          anthData = {
+            id: data.id || `msg_${Date.now()}`,
+            type: "message",
+            role: "assistant",
+            content: [{ type: "text", text }],
+            model,
+            stop_reason: finishMap[finish] || "end_turn",
+            stop_sequence: null,
+            usage: {
+              input_tokens: data.usage?.prompt_tokens || estimateMessagesTokens(body.messages as any),
+              output_tokens: data.usage?.completion_tokens || estimateTokens(text),
+            },
+          };
+          if (data.usage?.total_tokens) recordUsage(pid, key, data.usage.total_tokens);
+        } else {
+          anthData = {
+            id: `msg_${Date.now()}`,
+            type: "message",
+            role: "assistant",
+            content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data) }],
+            model,
+            stop_reason: "end_turn",
+            stop_sequence: null,
+            usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: 0 },
+          };
+        }
+        addLog({
+          id: `req-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          virtualKeyId: vk?.id,
+          virtualKeyName: vk?.name,
+          provider: pid,
+          model,
+          promptTokens: anthData.usage.input_tokens,
+          completionTokens: anthData.usage.output_tokens,
+          totalTokens: anthData.usage.input_tokens + anthData.usage.output_tokens,
+          latencyMs: latency,
+          status: 200,
+          verifiedStatus: vStatus,
+        });
+        c.header("X-Provider", pid);
+        c.header("X-Verified", vStatus);
+        return c.json(anthData);
+      }
+    } catch (e: any) {
+      logger.warn({ provider: pid, err: e.message }, "anthropic provider failed, trying next");
+      errors.push({ provider: pid, error: e.message });
+      recordFailure(pid);
+      continue;
+    }
+  }
+
+  addLog({
+    id: `req-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    virtualKeyId: vk?.id,
+    virtualKeyName: vk?.name,
+    provider: errors[0]?.provider || "none",
+    model,
+    promptTokens: estimateMessagesTokens(body.messages as any),
+    totalTokens: estimated,
+    latencyMs: Date.now() - startAll,
+    status: 502,
+    error: JSON.stringify(errors).slice(0, 500),
+  });
+
+  if (config.nodeEnv === "development" && errors.length > 0) {
+    return c.json(
+      {
+        id: `msg_mock_${Date.now()}`,
+        type: "message",
+        role: "assistant",
+        content: [{ type: "text", text: `[mock] All providers failed, returning mock. Errors: ${JSON.stringify(errors).slice(0, 900)}` }],
+        model,
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: 20 },
+        _mock: true,
+        _errors: errors,
+      },
+      200
+    );
+  }
+
+  return c.json({ error: { message: "All providers failed", type: "provider_error", provider_errors: errors } }, 502);
+});
+
+anthropicRoute.post("/count_tokens", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const messages = body.messages || [];
+  const system = body.system || "";
+  let tokens = estimateMessagesTokens(messages as any);
+  if (system) tokens += estimateTokens(system);
+  // Add tools overhead if present
+  if (body.tools) tokens += estimateTokens(JSON.stringify(body.tools));
+  return c.json({ input_tokens: tokens });
+});
+
+export default anthropicRoute;

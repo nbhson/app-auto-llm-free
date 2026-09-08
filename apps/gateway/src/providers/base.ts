@@ -49,12 +49,61 @@ export interface ImagesRequest {
   user?: string;
 }
 
+export interface AudioTranscriptionRequest {
+  file: File | Buffer | Blob;
+  filename?: string;
+  model: string;
+  language?: string;
+  prompt?: string;
+  response_format?: string;
+  temperature?: number;
+}
+
+export interface AudioSpeechRequest {
+  model: string;
+  input: string;
+  voice?: string;
+  response_format?: string;
+  speed?: number;
+}
+
+export interface ResponsesRequest {
+  model: string;
+  input: string | ChatMessage[] | Array<{ role: string; content: string }>;
+  instructions?: string;
+  previous_response_id?: string;
+  stream?: boolean;
+  temperature?: number;
+  max_output_tokens?: number;
+  tools?: unknown[];
+  tool_choice?: unknown;
+  user?: string;
+}
+
+export interface AnthropicRequest {
+  model: string;
+  messages: Array<{ role: "user" | "assistant"; content: string | Array<{ type: string; text?: string; source?: unknown; tool_use_id?: string; content?: string }> }>;
+  max_tokens: number;
+  system?: string;
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  stream?: boolean;
+  tools?: unknown[];
+  tool_choice?: unknown;
+  stop_sequences?: string[];
+}
+
 export interface Provider {
   id: string;
   type: "openai-compatible" | "gemini" | "anthropic" | "scraped";
   chat(req: ChatRequest, apiKey: string): Promise<Response>;
   embeddings?(req: EmbeddingsRequest, apiKey: string): Promise<Response>;
   images?(req: ImagesRequest, apiKey: string): Promise<Response>;
+  transcriptions?(req: AudioTranscriptionRequest, apiKey: string): Promise<Response>;
+  speech?(req: AudioSpeechRequest, apiKey: string): Promise<Response>;
+  responses?(req: ResponsesRequest, apiKey: string): Promise<Response>;
+  anthropic?(req: AnthropicRequest, apiKey: string): Promise<Response>;
   models(apiKey?: string): Promise<ModelInfo[]>;
   health(apiKey: string): Promise<boolean>;
 }

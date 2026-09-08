@@ -316,6 +316,20 @@ apiRoute.get("/logs/stream", (c) => {
   });
 });
 
+apiRoute.get("/config", (c) => {
+  return c.json({
+    SEMANTIC_CACHE_ENABLED: config.semanticCacheEnabled ? 1 : 0,
+    SEMANTIC_THRESHOLD: config.semanticCacheThreshold,
+    CACHE_TTL_S: config.semanticCacheTtlSec,
+    EMBEDDING_MODEL: (config as any).embeddingModels ? (config as any).embeddingModels.join(",") : config.embeddingModel,
+    EMBEDDING_FALLBACKS: (config as any).embeddingFallbacks ? (config as any).embeddingFallbacks.join(",") : "",
+    COMPRESSION_ENABLED: config.compressionEnabled ? 1 : 0,
+    COST_ROUTING_ENABLED: config.costRoutingEnabled ? 1 : 0,
+    ANALYTICS_RETENTION_DAYS: config.analyticsRetentionDays,
+    _source: ".env",
+  });
+});
+
 apiRoute.get("/stats", (c) => {
   const freellms = loadProvidersJson();
   const freeModelsArr = readDataJson<any[]>("freellms-models-free.json", []);
@@ -331,5 +345,56 @@ apiRoute.get("/stats", (c) => {
     tiers: config.fallbackTiers,
     logs: logStats,
     breakers: getAllStates(),
+    flags: { semanticCache: config.semanticCacheEnabled, compression: config.compressionEnabled, costRouting: config.costRoutingEnabled },
   });
+});
+
+// Vector 2 analytics & cache endpoints
+apiRoute.get("/analytics", async (c) => {
+  const interval = (c.req.query("interval") as "hour" | "day") || "day";
+  const groupBy = (c.req.query("groupBy") as "provider" | "key" | "model") || "provider";
+  const limit = Math.min(parseInt(c.req.query("limit") || "20", 10), 100);
+  try {
+    const { getAnalytics, getCostBreakdown, calculateSavings } = await import("../lib/analytics.js");
+    const analytics: any = getAnalytics({ interval, groupBy, limit });
+    const cost = getCostBreakdown();
+    const savings = calculateSavings();
+    return c.json({ interval, groupBy, analytics, cost, savings, generated_at: new Date().toISOString() });
+  } catch (e: any) {
+    return c.json({ interval, groupBy, error: e.message }, 500);
+  }
+});
+
+apiRoute.get("/cache/stats", async (c) => {
+  try {
+    const { SemanticCache } = await import("../lib/semantic-cache.js");
+    const sc: any = new (SemanticCache as any)();
+    const stats = await sc.getStats();
+    return c.json({ enabled: config.semanticCacheEnabled, ...stats });
+  } catch (e: any) {
+    return c.json({ enabled: config.semanticCacheEnabled, error: e.message }, 500);
+  }
+});
+
+apiRoute.delete("/cache", async (c) => {
+  try {
+    const { SemanticCache } = await import("../lib/semantic-cache.js");
+    const sc: any = new (SemanticCache as any)();
+    await sc.clear();
+    return c.json({ cleared: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+apiRoute.post("/compression/preview", async (c) => {
+  const body: any = await c.req.json().catch(() => ({}));
+  const messages = body.messages || [];
+  try {
+    const { compressMessages } = await import("../lib/compression.js");
+    const result = compressMessages(messages, body.maxTokens ? { maxTokens: body.maxTokens } : undefined);
+    return c.json({ original: messages.length, compressed: result.messages.length, ratio: result.ratio, savedTokens: result.savedTokens, preview: result.messages.slice(0, 3) });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
 });

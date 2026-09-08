@@ -11,6 +11,9 @@ import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
+import { config as cfg } from "../../config.js";
+import { compressMessages } from "../../lib/compression.js";
+import { logGenAI } from "../../lib/otel.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -99,9 +102,50 @@ chatRoute.post(
       providerOrder = providerOrder.filter((p) => p !== prefix);
     }
 
+    // Vector 2: cost-aware re-ranking
+    if (cfg.costRoutingEnabled && providerOrder.length > 1) {
+      try {
+        const { rankProvidersByCostAndLatency } = await import("../../lib/cost-router.js");
+        providerOrder = rankProvidersByCostAndLatency(providerOrder);
+        logger.info({ providerOrder }, "cost routing re-ranked");
+      } catch {}
+    }
+
     const estimated = estimateChatTokens({ messages: body.messages as any, max_tokens: body.max_tokens });
     const startAll = Date.now();
     const errors: any[] = [];
+
+    // Vector 2: semantic cache check first (cheapest) - only for non-stream
+    let cacheHitContent: string | null = null;
+    if (cfg.semanticCacheEnabled && !body.stream) {
+      try {
+        const { SemanticCache } = await import("../../lib/semantic-cache.js");
+        const sc: any = new (SemanticCache as any)();
+        const q = JSON.stringify(body.messages);
+        cacheHitContent = await sc.get(q, model);
+        if (cacheHitContent) {
+          logger.info({ model }, "semantic cache hit");
+          logGenAI("chat", { model, provider: "cache", promptTokens: estimated.prompt, latencyMs: Date.now() - startAll, cacheHit: true });
+          addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimated.prompt, completionTokens: estimateChatTokens({ messages: [{ role: "assistant", content: cacheHitContent }] as any }).prompt, totalTokens: estimated.prompt + 20, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
+          return c.json({ id: `chatcmpl-cache-${Date.now()}`, object: "chat.completion", created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, message: { role: "assistant", content: cacheHitContent }, finish_reason: "stop" }], usage: { prompt_tokens: estimated.prompt, completion_tokens: 20, total_tokens: estimated.prompt + 20 } });
+        }
+      } catch {}
+    }
+
+    // Vector 2: optional compression (only on cache miss) - reduces history/tools
+    let messagesToSend: any = body.messages;
+    let compressionRatio: number | undefined;
+    let compressedTokens: number | undefined;
+    if (cfg.compressionEnabled && body.messages?.length > 6) {
+      const comp = compressMessages(body.messages as any);
+      if (comp.ratio < 0.95) {
+        messagesToSend = comp.messages;
+        compressionRatio = comp.ratio;
+        compressedTokens = Math.round(estimated.prompt * comp.ratio);
+        logger.info({ model, original: (body.messages as any).length, compressed: messagesToSend.length, ratio: comp.ratio }, "compression applied");
+      }
+    }
+    const estimatedForQuota = estimateChatTokens({ messages: messagesToSend as any, max_tokens: body.max_tokens });
 
     for (const pid of providerOrder) {
       const provider = providers[pid];
@@ -123,8 +167,8 @@ chatRoute.post(
         continue;
       }
 
-      // Quota pre-check (RPM/TPM)
-      const quota = checkQuota(pid, key, estimated.total);
+      // Quota pre-check (RPM/TPM/RPD/TPD)
+      const quota = checkQuota(pid, key, (typeof estimatedForQuota !== "undefined" ? estimatedForQuota.total : estimated.total));
       if (!quota.allowed) {
         errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
         if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
@@ -146,7 +190,7 @@ chatRoute.post(
         const res = await provider.chat(
           {
             model,
-            messages: body.messages as any,
+            messages: (typeof messagesToSend !== "undefined" ? messagesToSend : body.messages) as any,
             temperature: body.temperature,
             max_tokens: body.max_tokens,
             stream: body.stream,
@@ -183,6 +227,7 @@ chatRoute.post(
         recordUsage(pid, key, estimated.total);
         const latency = Date.now() - startAll;
         const vStatus = verifiedMap.get(fullId) || "unknown";
+        logGenAI("chat", { provider: pid, model, promptTokens: estimated.prompt, latencyMs: latency, traceId: `req-${Date.now()}` });
 
         if (body.stream) {
           const contentType = res.headers.get("content-type") || "text/event-stream";
@@ -198,6 +243,9 @@ chatRoute.post(
             latencyMs: latency,
             status: 200,
             verifiedStatus: vStatus,
+            compressedTokens,
+            compressionRatio,
+            cost: estimated.total * 0.00000005,
           });
           return new Response(res.body, {
             status: 200,
@@ -232,7 +280,21 @@ chatRoute.post(
             latencyMs: latency,
             status: 200,
             verifiedStatus: vStatus,
+            compressedTokens,
+            compressionRatio,
+            cost: total * 0.00000005,
           });
+          // Vector 2: store in semantic cache if enabled
+          if (cfg.semanticCacheEnabled) {
+            try {
+              const text = data.choices?.[0]?.message?.content || "";
+              if (text) {
+                const { SemanticCache } = await import("../../lib/semantic-cache.js");
+                const sc: any = new (SemanticCache as any)();
+                await sc.set(JSON.stringify(body.messages), model, String(text));
+              }
+            } catch {}
+          }
           return c.json(data);
         }
         addLog({

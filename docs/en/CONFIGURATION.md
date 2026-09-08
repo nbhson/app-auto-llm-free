@@ -25,6 +25,10 @@ See the full `.env.example` (30 providers from freellms.org, live sync is now so
 
 ### Provider Keys (pooled, comma-separated) — 30 freellms providers, live via real keys
 
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEYS` | _(empty)_ | Anthropic-compatible `/v1/messages` upstream keys (comma-separated, round-robin). Required only if proxying to Anthropic directly; otherwise OpenAI adapters handle translation. |
+
 ```env
 # Core
 GROQ_API_KEYS=gsk_xxx
@@ -35,6 +39,9 @@ OPENROUTER_API_KEYS=sk-or-xxx
 GEMINI_API_KEYS=AIza_xxx
 CLOUDFLARE_API_TOKEN=cf_xxx
 CLOUDFLARE_ACCOUNT_ID=acc_xxx
+
+# Anthropic (Vector 1+2 — /v1/messages)
+ANTHROPIC_API_KEYS=sk-ant-xxx
 
 # Cohere / Mistral / SiliconFlow / SambaNova / Chutes / HuggingFace
 COHERE_API_KEYS=co_xxx
@@ -79,6 +86,21 @@ then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live
 | `FALLBACK_TIERS` | `[[...]]` | JSON freellms tiers: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before opening the circuit |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | Cooldown duration |
+
+### Vector 1+2 — Audio / Responses / Anthropic / Semantic Cache / Compression / Cost Routing / Analytics (2026-09-08)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEYS` | _(empty)_ | Comma-separated Anthropic keys for `/v1/messages` upstream (round-robin, same pool semantics as other providers) |
+| `SEMANTIC_CACHE_ENABLED` | `0` | Enable semantic vector cache for `/v1/chat/completions` + `/v1/messages`. `1` to enable, `0` to disable |
+| `SEMANTIC_THRESHOLD` | `0.92` | Cosine similarity threshold for cache hit (0.0–1.0, higher = stricter). Tuned for `cohere/embed-english-v3.0` |
+| `CACHE_TTL_S` | `3600` | TTL in seconds for cached completions (1 hour). Evicted via Redis TTL or in-memory sweep |
+| `EMBEDDING_MODEL` | `cohere/embed-english-v3.0` | Embedding model for semantic cache. Uses Cohere embeddings; swap to any compatible endpoint |
+| `COMPRESSION_ENABLED` | `0` | Enable token compression (history truncation + tools minify, 12-engine pattern like OmniRoute) to reduce cost |
+| `COST_ROUTING_ENABLED` | `0` | Enable cost-aware routing — prefers cheapest free provider first (ties broken by latency/verified) |
+| `ANALYTICS_RETENTION_DAYS` | `30` | Days to retain admin analytics rollups (cost tracking, savings, per-key billing, `costByProvider`, `cacheHitRate`, `p95` latency) |
+
+Flags are off by default (`0`) for backwards compatibility. Enable individually via `.env` and restart gateway (see kill/restart notes above).
 
 ### Rate Limit
 

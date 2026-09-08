@@ -2,6 +2,19 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-09-08
+
+### Added
+- **Vector 1 — Gateway parity**: `POST /v1/audio/transcriptions|translations|speech` (Groq Whisper, multipart) `routes/v1/audio.ts:1`, `POST /v1/responses` + `GET /v1/responses/:id` + `POST /v1/conversations` (Hebo Responses) `lib/responses-translator.ts:1`, `POST /v1/messages` + `POST /v1/messages/count_tokens` (Anthropic compat) `providers/anthropic.ts:1` + `lib/anthropic-translator.ts:1`, `providers/base.ts:52` mở rộng `transcriptions/speech/responses/anthropic`, `providers/openai-compatible.ts:13` fallback chain, `providers/registry.ts:63` `anthropic`, `config.ts:203` `ANTHROPIC_API_KEYS`, `app.ts:13` mount `/v1/audio|responses|messages|conversations`
+- **Vector 2 — Intelligence**: `lib/redis.ts:1` singleton `ioredis`, `lib/token-estimator.ts:1` thử `js-tiktoken` fallback `len/4`, `lib/quota-tracker.ts:1` thêm `RPD/TPD` 24h + `getQuotaHeadroom`, `lib/request-log.ts:7` `cost/cacheHit/compressedTokens` + `p95/cacheHitRate`, `lib/compression.ts:1` 3-engine `toolsMinify/historySummarize/codeDedup`, `lib/cost-router.ts:99` `rankProvidersByCostAndLatency` + `syncPricing` LiteLLM CDN, `lib/semantic-cache.ts:1` `sha256` + Redis + cosine `EMBEDDING_MODEL`, `lib/embeddings.ts:8` fallback chain `cohere→nvidia→cloudflare→hash`, `lib/analytics.ts:53` `GET /api/analytics|cache|compression`, `routes/api.ts:15` `GET /api/config` + `GET /api/cache/stats`, `routes/v1/chat.ts:105` pipeline `Cost→Cache→Compression→Upstream→Cache store`, `docker-compose.yml:36` `redisdata` + env flags
+- **Settings UI**: `apps/web/src/pages/Settings.tsx:1` page `/settings` ngoài cùng phải `main.tsx:88` `ml-auto`, defaults `.env` `GET /api/config` → `localStorage.gatewaySettings` `i18n.tsx:11` VI/EN, `.env` snippet copy, `config.ts:161` `EMBEDDING_MODEL` + `EMBEDDING_FALLBACKS`, `docker-compose.yml:36` env
+- **Docs & README**: `docs/en|vi/API.md` Audio/Responses/Anthropic + `GET /api/analytics|cache`, `docs/en|vi/ARCHITECTURE.md` Provider interface + Router cost + dir tree, `docs/en|vi/CONFIGURATION.md` Vector 2 flags, `docs/en|vi/ROADMAP.md` P6 `M6`, `README.md:55` pipeline `Cost→Cache→Compression`
+
+### Changed
+- **Pipeline re-order**: `routes/v1/chat.ts:114` cache trước compression (chỉ nén khi miss) để tiết kiệm compute, khớp flow `Cost Routing → Semantic Cache → Compression → Upstream`
+- **Embedding hard fallback**: `config.ts:161` `EMBEDDING_MODEL` có thể comma-separated + `EMBEDDING_FALLBACKS`, `lib/embeddings.ts:52` `embedWithFallback` thử `cohere`→`nvidia-nim/nv-embed-v1`→`cloudflare/bge-large`→hash, `semantic-cache.ts:58` lưu `embedding` kèm `value` để cosine scan `threshold 0.92`
+- **Version bump**: `package.json:4` `apps/gateway:4` `apps/web:4` `0.5.1→0.6.0`, `main.tsx:100` badge `v0.6.0`, `app.ts:55` `version 0.6.0`
+
 ## [0.5.1] - 2026-09-08
 
 ### Fixed

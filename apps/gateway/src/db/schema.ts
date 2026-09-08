@@ -40,6 +40,11 @@ export const requests = sqliteTable("requests", {
   latencyMs: integer("latency_ms"),
   status: text("status").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  cost: integer("cost"),
+  cacheHit: integer("cache_hit", { mode: "boolean" }),
+  semanticHit: integer("semantic_hit", { mode: "boolean" }),
+  compressedTokens: integer("compressed_tokens"),
+  compressionRatio: integer("compression_ratio"),
 });
 
 // pg equivalents (for production) — not used in sqlite mode but kept for type ref
