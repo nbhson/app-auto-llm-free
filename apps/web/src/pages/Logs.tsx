@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 import { RefreshCw, Radio } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
@@ -103,8 +103,8 @@ export default function Logs() {
               {visibleLogs.map((l) => {
                 const expanded = (l as any)._expanded;
                 return (
-                  <>
-                    <tr key={l.id} className={`${expanded ? "bg-slate-50/80" : "hover:bg-slate-50/80"} cursor-pointer`} onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !(x as any)._expanded } : x))}>
+                  <React.Fragment key={l.id}>
+                    <tr className={`${expanded ? "bg-slate-50/80" : "hover:bg-slate-50/80"} cursor-pointer`} onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !(x as any)._expanded } : x))}>
                       <td className="px-4 py-3"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-slate-100 border border-slate-200 text-[11px] font-bold">{expanded ? "−" : "+"}</span></td>
                       <td className="px-4 py-3 font-mono text-slate-600">{new Date(l.timestamp).toLocaleTimeString()}</td>
                       <td className="px-4 py-3 font-mono text-[11px]">{l.virtualKeyName || l.virtualKeyId || "-"}</td>
@@ -116,7 +116,7 @@ export default function Logs() {
                       <td className="px-4 py-3 text-[11px]">{l.verifiedStatus || "-"}</td>
                     </tr>
                     {expanded && (
-                      <tr key={l.id + "-detail"}>
+                      <tr>
                         <td colSpan={9} className="bg-slate-50/80 p-4">
                           <div className="grid md:grid-cols-2 gap-4 text-xs">
                             <div className="space-y-1"><div><b>ID:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.id}</code></div><div><b>Time:</b> {new Date(l.timestamp).toLocaleString()}</div><div><b>Key:</b> {l.virtualKeyName} ({l.virtualKeyId})</div><div><b>Provider:</b> {l.provider}</div><div><b>Model:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.model}</code></div></div>
@@ -126,7 +126,7 @@ export default function Logs() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>
