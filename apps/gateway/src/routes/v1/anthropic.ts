@@ -21,12 +21,12 @@ const anthropicSchema = z.object({
   model: z.string().min(1),
   messages: z.array(
     z.object({
-      role: z.enum(["user", "assistant"]),
+      role: z.string(),
       content: z.union([z.string(), z.array(z.any())]),
-    })
+    }).passthrough()
   ),
-  max_tokens: z.number().int().positive(),
-  system: z.string().optional(),
+  max_tokens: z.number().int().positive().optional(),
+  system: z.union([z.string(), z.array(z.any())]).optional(),
   temperature: z.number().optional(),
   top_p: z.number().optional(),
   top_k: z.number().optional(),
@@ -34,7 +34,7 @@ const anthropicSchema = z.object({
   tools: z.array(z.any()).optional(),
   tool_choice: z.any().optional(),
   stop_sequences: z.array(z.string()).optional(),
-});
+}).passthrough();
 
 function loadVerifiedMap(): Map<string, string> {
   try {
@@ -149,7 +149,32 @@ function normalizeAnthropicModel(m: string): string {
 }
 
 anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
-  const body = c.req.valid("json");
+  const rawBody: any = c.req.valid("json");
+  // Normalize system: array -> string, and extract system-role messages
+  let systemNorm: string | undefined = undefined;
+  if (Array.isArray(rawBody.system)) {
+    systemNorm = rawBody.system.map((b: any) => b?.text ?? (typeof b === "string" ? b : "")).join("\n");
+  } else if (typeof rawBody.system === "string") {
+    systemNorm = rawBody.system;
+  }
+  let messagesNorm: any[] = Array.isArray(rawBody.messages) ? [...rawBody.messages] : [];
+  // Extract messages with role system into systemNorm
+  const systemMsgs: string[] = [];
+  messagesNorm = messagesNorm.filter((m: any) => {
+    if (m?.role === "system") {
+      const c = m.content;
+      if (typeof c === "string") systemMsgs.push(c);
+      else if (Array.isArray(c)) systemMsgs.push(c.map((b: any) => b?.text ?? "").join("\n"));
+      else if (c) systemMsgs.push(String(c));
+      return false;
+    }
+    return true;
+  });
+  if (systemMsgs.length > 0) {
+    const extra = systemMsgs.join("\n");
+    systemNorm = systemNorm ? systemNorm + "\n" + extra : extra;
+  }
+  const body: any = { ...rawBody, system: systemNorm, messages: messagesNorm, max_tokens: rawBody.max_tokens || 4096 };
   const rawModel = body.model || config.defaultModel;
   const model = normalizeAnthropicModel(rawModel);
   const vk = (c as any).get("vk") as any;
