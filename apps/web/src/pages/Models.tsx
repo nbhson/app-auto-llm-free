@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, X, Check, ChevronDown, Filter, Info, Zap } from "lucide-react";
+import { Search, RefreshCw, X, Check, ChevronDown, Filter, Info, Zap, Copy } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
@@ -29,6 +29,7 @@ export default function Models() {
   const [usage, setUsage] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "score", dir: "desc" });
   const [total, setTotal] = useState(0);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [hasKeyOnly, setHasKeyOnly] = useState(() => {
     const v = localStorage.getItem("hasKeyOnly");
     const migrated = localStorage.getItem("hasKeyOnly_migrated");
@@ -368,7 +369,7 @@ export default function Models() {
                 return (
                   <tr key={`${m.id}::${idx}`} className={`${disabled ? `${isPayment ? "bg-amber-50/60 opacity-60 line-through decoration-amber-400" : isInvalid ? "bg-slate-100/60 opacity-60 line-through decoration-slate-400" : "bg-rose-50/60 opacity-60 line-through decoration-rose-400"}` : selected.has(m.id) ? "bg-blue-50/40" : "hover:bg-slate-50/80"} transition-colors`} title={isInvalid ? "Invalid model ID" : isPayment ? "Out of credits / payment required" : is404 || isGone ? "404/410" : ""}>
                     <td className="px-3 py-3 text-center"><input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} disabled={isInvalid} className="w-4 h-4 accent-slate-900 disabled:opacity-30 disabled:cursor-not-allowed" /></td>
-                    <td className="px-3 py-3"><code className={`text-xs font-mono px-2 py-0.5 rounded border font-semibold ${disabled ? (isInvalid ? "bg-slate-200 text-slate-600 border-slate-300 line-through" : isPayment ? "bg-amber-100 text-amber-700 border-amber-200 line-through" : "bg-rose-100 text-rose-700 border-rose-200 line-through") : "bg-slate-100 text-slate-800 border-slate-200"}`}>{m.id}</code></td>
+                    <td className="px-3 py-3"><div className="inline-flex items-center gap-1.5 group/id"><code className={`text-xs font-mono px-2 py-0.5 rounded border font-semibold ${disabled ? (isInvalid ? "bg-slate-200 text-slate-600 border-slate-300 line-through" : isPayment ? "bg-amber-100 text-amber-700 border-amber-200 line-through" : "bg-rose-100 text-rose-700 border-rose-200 line-through") : "bg-slate-100 text-slate-800 border-slate-200"}`}>{m.id}</code><button onClick={() => { navigator.clipboard.writeText(m.id).catch(()=>{}); setCopiedId(m.id); setTimeout(()=> setCopiedId(null), 1500); }} className="p-1 rounded-md hover:bg-slate-200 opacity-70 hover:opacity-100 transition-colors" title="Copy ID">{copiedId === m.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400 group-hover/id:text-slate-600" />}</button></div></td>
                     <td className="px-3 py-3 font-medium text-slate-700">{m.owned_by || m.provider}</td>
                     <td className="px-3 py-3 font-mono text-slate-600">{m.context_length ? (m.context_length >= 1000000 ? (m.context_length/1000000)+"M" : m.context_length >= 1000 ? Math.round(m.context_length/1000)+"K" : m.context_length) : "-"}</td>
                     <td className="px-3 py-3 font-mono font-bold">{m.score ?? "-"}</td>

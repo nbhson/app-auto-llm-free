@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] - 2026-09-08
+
+### Added
+- **Models copy ID**: `apps/web/src/pages/Models.tsx:149` thêm icon `Copy` cạnh `ID` trong bảng `Models` (group `inline-flex gap-1.5`, `navigator.clipboard.writeText`, `copiedId` → `Check` emerald 1.5s, `lucide-react:Copy`)
+
+### Changed
+- **Alias rename**: `gateway-llm/auto` → `free-llm-gateway/auto` toàn codebase — `registry.ts:107` `modelAliases`, `models.ts:255,348,358` 3 alias `id`, `anthropic.ts:144,147` `normalizeAnthropicModel`, `Models.tsx:149,154` `ALIAS_IDS` + whitelist, `README.md:25`/`README.vi.md:25` Claude Code doc
+- **Version bump**: `package.json:5` `apps/gateway:5` `apps/web:5` `0.6.2→0.7.0`, `main.tsx:100` badge `v0.7.0`, `app.ts:55` `version 0.7.0`
+
 ## [0.6.2] - 2026-09-08
 
 ### Fixed
