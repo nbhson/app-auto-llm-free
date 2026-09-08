@@ -5,11 +5,11 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 ## [0.6.2] - 2026-09-08
 
 ### Fixed
-- **Anthropic Claude Code 404/400**: `anthropic.ts:144` `post("/messages")` → `post("/")` khi mount `/v1/messages` (duplicate `/v1/messages/messages` 404), `app.ts:60` chấp nhận `x-api-key` cho Claude Code, `normalizeAnthropicModel` `auto`→`claude-3-5-sonnet` và `gateway-llm/auto` giữ nguyên, `system: string|array` + `messages.role: string` + extract `role:system` vào `system`, `max_tokens` optional
+- **Anthropic Claude Code 404/400**: `anthropic.ts:144` `post("/messages")` → `post("/")` khi mount `/v1/messages` (duplicate `/v1/messages/messages` 404), `app.ts:60` chấp nhận `x-api-key` cho Claude Code, `normalizeAnthropicModel` `auto`→`claude-3-5-sonnet` và `free-llm-gateway/auto` giữ nguyên, `system: string|array` + `messages.role: string` + extract `role:system` vào `system`, `max_tokens` optional
 - **Fallback strict + .env sync**: `router.ts:25` single-tier `<=8` không append remaining + không re-sort, giữ đúng order `pollinations,llm7-io...`, `.env:20` update `FALLBACK_TIERS` single-tier, phải restart gateway (config boot `config.ts:22`)
 - **Docs EN VI**: `docs/en/ARCHITECTURE.md:1` dịch Vietnamese → English (title, overview, request flow, router, key mgmt, rate limit, structure)
 - **Logs key warning**: `Logs.tsx:103` `<>` → `<React.Fragment key={l.id}>` fix `Each child should have unique key`
-- **Registry alias**: `registry.ts:106` chỉ giữ `gateway-llm/auto` 20 providers, remove `llm-gateway/auto` + `auto` theo yêu cầu, typo `ollama-clound→ollama-cloud`
+- **Registry alias**: `registry.ts:106` chỉ giữ `free-llm-gateway/auto` 20 providers, remove `llm-gateway/auto` + `auto` theo yêu cầu, typo `ollama-clound→ollama-cloud`
 
 ### Changed
 - **Version bump**: `package.json:4` `apps/gateway:4` `apps/web:4` `0.6.1→0.6.2`, `main.tsx:100` badge `v0.6.2`, `app.ts:55` `version 0.6.2`

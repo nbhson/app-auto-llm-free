@@ -104,7 +104,7 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
 // Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback
 // Opencode custom models from user's opencode.json (2026-09-06) — many are :free variants not in freellms
 export const modelAliases: Record<string, string[]> = {
-  "gateway-llm/auto": [
+  "free-llm-gateway/auto": [
     "pollinations",
     "llm7-io",
     "ollama-cloud",

@@ -146,12 +146,12 @@ export default function Models() {
     if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
     return false;
   };
-  const ALIAS_IDS = new Set(["llm-gateway/auto","auto","gpt-4","gpt-3.5","claude-3","gemini","gemini-flash","llama","qwen","glm","kimi","code","embedding","rerank","deepseek","mistral","kilo-auto"]);
+  const ALIAS_IDS = new Set(["free-llm-gateway/auto","auto","gpt-4","gpt-3.5","claude-3","gemini","gemini-flash","llama","qwen","glm","kimi","code","embedding","rerank","deepseek","mistral","kilo-auto"]);
   const isInvalidId = (m: any) => {
     const id: string = (m.id || "").trim();
     if (!id) return true;
     if (ALIAS_IDS.has(id)) return false;
-    if (m.owned_by === "gateway" && id === "llm-gateway/auto") return false;
+    if (m.owned_by === "gateway" && id === "free-llm-gateway/auto") return false;
     if (!id.includes("/")) return true;
     if (/\s/.test(id)) return true;
     if (/[^a-zA-Z0-9-_/.:]/.test(id)) return true;

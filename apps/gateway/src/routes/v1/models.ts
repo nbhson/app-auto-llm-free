@@ -252,7 +252,7 @@ modelsRoute.get("/", async (c) => {
     }
     if (!providerFilter || providerFilter === "gateway") {
         all.unshift(
-          { id: "llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
+          { id: "free-llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
         );
       }
     } else if (freellmsModels.length > 0) {
@@ -345,7 +345,7 @@ modelsRoute.get("/", async (c) => {
       }
       if (!providerFilter || providerFilter === "gateway") {
         all.unshift(
-          { id: "llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
+          { id: "free-llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
         );
       }
   } else {
@@ -355,7 +355,7 @@ modelsRoute.get("/", async (c) => {
       { id: "gemini/gemini-2.0-flash", object: "model", owned_by: "gemini", context_length: 1000000 },
       { id: "nvidia-nim/z-ai-glm-5.2", object: "model", owned_by: "nvidia-nim", context_length: 1048576 },
       { id: "pollinations/openai", object: "model", owned_by: "pollinations", context_length: 8192 },
-      { id: "llm-gateway/auto", object: "model", owned_by: "gateway", context_length: 8192 },
+      { id: "free-llm-gateway/auto", object: "model", owned_by: "gateway", context_length: 8192 },
     ];
     for (const m of staticModels) {
       if (!providerFilter || m.owned_by === providerFilter) all.push({ ...m, created: 1715433600 });
