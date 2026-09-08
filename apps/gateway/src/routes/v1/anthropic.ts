@@ -141,9 +141,17 @@ function openAIStreamToAnthropicStream(openAIStream: ReadableStream<Uint8Array>,
 
 export const anthropicRoute = new Hono();
 
-anthropicRoute.post("/messages", zValidator("json", anthropicSchema), async (c) => {
+// Claude Code sends model "auto" -> map to default claude model
+function normalizeAnthropicModel(m: string): string {
+  if (!m || m === "auto") return "claude-3-5-sonnet-20241022";
+  // already anthropic/claude... -> strip prefix handled later
+  return m;
+}
+
+anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
   const body = c.req.valid("json");
-  const model = body.model || config.defaultModel;
+  const rawModel = body.model || config.defaultModel;
+  const model = normalizeAnthropicModel(rawModel);
   const vk = (c as any).get("vk") as any;
 
   if (vk && !hasScope(vk, model, undefined)) {

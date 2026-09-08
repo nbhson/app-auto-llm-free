@@ -59,7 +59,12 @@ export function createApp() {
   // Auth middleware for /v1/* (except health) — uses virtual-keys + master
   app.use("/v1/*", async (c, next) => {
     if (c.req.path === "/v1/health" || c.req.path === "/v1/health/ready") return next();
-    const key = extractBearer(c as any);
+    // Support both Authorization: Bearer fgk-... and x-api-key: fgk-... (Anthropic style for Claude Code)
+    let key = extractBearer(c as any);
+    if (!key) {
+      const xKey = c.req.header("x-api-key") || c.req.header("X-API-Key");
+      if (xKey) key = xKey.trim();
+    }
     const vk = key ? isValidVirtualKeyLive(key) : null;
     if (!vk) {
       return c.json({ error: { message: "Invalid API key", type: "invalid_api_key", code: 401 } }, 401);
