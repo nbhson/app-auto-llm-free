@@ -126,19 +126,21 @@ ANALYTICS_RETENTION_DAYS=${form.ANALYTICS_RETENTION_DAYS}`;
     if (!m) { setStatus("error"); return; }
     setStatus("checking");
     const key = localStorage.getItem("masterKey") || "fgk-master-dev-key";
+    let timer: any = null;
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
+      timer = setTimeout(() => ctrl.abort(), 8000);
       const res = await fetch("/v1/embeddings", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: m, input: "hello" }),
         signal: ctrl.signal,
       });
-      clearTimeout(t);
+      if (timer) clearTimeout(timer);
       if (res.ok) setStatus("ok");
       else setStatus("error");
     } catch {
+      if (timer) clearTimeout(timer);
       setStatus("error");
     }
   };
@@ -153,18 +155,20 @@ ANALYTICS_RETENTION_DAYS=${form.ANALYTICS_RETENTION_DAYS}`;
     const key = localStorage.getItem("masterKey") || "fgk-master-dev-key";
     await Promise.all(
       list.map(async (m) => {
+        let timer: any = null;
         try {
           const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 8000);
+          timer = setTimeout(() => ctrl.abort(), 8000);
           const res = await fetch("/v1/embeddings", {
             method: "POST",
             headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
             body: JSON.stringify({ model: m, input: "hello" }),
             signal: ctrl.signal,
           });
-          clearTimeout(t);
+          if (timer) clearTimeout(timer);
           setFallbackStatuses((prev) => ({ ...prev, [m]: res.ok ? "ok" : "error" }));
         } catch {
+          if (timer) clearTimeout(timer);
           setFallbackStatuses((prev) => ({ ...prev, [m]: "error" }));
         }
       })
