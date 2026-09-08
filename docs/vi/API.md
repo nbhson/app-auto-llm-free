@@ -2,7 +2,7 @@
 
 # API Reference
 
-OpenAI-compatible API của gateway (43 provider ids — 30 freellms + 13 alias; freellms snapshot 324 models — 316 free + alias, **live sync hiện 2185 total / 882 free / 853 hasKey, `?hasKey=1` trả 2190 total từ live cache**). Dùng trực tiếp với `openai` SDK hoặc `curl`.
+OpenAI-compatible API của gateway (41 provider ids — 30 freellms + 11 alias; freellms snapshot 324 models — 316 free + alias, **live sync hiện 2185 total / 882 free / 853 hasKey, `?hasKey=1` trả 2190 total từ live cache**). Dùng trực tiếp với `openai` SDK hoặc `curl`.
 
 Base URL: `http://localhost:7373/v1` (kèm dashboard tại `http://localhost:3000` — header 2 hàng, i18n VI/EN)
 
@@ -152,15 +152,17 @@ Không cần auth, trả status gateway + provider pool.
 { "status":"ok", "providers":43, "tiers":[["nvidia-nim","groq",...]], "uptime":123 }
 ```
 
-### Admin API (`/api/*`, cần `MASTER_KEY` hoặc `admin` role)
+### Admin API (`/api/*`, cần `MASTER_KEY` hoặc `admin` role — trừ bootstrap)
 
 | Method | Path | Mô tả |
 |--------|------|-------|
+| `GET` | `/api/bootstrap` | **Mới `8f1b3b7`**: Public, không cần auth — trả `{masterKey}` tự sinh (`config.masterKey`) để UI lần đầu tự bind (`main.tsx:34`); tắt bằng `EXPOSE_BOOTSTRAP=0`/`false` (`app.ts:23`) |
+| `GET` | `/api/config/master` | Alias cho `/api/bootstrap` |
 | `POST` | `/api/keys` | Tạo virtual key `fgk-...` (hash SHA256, scopes, RPM) |
 | `GET` | `/api/keys` | List keys + `requestCount` |
 | `DELETE` | `/api/keys/:id` | Xóa key |
 | `GET` | `/api/providers?page=&limit=&q=&hasKey=` | List providers + `detailed[]` (free_models, keys, `hasRealKey` highlight `#f0fdf4` + `● has key`, `Get Key` URL xanh khi hasRealKey) — **pagination 25/50 LOV ở sticky bottom**, `q` debounce 400ms, `hasKey` filter real keys |
-| `GET` | `/api/providers/health` | Live ping 43 providers parallel 5s (online/offline/no-key, latency, breaker) |
+| `GET` | `/api/providers/health` | Live ping 41 providers parallel 5s (online/offline/no-key, latency, breaker) |
 | `GET` | `/api/models/health?model=` | Probe **1 model** live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models của provider (summary usable/unusable) |
 | `GET` | `/api/models/health/:id` | Probe 1 model full id (vd `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) |
@@ -169,7 +171,7 @@ Không cần auth, trả status gateway + provider pool.
 | `DELETE` | `/api/models/health/persisted/:id` | Xóa 1 persisted, `DELETE /api/models/health/persisted` xóa hết |
 | `POST` | `/api/models/live/sync` | Sync live models `{freeOnly:true}` (mặc định true, lọc Permanent Free hoặc `:free` hoặc freellms list) → `data/live-models.json` (2185 total, 882 free) — cùng endpoint **Sync Live Now** ở cả `/providers` và `/models` `Providers.tsx:37`/`Models.tsx:99` |
 | `GET` | `/api/models/live` | **Mới**: Get live cache `{total, providers, free_only, models[]}` — `/v1/models?hasKey=1` dùng cache này |
-| `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers` |
+| `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:41`, `free_models:316`, `breakers` |
 | `GET` | `/api/models/sync` | Freellms sync info (source, last_sync, script — lịch sử, disabled) |
 | `GET` | `/api/verify` | Full live verify `data/verified-models.json` (316 rows, `verified_free/deprecated`) |
 | `GET` | `/api/verify/summary` | Summary nhanh (per-provider) |

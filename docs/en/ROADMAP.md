@@ -10,7 +10,7 @@
 - [x] `apps/web` Vite + React + shadcn/ui + TanStack Query + i18n `lib/i18n.tsx` (VI/EN, `localStorage lang`)
 - [x] Drizzle ORM + SQLite (dev) / Postgres (prod), `drizzle.config.ts`, first migration
 - [x] Docker + docker-compose.yml + .env.example (30 providers, 4-tier freellms)
-- [x] `GET /v1/models` (freellms 316 + live 882) + `GET /v1/health` (43 providers) + `?hasKey=1` + pagination 25/50 sticky bottom + debounce 400ms
+- [x] `GET /v1/models` (freellms 316 + live 882) + `GET /v1/health` (41 providers) + `?hasKey=1` + pagination 25/50 sticky bottom + debounce 400ms
 - [x] `Provider` interface + `providers/base.ts`, `openai-compatible.ts`, `gemini.ts`, `pollinations.ts`
 - [x] `format-translator.ts` (OpenAI ↔ Gemini), `POST /v1/chat/completions` fallback mock + streaming SSE
 - [x] `models.yaml` (316) + `data/freellms-*.json` + `data/live-models.json` (2185/882) + `scripts/sync-freellms.py` (disabled) + `jobs/sync-live-models.ts`
@@ -41,7 +41,7 @@
 - [x] `middleware/rate-limit.ts` — 4x limit for list endpoints (`/v1/models`, `/api/providers`, `/api/models/health` → `max(rpmLimit*4,200)`), frontend debounce `q` 400ms (Models/Providers) — 429 fix
 - [x] `lib/router.ts` — `getProvidersForRequest` tiered 15 + `isPublicProvider`, verified filter (skips `deprecated` per `verified-models.json` + `model-health.json` persisted 404/410)
 - [x] `routes/v1/chat.ts` — quota pre-check (`estimateChatTokens` → `checkQuota`), circuit `isOpen` skip, `markRateLimited` on 429, persisted 404 mark, `recordSuccess/Failure`, `recordUsage`, `X-Verified` header, mock fallback in dev
-- [x] `routes/api.ts` — `GET /api/providers/health` live ping of 43 providers in parallel with 5s timeout, latency, breaker state, summary (online/offline/no_key/open_breaker) + `GET /api/providers?hasKey=1` highlight `#f0fdf4` + `GET /api/models/health/persisted` + `POST /api/models/health/mark` + `POST /api/models/live/sync` (freeOnly) + `GET /api/models/live`
+- [x] `routes/api.ts` — `GET /api/providers/health` live ping of 41 providers in parallel with 5s timeout, latency, breaker state, summary (online/offline/no_key/open_breaker) + `GET /api/providers?hasKey=1` highlight `#f0fdf4` + `GET /api/models/health/persisted` + `POST /api/models/health/mark` + `POST /api/models/live/sync` (freeOnly) + `GET /api/models/live`
 - [x] Tests: `GET /api/providers/health` live (online 13, offline 25), `POST /v1/chat/completions` auto → pollinations still succeeds with quota/breaker, `X-Verified` header
 
 ## P4 — Auth + Dashboard (3–4 days) ✅ Done 2026-09-06 (P4.1) + polish
@@ -77,7 +77,7 @@
 
 | Milestone | Date | Deliverable |
 |-----------|------|-------------|
-| M1 | 2026-09-06 | P1 done: Gateway 43 ids, freellms 316 + live 882, `/v1/models?hasKey=1`, 2-row header, i18n VI/EN, 24h scheduler |
+| M1 | 2026-09-06 | P1 done: Gateway 41 ids, freellms 316 + live 882, `/v1/models?hasKey=1`, 2-row header, i18n VI/EN, 24h scheduler |
 | M2 | 2026-09-06 | P2 done: 30 adapters, streaming Gemini SSE, `auto` 15-tier → pollinations live, `x-router` pin |
 | M3 | 2026-09-06 | P3 done: key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health live 40 (online 13), rate-limit 4x + debounce 400ms |
 | M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE (Live ON) + Dashboard 5 routes (hasKey/hide404, hasRealKey highlight, sticky bottom LOV) |

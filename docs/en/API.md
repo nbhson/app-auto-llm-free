@@ -2,7 +2,7 @@
 
 # API Reference
 
-OpenAI-compatible gateway API (43 provider IDs — 30 freellms + 13 aliases; freellms snapshot 324 models — 316 free + alias, **live sync now 2185 total / 882 free / 853 hasKey, `?hasKey=1` returns 2190 total from live cache**). Use directly with the `openai` SDK or `curl`.
+OpenAI-compatible gateway API (41 provider IDs — 30 freellms + 11 aliases; freellms snapshot 324 models — 316 free + alias, **live sync now 2185 total / 882 free / 853 hasKey, `?hasKey=1` returns 2190 total from live cache**). Use directly with the `openai` SDK or `curl`.
 
 Base URL: `http://localhost:7373/v1` (with dashboard at `http://localhost:3000` — 2-row header, i18n VI/EN)
 
@@ -149,18 +149,20 @@ Uses Pollinations or any provider that supports images.
 No auth required; returns gateway status and provider pool.
 
 ```json
-{ "status":"ok", "providers":43, "tiers":[["nvidia-nim","groq",...]], "uptime":123 }
+{ "status":"ok", "providers":41, "tiers":[["nvidia-nim","groq",...]], "uptime":123 }
 ```
 
-### Admin API (`/api/*`, requires `MASTER_KEY` or `admin` role)
+### Admin API (`/api/*`, requires `MASTER_KEY` or `admin` role — except bootstrap)
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/api/bootstrap` | **New `8f1b3b7`**: Public, no auth — returns `{masterKey}` auto-generated (`config.masterKey`) for first-time UI auto-bind (`main.tsx:34`); disable via `EXPOSE_BOOTSTRAP=0`/`false` (`app.ts:23`) |
+| `GET` | `/api/config/master` | Alias for `/api/bootstrap` |
 | `POST` | `/api/keys` | Create virtual key `fgk-...` (SHA256 hash, scopes, RPM) |
 | `GET` | `/api/keys` | List keys + `requestCount` |
 | `DELETE` | `/api/keys/:id` | Delete a key |
 | `GET` | `/api/providers?page=&limit=&q=&hasKey=` | List providers + `detailed[]` (free_models, keys, `hasRealKey` highlight `#f0fdf4` + `● has key`, `Get Key` URL green when hasRealKey) — **pagination 25/50 LOV at sticky bottom**, `q` 400ms debounce, `hasKey` filters real keys |
-| `GET` | `/api/providers/health` | Live ping of 43 providers in parallel, 5s (online/offline/no-key, latency, breaker) |
+| `GET` | `/api/providers/health` | Live ping of 41 providers in parallel, 5s (online/offline/no-key, latency, breaker) |
 | `GET` | `/api/models/health?model=` | Probe **1 model** with live chat `Hi` 5 tokens 8s → `usable/unusable/no-key/timeout` + `410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models of a provider (summary usable/unusable) |
 | `GET` | `/api/models/health/:id` | Probe 1 model by full id (e.g. `nvidia-nim/nvidia/nemotron-3-ultra-550b-a55b`) |
@@ -169,7 +171,7 @@ No auth required; returns gateway status and provider pool.
 | `DELETE` | `/api/models/health/persisted/:id` | Remove one persisted entry, `DELETE /api/models/health/persisted` removes all |
 | `POST` | `/api/models/live/sync` | Sync live models `{freeOnly:true}` (default true, filtered by Permanent Free tier or `:free` suffix or freellms free list) → `data/live-models.json` (2185 total, 882 free) — same endpoint used by **Sync Live Now** on both `/providers` and `/models` `Providers.tsx:37`/`Models.tsx:99` |
 | `GET` | `/api/models/live` | **New**: Get live cache `{total, providers, free_only, models[]}` — `/v1/models?hasKey=1` uses this cache |
-| `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers` |
+| `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:41`, `free_models:316`, `breakers` |
 | `GET` | `/api/models/sync` | Freellms sync info (source, last_sync, script — historical, disabled) |
 | `GET` | `/api/verify` | Full live verify `data/verified-models.json` (316 rows, `verified_free/deprecated`) |
 | `GET` | `/api/verify/summary` | Quick summary (per-provider) |

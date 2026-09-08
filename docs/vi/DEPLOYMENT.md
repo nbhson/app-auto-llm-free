@@ -43,7 +43,7 @@ docker compose up -d --build
 docker compose logs -f gateway
 ```
 
-Health check: `curl http://localhost:7373/v1/health` → `providers:43`, `tiers` 4-tier freellms  
+Health check: `curl http://localhost:7373/v1/health` → `providers:41`, `tiers` 4-tier freellms  
 Verify check: `curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER_KEY"`  
 Live sync: `curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER_KEY"` (2185 total) + `curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -d '{"freeOnly":true}'`  
 Live models: `curl "http://localhost:7373/v1/models?hasKey=1" -H "Authorization: Bearer $MASTER_KEY"` → 2190 total  
@@ -125,7 +125,7 @@ Dashboard (`apps/web`) deploy trực tiếp Vercel (Vite, header 2 hàng, i18n V
 ## 6. Monitoring & Verify
 
 * `/v1/health` cho uptime check (UptimeRobot)
-* `/api/stats` cho Grafana (poll 10s) — `free_models:316`, `providers:43`, live `data/live-models.json:1` 2185/882
+* `/api/stats` cho Grafana (poll 10s) — `free_models:316`, `providers:41`, live `data/live-models.json:1` 2185/882
 * `/api/verify/summary` cho alert nếu `deprecated` tăng đột biến (freellms stale) + `/api/models/live` check live cache freshness
 * `/api/verify` chi tiết per-model `live_status` + `/api/models/health/persisted` 404 strikethrough
 * GitHub Actions daily: `sync-freellms.yml` tự động commit `data/` + `models.yaml` nếu có thay đổi (hiện live sync thay)

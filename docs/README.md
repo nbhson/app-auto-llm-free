@@ -7,7 +7,7 @@
 
 ---
 
-* **VI:** Toàn bộ tài liệu gốc tiếng Việt nằm trong [`docs/vi/`](vi/GETTING_STARTED.md) — cập nhật mới nhất (pagination 25/50, persisted 404 strikethrough, header 2 hàng, 43 providers/324 models).
+* **VI:** Toàn bộ tài liệu gốc tiếng Việt nằm trong [`docs/vi/`](vi/GETTING_STARTED.md) — cập nhật mới nhất (pagination 25/50, persisted 404 strikethrough, header 2 hàng, 41 providers/324 models).
 * **EN:** English docs in [`docs/en/`](en/GETTING_STARTED.md) — translated from VI, PRs welcome for better translation.
 * **Root `docs/*.md` removed 2026-09-07 — only `README.md` + `EVIDENCE.md` remain at root; all guides now live in `vi/` (source) and `en/` (translation). Old links `/docs/API.md` → use `/docs/vi/API.md` or `/docs/en/API.md`.
 

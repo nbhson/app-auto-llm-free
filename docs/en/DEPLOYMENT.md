@@ -45,7 +45,7 @@ docker compose logs -f gateway  # check Auto-generated MASTER_KEY=fgk-master-...
 grep MASTER_KEY .env  # single key for /v1/* + /api/*
 ```
 
-Health check: `curl http://localhost:7373/v1/health` → `providers:43`, `tiers` 4-tier freellms  
+Health check: `curl http://localhost:7373/v1/health` → `providers:41`, `tiers` 4-tier freellms  
 Verify check: `curl http://localhost:7373/api/verify/summary -H "Authorization: Bearer $MASTER_KEY"`  
 Live sync: `curl http://localhost:7373/api/models/live -H "Authorization: Bearer $MASTER_KEY"` (2185 total) + `curl -X POST http://localhost:7373/api/models/live/sync -H "Authorization: Bearer $MASTER_KEY" -d '{"freeOnly":true}'`  
 Live models: `curl "http://localhost:7373/v1/models?hasKey=1" -H "Authorization: Bearer $MASTER_KEY"` → 2190 total  
@@ -126,7 +126,7 @@ The Dashboard (`apps/web`) can be deployed directly to Vercel (Vite, 2-row heade
 ## 6. Monitoring & Verify
 
 * `/v1/health` for uptime checks (UptimeRobot)
-* `/api/stats` for Grafana (poll every 10s) — `free_models:316`, `providers:43`, live `data/live-models.json:1` 2185/882
+* `/api/stats` for Grafana (poll every 10s) — `free_models:316`, `providers:41`, live `data/live-models.json:1` 2185/882
 * `/api/verify/summary` to alert if `deprecated` spikes (freellms data is stale) + `/api/models/live` to check live cache freshness
 * `/api/verify` for per-model `live_status` details + `/api/models/health/persisted` 404 strikethrough
 * GitHub Actions daily: `sync-freellms.yml` auto-commits `data/` + `models.yaml` when changes are detected (now live sync replaces it)

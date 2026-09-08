@@ -21,6 +21,7 @@ See the full `.env.example` (30 providers from freellms.org, live sync is now so
 | `NODE_TLS_REJECT_UNAUTHORIZED` | _(unset)_ | Dev-only behind corporate SSL-inspection proxy (Zscaler) if you hit `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` disables verification → MITM risk, **never in prod**. Safer: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 | `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler for verify + live sync |
 | `DISABLE_SCHEDULER` | `0` | Set to `1` to disable scheduler |
+| `EXPOSE_BOOTSTRAP` | `1` (enabled) | Public `GET /api/bootstrap` + `/api/config/master` returning `MASTER_KEY` for first-time UI auto-bind (`app.ts:23`); set `0`/`false` to disable in public deployments |
 
 ### Provider Keys (pooled, comma-separated) — 30 freellms providers, live via real keys
 
@@ -68,7 +69,7 @@ Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped pr
 - **Windows PowerShell:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F` (or `taskkill /F /IM node.exe`)
 - **Windows CMD/Git Bash:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F`
 
-then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live-models.json`. See the full table in `docs/PROVIDERS.md:1`.
+then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live-models.json`. Fresh clone has empty `data/` (`data/.gitkeep` only, `b930e6d` — `data/*.json` gitignored); run sync to generate. See the full table in `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -154,7 +155,15 @@ In the `virtual_keys` table:
 
 ## 2-Row Header
 
-`apps/web/src/main.tsx:40` — `display: flex; flexDirection: column; gap:10`: row 1 `justifyContent: space-between` left logo + health + `30 providers • 316 free` / right `VI/EN` + `Master` input; row 2 nav 5 tabs centered `alignSelf: center`. Previously single row with grid/nav centered — now split into 2 rows.
+`apps/web/src/main.tsx:40` — `display: flex; flexDirection: column; gap:10`: row 1 `justifyContent: space-between` left logo + health + `30 providers • 316 free` / right `VI/EN` + `Master` **editable input** (password/text toggle, auto-filled from `GET /api/bootstrap` on placeholder/mismatch, `localStorage masterKey`); row 2 nav 5 tabs centered `alignSelf: center`. Previously single row with grid/nav centered — now split into 2 rows. Header input is **not read-only** since `8f1b3b7`.
+
+## Bootstrap — auto-bind MASTER_KEY
+
+`apps/gateway/src/app.ts:23` public `GET /api/bootstrap` (alias `/api/config/master`) returns `{masterKey}` for first-time UI binding. Frontend `apps/web/src/main.tsx:34` fetches when `localStorage masterKey` is placeholder (`fgk-master-dev-key`/`change-me`/len<16) and re-bootstraps on `401`. Disable in public via `EXPOSE_BOOTSTRAP=0`/`false`.
+
+## Fresh clone data
+
+`b930e6d` clears committed `data/*.json`; `.gitignore:18` now `data/*.json` + `!data/.gitkeep`. Fresh `git clone` → empty `data/`; run `POST /api/models/live/sync` or `npx tsx apps/gateway/src/jobs/sync-live-models.ts` with real keys to populate live cache before `?hasKey=1` works.
 
 ## Persisted 404 + hide404
 

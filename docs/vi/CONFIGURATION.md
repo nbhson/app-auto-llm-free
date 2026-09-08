@@ -21,6 +21,7 @@ Xem `.env.example` đầy đủ (30 providers freellms.org, live sync là source
 | `NODE_TLS_REJECT_UNAUTHORIZED` | _(không đặt)_ | Chỉ dev sau proxy SSL inspection (Zscaler) khi gặp `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` tắt verify → MITM, **không bao giờ prod**. An toàn hơn: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 | `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler cho verify + live sync |
 | `DISABLE_SCHEDULER` | `0` | Đặt `1` để tắt scheduler |
+| `EXPOSE_BOOTSTRAP` | `1` (bật) | Public `GET /api/bootstrap` + `/api/config/master` trả `MASTER_KEY` cho UI tự điền lần đầu (`app.ts:23`); đặt `0`/`false` để tắt khi deploy public |
 
 ### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers, live via real keys
 
@@ -68,7 +69,7 @@ POLLINATIONS_API_KEY= # thường không cần
 - **Windows PowerShell:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F` (hoặc `taskkill /F /IM node.exe`)
 - **Windows CMD/Git Bash:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F`
 
-sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/live-models.json`. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
+sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/live-models.json`. Clone mới `data/` trống (`data/.gitkeep` only, `b930e6d` — `data/*.json` đã gitignored); chạy sync mới có cache. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -154,7 +155,15 @@ Trong `virtual_keys` table:
 
 ## Header 2 hàng
 
-`apps/web/src/main.tsx:40` — `display: flex; flexDirection: column; gap:10`: hàng 1 `justifyContent: space-between` trái logo + health + `30 providers • 316 free` / phải `VI/EN` + `Master` input; hàng 2 nav 5 tabs căn giữa `alignSelf: center`. Trước đây single row với grid/nav centered — hiện đã tách 2 hàng.
+`apps/web/src/main.tsx:40` — `display: flex; flexDirection: column; gap:10`: hàng 1 `justifyContent: space-between` trái logo + health + `30 providers • 316 free` / phải `VI/EN` + `Master` **input chỉnh sửa** (toggle password/text, tự điền từ `GET /api/bootstrap` khi placeholder/mismatch, `localStorage masterKey`); hàng 2 nav 5 tabs căn giữa `alignSelf: center`. Trước đây single row — hiện 2 hàng. Header **không còn read-only** từ `8f1b3b7`.
+
+## Bootstrap — tự điền MASTER_KEY
+
+`apps/gateway/src/app.ts:23` public `GET /api/bootstrap` (alias `/api/config/master`) trả `{masterKey}` để UI lần đầu tự bind. Frontend `apps/web/src/main.tsx:34` fetch khi `localStorage masterKey` placeholder (`fgk-master-dev-key`/`change-me`/len<16) và re-bootstrap khi `401`. Tắt khi public bằng `EXPOSE_BOOTSTRAP=0`/`false`.
+
+## Clone mới — data trống
+
+`b930e6d` xóa `data/*.json` committed; `.gitignore:18` hiện `data/*.json` + `!data/.gitkeep`. `git clone` mới → `data/` trống; chạy `POST /api/models/live/sync` hoặc `npx tsx apps/gateway/src/jobs/sync-live-models.ts` với key thật để nạp cache live trước khi `?hasKey=1` có dữ liệu.
 
 ## Persisted 404 + hide404
 

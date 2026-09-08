@@ -2,10 +2,10 @@
 
 # Providers
 
-> **Historical source: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 IDs — live sync is now source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total).**  
+> **Historical source: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 41 IDs — live sync is now source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total).**  
 > Dashboard nav has **Providers (30) before Models (316)**. The **Get Key ↗** column (direct console + freellms ↗) lives in `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs). Table **highlights hasRealKey**: `background #f0fdf4` + `borderLeft 3px #16a34a` + badge `● has key` green + `Keys` `✓ real` green + `Get Key` green when hasRealKey. **Top filter** debounce 400ms `q` + pill `hasKey`, **sticky bottom pagination** LOV 25/50 (no longer on top).  
 > Historical details: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`; **live**: `data/live-models.json:1` / `GET /api/models/live` / `POST /api/models/live/sync`  
-> Gateway `apps/gateway/src/providers/registry.ts:1` holds 43 IDs (30 slugs + aliases), `models.yaml:1` has 316 free (snapshot), and `lib/paths.ts:1` fixes the 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
+> Gateway `apps/gateway/src/providers/registry.ts:1` holds 41 IDs (30 slugs + aliases), `models.yaml:1` has 316 free (snapshot), and `lib/paths.ts:1` fixes the 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
 
 ## 1. freellms.org Overview (historical) + live current
 
@@ -139,11 +139,11 @@ curl http://localhost:7373/v1/chat/completions \
 ## 6. Health Check (live) + hasRealKey highlight + rate limit
 
 * `GET /api/providers?page=&limit=&q=&hasKey=` — `detailed[]` with `free_models`, `keys`, `hasRealKey` (check `!xxx`, length>20), `status`, **Get Key ↗** (console link) + freellms ↗. **UI highlight**: row with hasRealKey → `background #f0fdf4` + `borderLeft 3px solid #16a34a` + badge `● has key` green + cell `Keys: ✓ real` green + `Get Key` button green. Pagination **LOV 25/50 at sticky bottom**, top filter only `q` (400ms debounce) + pill `hasKey`.
-* `GET /api/providers/health` — live ping of 43 providers in parallel with 5s timeout (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
+* `GET /api/providers/health` — live ping of 41 providers in parallel with 5s timeout (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
 * `GET /api/models/health?model=pollinations/openai` — single-model chat probe (`usable` 2457ms, `unusable 410 Gone`)
 * `GET /api/models/health?provider=nvidia-nim&limit=2` — bulk probe, summary `usable/unusable/no-key`
 * `GET /api/models/health/persisted` — list persisted 404/410 strikethrough `#dc2626` + `hide404` pill
 * `GET /v1/models?hasKey=1` + `POST /api/models/live/sync {freeOnly:true}` — identify actually free models from live (882 free)
 * `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (from logs) — identifies which models are actually usable (freellms snapshot)
-* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers`
+* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:41`, `free_models:316`, `breakers`
 * **Rate limit**: `middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) limit 4x (min 200), debounce search `q` 400ms to prevent 429.

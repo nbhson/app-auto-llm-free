@@ -1,6 +1,6 @@
 # Kiến trúc (Architecture)
 
-Tài liệu này mô tả kiến trúc chi tiết của `app-auto-llm-free` — gateway thống nhất cho LLM free (30 freellms + 13 alias = 43 ids, 324 models từ freellms.org + alias).
+Tài liệu này mô tả kiến trúc chi tiết của `app-auto-llm-free` — gateway thống nhất cho LLM free (30 freellms + 11 alias = 41 ids, 324 models từ freellms.org + alias).
 
 ## 1. Tổng quan
 
@@ -23,8 +23,8 @@ flowchart LR
 
 * **Gateway**: Hono app chạy trên Bun/Node/Cloudflare Workers (WinterCG). Multi-runtime, ultrafast RegExpRouter.
 * **Router**: Chọn provider pool dựa trên `model`, alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`), header `x-router`, tier fallback 4-tier freellms, sanitize `gemini 3.6 flash`/`nvidia: nemotron` (`openai-compatible.ts:31`).
-* **Adapters**: Mỗi provider implement `Provider` interface. 43 ids (30 freellms NVIDIA 97, ModelScope 43, Cloudflare 35... + 13 alias) qua `createOpenAICompatibleProvider`, Gemini `gemini-3.6-flash` (`gemini.ts:5`), Pollinations scraped. `nvidia-nim auto: nvidia/nemotron-3-ultra-550b-a55b` (đã fix 410).
-* **Dashboard**: Vite + React (recharts), 5 routes `Dashboard→Providers→Models→Keys→Logs` (header 2 hàng `max-w-[1440px]` + Master read-only hàng 1, nav giữa hàng 2), `Dashboard` 4 cards + 3 charts + tokens, `Models` **filter bar 1 hàng**: `q` + `provider` + `verified` + **Filters** dropdown (4 toggles `hasKey` **mặc định tắt** + `hide404`/`Hide credits`/`Hide invalid ID` mặc định bật) + **top-right 3 nút** `Check Live (n)`/`Sync Live Now`/`Refresh` (`Refresh` reset `hasKeyOnly:false`, `Check` yêu cầu filter `q`/`provider`), pagination 25/50 sticky bottom + checkbox (`isRowDisabled` ưu tiên `live usable 200`/`usage>0` trước `deprecated`/`404/410`) + `Used/Limit` + strikethrough persist (`200 usable` giữ không đỏ sau reload), `Providers` pagination 25/50 + `Get Key ↗` + health + **Sync Live Now** (chung `POST /api/models/live/sync`), `Keys` Generator (collapsed) + CRUD `fgk-...`, `Logs` charts + SSE.
+* **Adapters**: Mỗi provider implement `Provider` interface. 41 ids (30 freellms NVIDIA 97, ModelScope 43, Cloudflare 35... + 11 alias) qua `createOpenAICompatibleProvider`, Gemini `gemini-3.6-flash` (`gemini.ts:5`), Pollinations scraped. `nvidia-nim auto: nvidia/nemotron-3-ultra-550b-a55b` (đã fix 410).
+* **Dashboard**: Vite + React (recharts), 5 routes `Dashboard→Providers→Models→Keys→Logs` (header 2 hàng `max-w-[1440px]` + Master **editable input** hàng 1 (password/text toggle, auto-filled from `GET /api/bootstrap`), nav giữa hàng 2), `Dashboard` 4 cards + 3 charts + tokens, `Models` **filter bar 1 hàng**: `q` + `provider` + `verified` + **Filters** dropdown (4 toggles `hasKey` **mặc định tắt** + `hide404`/`Hide credits`/`Hide invalid ID` mặc định bật) + **top-right 3 nút** `Check Live (n)`/`Sync Live Now`/`Refresh` (`Refresh` reset `hasKeyOnly:false`, `Check` yêu cầu filter `q`/`provider`), pagination 25/50 sticky bottom + checkbox (`isRowDisabled` ưu tiên `live usable 200`/`usage>0` trước `deprecated`/`404/410`) + `Used/Limit` + strikethrough persist (`200 usable` giữ không đỏ sau reload), `Providers` pagination 25/50 + `Get Key ↗` + health + **Sync Live Now** (chung `POST /api/models/live/sync`), `Keys` Generator (collapsed) + CRUD `fgk-...`, `Logs` charts + SSE.
 * **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify), `data/model-health.json` (persisted `404/410` + `200 usable` — `POST /api/models/health/mark` `200` override `404`, `GET /v1/models` `verified_free` sau `Check`), `data/live-models.json` (live sync 882 free, `POST /api/models/live/sync {freeOnly:true}` ở cả 2 pages), `data/request-log.json` (1000 logs), `lib/paths.ts` resolve `data/` cho cả `cwd=root` và `cwd=apps/gateway`.
 * **Scheduler**: `jobs/scheduler.ts` 24h (`SYNC_INTERVAL_MS`), so sánh freellms FREE vs live `/models` + `jobs/probe-models.ts` chat probe per-model (`/api/models/health` `usable/402/404/410`) + `jobs/sync-live-models.ts` live sync 882 free. Đổi `.env` phải **restart gateway** `config.ts:22` mới nạp `hasRealKey`.
 * **Token**: `lib/token-estimator.ts` char/4, `lib/request-log.ts` aggregation `allTimeTokens` + `tokensByProvider` cho Dashboard/Logs charts.
@@ -80,7 +80,7 @@ export interface Provider {
 * `gemini`: Google (`generativelanguage.googleapis.com/v1beta`) — cần `format-translator` (OpenAI → Gemini contents).
 * `scraped`: Pollinations (`text.pollinations.ai/openai`) — không cần key, tự map alias `auto` → `openai`.
 
-Registry `apps/gateway/src/providers/registry.ts:1` liệt kê 43 ids (30 freellms slugs + 13 alias `mistral`/`gemini`/`nvidia`/`kilo-code`/`openrouter`), `providerMeta` chứa caps/tier/noCard, alias map 15+ keys (`kilo-auto`, `gemini-3.6`...).
+Registry `apps/gateway/src/providers/registry.ts:1` liệt kê 41 ids (30 freellms slugs + 11 alias `mistral`/`gemini`/`nvidia`/`kilo-code`/`openrouter`), `providerMeta` chứa caps/tier/noCard, alias map 15+ keys (`kilo-auto`, `gemini-3.6`...).
 
 ## 4. Router & Fallback
 

@@ -2,10 +2,10 @@
 
 # Providers
 
-> **Nguồn lịch sử: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 43 ids — hiện live sync là source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total).**  
+> **Nguồn lịch sử: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 41 ids — hiện live sync là source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total).**  
 > Dashboard nav **Providers (30) trước Models (316)**. Cột **Get Key ↗** (console trực tiếp + freellms ↗) trong `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs). Bảng **highlight hasRealKey**: `background #f0fdf4` + `borderLeft 3px #16a34a` + badge `● has key` xanh lá + `Keys` `✓ real` xanh + `Get Key` xanh lá khi hasRealKey. **Top filter** debounce 400ms `q` + pill `hasKey`, **sticky bottom pagination** LOV 25/50 (không còn trên top).  
 > Chi tiết lịch sử: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`; **live**: `data/live-models.json:1` / `GET /api/models/live` / `POST /api/models/live/sync`  
-> Gateway `apps/gateway/src/providers/registry.ts:1` 43 ids (30 slugs + alias), `models.yaml:1` 316 free (snapshot), `lib/paths.ts:1` fix 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
+> Gateway `apps/gateway/src/providers/registry.ts:1` 41 ids (30 slugs + alias), `models.yaml:1` 316 free (snapshot), `lib/paths.ts:1` fix 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
 
 ## 1. Tổng quan freellms.org (lịch sử) + live hiện tại
 
@@ -139,11 +139,11 @@ curl http://localhost:7373/v1/chat/completions \
 ## 6. Health Check (live) + hasRealKey highlight + rate limit
 
 * `GET /api/providers?page=&limit=&q=&hasKey=` — `detailed[]` với `free_models`, `keys`, `hasRealKey` (check `!xxx`, length>20), `status`, **Get Key ↗** (link console) + freellms ↗. **UI highlight**: row có hasRealKey → `background #f0fdf4` + `borderLeft 3px solid #16a34a` + badge `● has key` xanh lá + cell `Keys: ✓ real` xanh + nút `Get Key` nền xanh lá. Pagination **LOV 25/50 ở sticky bottom**, top filter chỉ có `q` (debounce 400ms) + pill `hasKey`.
-* `GET /api/providers/health` — live ping 43 providers parallel 5s (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
+* `GET /api/providers/health` — live ping 41 providers parallel 5s (online/offline/no-key, `latency_ms`, `breaker: open/closed`)
 * `GET /api/models/health?model=pollinations/openai` — probe chat 1 model (`usable` 2457ms, `unusable 410 Gone`)
 * `GET /api/models/health?provider=nvidia-nim&limit=2` — bulk probe, summary `usable/unusable/no-key`
 * `GET /api/models/health/persisted` — list persisted 404/410 Strikethrough `#dc2626` + `hide404` pill
 * `GET /v1/models?hasKey=1` + `POST /api/models/live/sync {freeOnly:true}` — biết model nào thực sự free từ live (882 free)
 * `GET /v1/models?verified=free` + Dashboard **Models** checkbox + `Check Live (n)` + `Used/Limit` (từ logs) — biết model nào thực sự usable (freellms snapshot)
-* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:43`, `free_models:316`, `breakers`
+* `GET /api/stats` — `allTimeTokens`, `tokensByProvider`, `avgTokens`, `providers:41`, `free_models:316`, `breakers`
 * **Rate limit**: `middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) limit 4x (min 200), debounce search `q` 400ms để tránh 429.

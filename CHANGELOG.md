@@ -2,6 +2,19 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-09-08
+
+### Fixed
+- **Windows `better-sqlite3` + Node 22**: require `Node >=22` (`package.json:37` engines), `better-sqlite3@^13.0.3` prebuild ABI 127–147, fix `gyp ERR!` trên Windows nvm4w + thiếu Build Tools — docs `README.md:70`, `docs/en|vi/GETTING_STARTED.md:8`, `docs/en|vi/CONFIGURATION.md:176` (Node 22 LTS, `node:22-alpine`).
+
+### Changed
+- **Providers 43→41**: remove `9router`/`omniroute` (`config.ts:192`, `registry.ts:49`, `routes/v1/models.ts:122` + aliases `ag/gemini-3.7-flash-high`, `kc/minimax-m3:free` etc.) — docs `README.md:8`, `docs/en|vi/PROVIDERS.md`, `docs/en|vi/API.md`, `docs/en|vi/ARCHITECTURE.md` cập nhật `41 IDs (30+11 alias)`, health `41` providers.
+- **Fresh clone data empty**: `b930e6d` xóa `data/*.json`, `.gitignore:18` `data/*.json` + `!data/.gitkeep`, `data/.gitkeep` + `apps/data/.gitkeep` — fresh clone chỉ có `.gitkeep`, phải chạy `Sync Live Now` `POST /api/models/live/sync` để nạp `data/live-models.json` — docs `GETTING_STARTED.md:36`, `CONFIGURATION.md:71`.
+- **Docs Node + Windows**: `e1293db` badge `Hono+Bun→Hono+Node`, `README.md:70` `Node >=22 + npm >=10`, `GETTING_STARTED.md:148` + `CONFIGURATION.md:65` thêm kill old process guide per OS (Docker `restart gateway`, macOS/Linux `pkill+lsof`, Windows PowerShell `netstat/taskkill/Get-NetTCPConnection` + CMD/Git Bash).
+
+### Added
+- **Auto-bind MASTER_KEY bootstrap** (`8f1b3b7`): gateway public `GET /api/bootstrap` + `/api/config/master` (`app.ts:23`, bypass `/api/*` auth, disable via `EXPOSE_BOOTSTRAP=false`), web header Master input editable (password/text toggle, `main.tsx:40`) auto-fetch bootstrap nếu `localStorage` placeholder (`fgk-master-dev-key`/`change-me`/len<16) và re-bootstrap khi `401` — docs `GETTING_STARTED.md:36`, `ARCHITECTURE.md:27`, `CONFIGURATION.md:23`, `API.md:155`.
+
 ## [Unreleased]
 
 ### Fixed
