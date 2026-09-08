@@ -18,17 +18,16 @@ out/
 data.db
 *.db
 *.sqlite
-# Gateway runtime data (ephemeral, contains secrets/logs)
-data/benchmark.json
-data/request-log.json
-data/virtual-keys.json
-data/live-models.json
-data/model-health.json
-data/verified-models.json
-data/verified-summary.json
-data/evidence-sources.json
-apps/data/live-models.json
+# Gateway runtime data (ephemeral, generated at runtime — fresh on clone)
+# All JSON under data/ is generated via: `scripts/sync-freellms.py` or `POST /api/models/live/sync` / `POST /api/verify`
+# Keep data/ empty for new users; run sync jobs to populate.
+data/*.json
+data/**/*.json
+!data/.gitkeep
+apps/data/*
+!apps/data/.gitkeep
 apps/data/*.json
+apps/data/**/*.json
 
 # Logs
 logs/
@@ -60,4 +59,3 @@ coverage/
 # Docker
 pgdata/
 redisdata/
-apps/data/
