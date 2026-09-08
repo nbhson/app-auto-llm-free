@@ -118,20 +118,30 @@ function parseTiers(): string[][] {
     const raw = process.env.FALLBACK_TIERS;
     if (!raw)
       return [
-        ["nvidia-nim", "groq", "cerebras", "google-gemini"],
-        ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
-        ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
-        ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
-        ["anthropic", "claude-code", "codex", "agnes-ai"],
+        [
+          "nvidia-nim",
+          "llm7-io",
+          "pollinations",
+          "hugging-face",
+          "orcarouter",
+          "kilo-code",
+          "openrouter",
+          "agnes-ai",
+        ],
       ];
     return JSON.parse(raw);
   } catch {
     return [
-      ["nvidia-nim", "groq", "cerebras", "google-gemini"],
-      ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
-      ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
-      ["openrouter", "kilo-code", "pollinations", "orcarouter", "freeai", "cline"],
-      ["anthropic", "claude-code", "codex", "agnes-ai"],
+      [
+        "nvidia-nim",
+        "llm7-io",
+        "pollinations",
+        "hugging-face",
+        "orcarouter",
+        "kilo-code",
+        "openrouter",
+        "agnes-ai",
+      ],
     ];
   }
 }
