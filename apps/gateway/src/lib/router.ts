@@ -20,7 +20,7 @@ export function getProvidersForRequest(model: string, strategy: Strategy = "tier
     return rotated.filter((id) => providers[id]);
   }
 
-  // tiered: respect FALLBACK_TIERS, but filter by model alias if specified
+  // tiered: respect FALLBACK_TIERS strictly (user-defined single tier = only those 8, no append)
   const preferred = resolveProvidersForModel(model);
   const tiers = config.fallbackTiers;
   const ordered: string[] = [];
@@ -29,9 +29,16 @@ export function getProvidersForRequest(model: string, strategy: Strategy = "tier
       if (preferred.includes(p) && providers[p] && !ordered.includes(p)) ordered.push(p);
     }
   }
-  // append remaining preferred not in tiers
-  for (const p of preferred) {
-    if (!ordered.includes(p) && providers[p]) ordered.push(p);
+  // Only append remaining preferred if FALLBACK_TIERS is multi-tier (default) - for single-tier strict mode, keep only tier providers
+  const isSingleTierStrict = tiers.length === 1 && tiers[0].length <= 8;
+  if (!isSingleTierStrict) {
+    for (const p of preferred) {
+      if (!ordered.includes(p) && providers[p]) ordered.push(p);
+    }
+  }
+  // For strict single-tier (user-defined 8), keep exact tier order as specified, no re-sort
+  if (isSingleTierStrict) {
+    return ordered;
   }
   // Ưu tiên: key thật (real) -> public free (pollinations) -> dummy/no-key
   // Nếu chưa có key thật nào, pollinations sẽ lên đầu để auto không mock (10s -> 1s)
