@@ -205,6 +205,11 @@ export const modelAliases: Record<string, string[]> = {
 export function resolveProvidersForModel(model: string): string[] {
   if (model.includes("/")) {
     const prefix = model.split("/")[0];
+    // First check if there's an alias for the model (with or without prefix)
+    const withoutPrefix = model.startsWith(prefix + "/") ? model.slice(prefix.length + 1) : model;
+    const alias = modelAliases[model.toLowerCase()] || modelAliases[withoutPrefix.toLowerCase()];
+    if (alias) return alias;
+    // Fall back to prefix-based routing
     if (providers[prefix]) return [prefix];
     // freellms slug with hyphen: nvidia-nim/z-ai/glm-5.2 -> try first part
     const slug = model.split("/")[0];

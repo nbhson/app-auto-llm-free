@@ -15,7 +15,7 @@ import { compressWithMetrics } from "../../lib/compression.js";
 import { logGenAI } from "../../lib/otel.js";
 import { FREELLMS_COST, rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
-import { loadVerifiedMap } from "../../lib/model-store.js";
+import { loadVerifiedMap, loadHealthMap } from "../../lib/model-store.js";
 
 const chatSchema = z.object({
   model: z.string().min(1),
@@ -71,11 +71,20 @@ chatRoute.post(
     }
 
     // Filter deprecated models if verified data exists
+    // Only skip providers where the model is explicitly deprecated AND has health data
     const verifiedMap = loadVerifiedMap();
+    const healthMap = loadHealthMap();
     if (model.includes("/") && verifiedMap.get(model) === "deprecated") {
-      logger.warn({ model }, "requested model is deprecated, will fallback");
+      logger.warn({ model }, "requested model is deprecated, will fallback to other providers");
+      // Don't blindly filter by prefix - instead check per-provider health
+      // If the requesting provider has health data showing usable, keep it
       const prefix = model.split("/")[0];
-      providerOrder = providerOrder.filter((p) => p !== prefix);
+      const healthEntry = healthMap.get(model);
+      // Only filter out if the specific provider-model combination is unusable
+      if (healthEntry && healthEntry.status !== "usable") {
+        providerOrder = providerOrder.filter((p) => p !== prefix);
+        logger.info({ model, filteredOut: prefix }, "filtered deprecated provider");
+      }
     }
 
     // Vector 2: cost-aware re-ranking (skip if x-router pinned)
@@ -155,9 +164,12 @@ chatRoute.post(
         continue;
       }
 
-      // Skip deprecated model for this provider if verified
+      // Skip deprecated model for this provider if verified AND provider is NOT the original requesting provider
+      // If user explicitly requests kilo-code/..., allow kilo-code to serve it even if marked deprecated
       const fullId = model.includes("/") ? model : `${pid}/${model}`;
-      if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
+      const requestedPrefix = model.split("/")[0];
+      const isRequestingProvider = pid === requestedPrefix;
+      if (verifiedMap.get(fullId) === "deprecated" && !isRequestingProvider) {
         errors.push({ provider: pid, error: "model deprecated per verified-models.json" });
         continue;
       }
