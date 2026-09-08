@@ -31,11 +31,42 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     if (masterKey) localStorage.setItem("masterKey", masterKey);
   }, [masterKey]);
 
+  // Auto-bootstrap: fetch auto-generated MASTER_KEY from backend if local key is placeholder
+  // Ensures fresh clone / new user always has valid key bound to top-right input on first start
+  React.useEffect(() => {
+    const saved = localStorage.getItem("masterKey");
+    const isPlaceholder = !saved || saved === "fgk-master-dev-key" || saved.includes("change-me") || saved.trim().length < 16;
+    if (!isPlaceholder) return;
+    fetch("/api/bootstrap").then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const k = d?.masterKey;
+      if (k && k.startsWith("fgk-master-") && k !== saved) {
+        localStorage.setItem("masterKey", k);
+        setMasterKey(k);
+      }
+    }).catch(() => {});
+  }, []);
+
   React.useEffect(() => {
     fetch("/v1/health").then((r) => (r.ok ? setHealth("ok") : setHealth("down"))).catch(() => setHealth("down"));
-    const key = getMasterKey();
-    fetch("/api/stats", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.json()).then(setHeaderStats).catch(() => {});
   }, []);
+  React.useEffect(() => {
+    if (!masterKey || masterKey === "fgk-master-dev-key" || masterKey.includes("change-me")) return;
+    fetch("/api/stats", { headers: { Authorization: `Bearer ${masterKey}` } }).then((r) => {
+      if (r.status === 401) throw new Error("unauthorized");
+      return r.json();
+    }).then(setHeaderStats).catch((e) => {
+      if (String(e).includes("unauthorized")) {
+        // Key outdated (gateway regenerated) — re-bootstrap
+        fetch("/api/bootstrap").then((r2) => (r2.ok ? r2.json() : null)).then((d) => {
+          const k = d?.masterKey;
+          if (k && k.startsWith("fgk-master-") && k !== masterKey) {
+            localStorage.setItem("masterKey", k);
+            setMasterKey(k);
+          }
+        }).catch(() => {});
+      }
+    });
+  }, [masterKey]);
 
   const handleCopyMasterKey = () => {
     navigator.clipboard.writeText(masterKey);
@@ -116,14 +147,22 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 bg-slate-50/90 border border-slate-200/90 rounded-lg px-2.5 py-1 shadow-2xs">
-                <div className="flex items-center gap-1 text-slate-500 select-none" title="Auto-generated admin key (read-only)">
+              <div className="flex items-center gap-1.5 bg-slate-50/90 border border-slate-200/90 rounded-lg px-2.5 py-1 shadow-2xs focus-within:ring-1 focus-within:ring-amber-500/20 focus-within:border-amber-200">
+                <div className="flex items-center gap-1 text-slate-500 select-none" title="Master key — auto-filled from server on first start, editable">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 hidden sm:inline">{t("header.master")}</span>
                 </div>
-                <code className="font-mono text-xs text-slate-700 bg-transparent max-w-[160px] sm:max-w-[220px] truncate select-all" title={masterKey}>
-                  {showKey ? masterKey : `${masterKey.slice(0, 12)}${masterKey.length > 12 ? "••••" + masterKey.slice(-4) : ""}`}
-                </code>
+                <input
+                  type={showKey ? "text" : "password"}
+                  value={masterKey}
+                  onChange={(e) => setMasterKey(e.target.value)}
+                  onBlur={() => { const v = masterKey.trim(); if (v) { localStorage.setItem("masterKey", v); setMasterKey(v); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                  className="font-mono text-xs text-slate-700 bg-transparent max-w-[160px] sm:max-w-[220px] truncate focus:outline-none px-1"
+                  title={masterKey}
+                  placeholder="fgk-master-..."
+                  spellCheck={false}
+                />
                 <button type="button" onClick={() => setShowKey(!showKey)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors" title={showKey ? "Hide" : "Show"}>
                   {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>

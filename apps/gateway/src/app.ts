@@ -23,6 +23,23 @@ export function createApp() {
   app.use("*", requestLogger);
   app.use("*", virtualKeyRateLimit);
 
+  // Public bootstrap — expose auto-generated MASTER_KEY for first-time UI binding (local self-hosted)
+  // Frontend will auto-fetch this if localStorage.masterKey is placeholder, so new users always have a valid key on first start.
+  app.get("/api/bootstrap", (c) => {
+    // Allow disabling via env in public deployments
+    if (process.env.EXPOSE_BOOTSTRAP === "0" || process.env.EXPOSE_BOOTSTRAP === "false") {
+      return c.json({ error: { message: "Bootstrap disabled", type: "forbidden" } }, 403);
+    }
+    return c.json({ masterKey: config.masterKey });
+  });
+  // Alias for convenience
+  app.get("/api/config/master", (c) => {
+    if (process.env.EXPOSE_BOOTSTRAP === "0" || process.env.EXPOSE_BOOTSTRAP === "false") {
+      return c.json({ error: { message: "Bootstrap disabled", type: "forbidden" } }, 403);
+    }
+    return c.json({ masterKey: config.masterKey });
+  });
+
   // Public
   app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.1.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
@@ -65,6 +82,7 @@ export function createApp() {
 
   // Admin /api/* — require master or admin virtual key
   app.use("/api/*", async (c, next) => {
+    if (c.req.path === "/api/bootstrap" || c.req.path === "/api/config/master") return next();
     const key = extractBearer(c as any);
     if (c.req.path === "/api/providers" && config.nodeEnv === "development") return next();
     const vk = key ? isValidVirtualKeyLive(key) : null;
