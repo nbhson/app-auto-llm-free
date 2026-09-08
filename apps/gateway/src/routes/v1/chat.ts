@@ -15,8 +15,7 @@ import { compressWithMetrics } from "../../lib/compression.js";
 import { logGenAI } from "../../lib/otel.js";
 import { FREELLMS_COST, rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
-import fs from "node:fs";
-import path from "node:path";
+import { loadVerifiedMap } from "../../lib/model-store.js";
 
 const chatSchema = z.object({
   model: z.string().min(1),
@@ -42,30 +41,6 @@ const chatSchema = z.object({
   frequency_penalty: z.number().optional(),
   user: z.string().optional(),
 });
-
-function loadVerifiedMap(): Map<string, string> {
-  try {
-    const p = path.resolve("data/verified-models.json");
-    if (!fs.existsSync(p)) return new Map();
-    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
-    const m = new Map<string, string>();
-    for (const row of data.models || []) m.set(row.id, row.status);
-    // merge persisted 404/410 from model-health.json as deprecated
-    try {
-      const hp = path.resolve("data/model-health.json");
-      if (fs.existsSync(hp)) {
-        const hdata = JSON.parse(fs.readFileSync(hp, "utf-8"));
-        for (const [id, v] of Object.entries(hdata as any)) {
-          const hv = v as any;
-          if (hv.http_status === 404 || hv.http_status === 410) m.set(id, "deprecated");
-        }
-      }
-    } catch {}
-    return m;
-  } catch {
-    return new Map();
-  }
-}
 
 export const chatRoute = new Hono();
 
@@ -349,7 +324,7 @@ chatRoute.post(
       error: JSON.stringify(errors).slice(0, 500),
     });
 
-    if (config.nodeEnv === "development" && errors.length > 0) {
+    if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development" && errors.length > 0) {
       return c.json(
         {
           id: `chatcmpl-mock-${Date.now()}`,

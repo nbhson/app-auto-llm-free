@@ -2,6 +2,20 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.2] - 2026-09-09
+
+### Fixed
+- **Security**: `app.ts:39` bootstrap `EXPOSE_BOOTSTRAP` default `0` secure (403 unless `1/true`), remove `GET /api/providers` dev bypass `app.ts:108`, mask `MASTER_KEY` log in production `config.ts:69`, `auth.ts:29` + `virtual-keys.ts:138` remove `fgk-` dev fallback (opt-in `ALLOW_DEV_FALLBACK=1`), mock `200 _mock` gated by `ALLOW_MOCK=1` `chat.ts:352` `anthropic.ts:525` `embeddings.ts:110` `audio.ts:113,170` + `logger.ts:9` requestId + `audio 25MB` limit
+- **Deduplicate**: `lib/sanitize.ts` + `lib/model-store.ts` TTL 5s extract `sanitizeFreellmsName` + `loadVerifiedMap` from 3 routes, `openai-compatible.ts:45` + `models.ts:13` share helper, `cost-router.ts:45` remove typo `sambanova_cohere`, add `stopLatencyWatcher` fix `watchFile` leak, `router.ts:6` split `rrIndex/keyIndex` race
+- **Quality**: `eslint.config.js:14` `no-explicit-any: warn`, `no-console: warn`, `Dockerfile:1` `node:20→22`, `virtual-keys.ts:50` debounce `saveAsync` 1s, `models.ts` compat `loadVerifiedMapFull`, remove 66 pad lines `audio.ts:176`
+
+### Added
+- **Tests**: `vitest.config.ts` + `sanitize.test.ts` `auth.test.ts` `router.test.ts` `cost-router.test.ts` 10 tests, `ci.yml` `lint+typecheck+build+test`
+- **Docs**: `README.md:3,69,273` + `README.vi.md:3,267` remove `OmniRoute/9Router/FreeLLMAPI` tagline/References, fix EN pipeline Vietnamese
+
+### Changed
+- **Version bump**: `package.json:5` `apps/gateway:5` `apps/web:5` `0.7.1→0.7.2`, `main.tsx:100` badge `v0.7.2`, `app.ts:60` + `health.ts:10` `version 0.7.2`
+
 ## [0.7.1] - 2026-09-09
 
 ### Fixed

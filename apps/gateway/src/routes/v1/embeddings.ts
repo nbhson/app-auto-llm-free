@@ -106,9 +106,8 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
 
   logger.warn({ model, errors, latency: Date.now() - startAll }, "all embeddings providers failed");
 
-  // Dev fallback mock only if explicitly allowed or no providers tried
-  if (config.nodeEnv === "development" && errors.length > 0) {
-    // Check if any provider actually supports embeddings — if none tried, return mock
+  // Mock only if explicitly allowed via ALLOW_MOCK
+  if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development" && errors.length > 0) {
     const anyEmbeddingProvider = providerOrder.some((pid) => providers[pid]?.embeddings);
     if (!anyEmbeddingProvider || errors.length === providerOrder.filter((pid) => providers[pid]?.embeddings).length) {
       return c.json(

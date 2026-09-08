@@ -1,6 +1,6 @@
 # app-auto-llm-free
 
-> **Một endpoint duy nhất cho mọi LLM miễn phí.** Tương tự OmniRoute / 9Router / FreeLLMAPI — tự host, OpenAI-compatible, gom toàn bộ provider & model free vào một gateway.
+> **Một endpoint duy nhất cho mọi LLM miễn phí.** Tự host, OpenAI-compatible, gom toàn bộ provider & model free vào một gateway duy nhất.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stack: Hono + Node](https://img.shields.io/badge/Stack-Hono%20%2B%20Node-green)](https://hono.dev)
@@ -263,5 +263,3 @@ PRs welcome! Xem [CONTRIBUTING.md](CONTRIBUTING.md). Vui lòng chạy `npm run l
 Apache-2.0 — xem [LICENSE](LICENSE).
 
 ---
-
-**Tham khảo**: [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (271 providers), [9Router](https://github.com/decolua/9router), [Free LLM Gateway](https://github.com/MrFadiAi/free-llm-gateway) (24+ providers), [LiteLLM](https://github.com/BerriAI/litellm), [Hebo Gateway](https://github.com/8monkey-ai/hebo-gateway).

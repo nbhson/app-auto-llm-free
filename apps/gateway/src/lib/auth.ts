@@ -25,10 +25,8 @@ export function extractBearer(c: { req: { header: (n: string) => string | undefi
   return m ? m[1].trim() : null;
 }
 
-// Virtual keys will be DB-backed in P4; for P1 we accept MASTER_KEY and any fgk-* if master is prefix
 export function isValidVirtualKey(key: string): boolean {
   if (isValidMasterKey(key)) return true;
-  // P1 permissive: allow any fgk- key if no DB yet (dev mode)
-  if (config.nodeEnv === "development" && key.startsWith("fgk-")) return true;
+  // Strict: no dev fallback. Use virtual-keys store via isValidVirtualKeyLive for fgk-* validation.
   return false;
 }

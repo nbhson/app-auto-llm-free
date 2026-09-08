@@ -47,9 +47,36 @@ function load(): VirtualKey[] {
   return [master];
 }
 
-function save(keys: VirtualKey[]) {
+function save(keys: VirtualKey[]): void {
   fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
   fs.writeFileSync(STORE_PATH, JSON.stringify(keys, null, 2));
+}
+
+async function saveAsync(keys: VirtualKey[]): Promise<void> {
+  try {
+    await fs.promises.mkdir(path.dirname(STORE_PATH), { recursive: true });
+    await fs.promises.writeFile(STORE_PATH, JSON.stringify(keys, null, 2));
+  } catch {}
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSave = false;
+function scheduleSave(): void {
+  if (saveTimer) {
+    pendingSave = true;
+    return;
+  }
+  // debounce 1s to avoid per-request fs sync
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    const keys = cache ? [...cache] : [];
+    void saveAsync(keys).finally(() => {
+      if (pendingSave) {
+        pendingSave = false;
+        scheduleSave();
+      }
+    });
+  }, 1000);
 }
 
 let cache: VirtualKey[] | null = null;
@@ -128,14 +155,14 @@ export function isValidVirtualKeyLive(key: string): VirtualKey | null {
   }
   const vk = findByKey(key);
   if (vk) {
-    // Update lastUsed
     vk.lastUsedAt = new Date().toISOString();
     vk.requestCount = (vk.requestCount || 0) + 1;
-    save(getAll());
+    scheduleSave();
     return vk;
   }
-  // Fallback dev: allow any fgk- in development (legacy)
-  if (config.nodeEnv === "development" && key.startsWith("fgk-")) {
+  // Secure: no fallback for arbitrary fgk- keys. All keys must be registered via createVirtualKey or master.
+  // To enable legacy dev fallback, set ALLOW_DEV_FALLBACK=1 explicitly (not recommended for production)
+  if (process.env.ALLOW_DEV_FALLBACK === "1" && config.nodeEnv === "development" && key.startsWith("fgk-")) {
     return {
       id: "vk-dev",
       name: "dev-fallback",

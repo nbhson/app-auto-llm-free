@@ -1,6 +1,6 @@
 # app-auto-llm-free
 
-> **One endpoint for all free LLMs.** Like OmniRoute / 9Router / FreeLLMAPI — self-hosted, OpenAI-compatible, aggregating all free providers & models into a single gateway.
+> **One endpoint for all free LLMs.** Self-hosted, OpenAI-compatible gateway aggregating all free providers & models into a single endpoint.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stack: Hono + Node](https://img.shields.io/badge/Stack-Hono%20%2B%20Node-green)](https://hono.dev)
@@ -76,13 +76,13 @@ Client Request
   ↓
 [Token Compression?] — config.ts:162 COMPRESSION_ENABLED=1 → lib/compression.ts:103 compressMessages (toolsMinify/historySummarize/codeDedup, ratio <0.95) → messagesToSend
   ↓
-Gửi lên Upstream (Anthropic/OpenAI/Gemini...) → Fallback tiered + Circuit Breaker isOpen + checkQuota RPM/TPM/RPD/TPD
+Send to Upstream (Anthropic/OpenAI/Gemini...) → Fallback tiered + Circuit Breaker isOpen + checkQuota RPM/TPM/RPD/TPD
   ↓
-Lưu kết quả vào cache (lib/semantic-cache.ts:58 set EX CACHE_TTL_S) + ghi analytics (request-log.ts:7 cost/cacheHit/compressedTokens, lib/analytics.ts:53)
+Store result in cache (lib/semantic-cache.ts:58 set EX CACHE_TTL_S) + record analytics (request-log.ts:7 cost/cacheHit/compressedTokens, lib/analytics.ts:53)
   ↓
-Trả về Client (OpenAI SSE/JSON + X-Provider/X-Verified + logGenAI otel.ts:10)
+Return to Client (OpenAI SSE/JSON + X-Provider/X-Verified + logGenAI otel.ts:10)
 ```
-> Flow đúng như bạn mô tả: `Cost Routing → Semantic Cache → Compression → Upstream → Cache store + Analytics`. Code đã re-order `chat.ts:114` để cache check trước compression (chỉ nén khi cache miss, tiết kiệm compute). Toggle qua `Settings` `/settings` (localStorage `gatewaySettings`, default `.env` `GET /api/config`).
+> Flow: `Cost Routing → Semantic Cache → Compression → Upstream → Cache store + Analytics`. Code reorders `chat.ts:114` to check cache before compression (compress only on cache miss to save compute). Toggle via `Settings` `/settings` (localStorage `gatewaySettings`, defaults from `.env` `GET /api/config`).
 
 See [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md)
 
@@ -269,5 +269,3 @@ PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md). Please run `npm run lint` +
 Apache-2.0 — see [LICENSE](LICENSE).
 
 ---
-
-**References**: [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (271 providers), [9Router](https://github.com/decolua/9router), [Free LLM Gateway](https://github.com/MrFadiAi/free-llm-gateway) (24+ providers), [LiteLLM](https://github.com/BerriAI/litellm), [Hebo Gateway](https://github.com/8monkey-ai/hebo-gateway).

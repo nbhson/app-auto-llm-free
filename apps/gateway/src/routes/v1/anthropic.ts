@@ -17,8 +17,7 @@ import { hasScope } from "../../lib/virtual-keys.js";
 import { compressWithMetrics } from "../../lib/compression.js";
 import { rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
-import fs from "node:fs";
-import path from "node:path";
+import { loadVerifiedMap } from "../../lib/model-store.js";
 
 const anthropicSchema = z.object({
   model: z.string().min(1),
@@ -39,28 +38,7 @@ const anthropicSchema = z.object({
   stop_sequences: z.array(z.string()).optional(),
 }).passthrough();
 
-function loadVerifiedMap(): Map<string, string> {
-  try {
-    const p = path.resolve("data/verified-models.json");
-    if (!fs.existsSync(p)) return new Map();
-    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
-    const m = new Map<string, string>();
-    for (const row of data.models || []) m.set(row.id, row.status);
-    try {
-      const hp = path.resolve("data/model-health.json");
-      if (fs.existsSync(hp)) {
-        const hdata = JSON.parse(fs.readFileSync(hp, "utf-8"));
-        for (const [id, v] of Object.entries(hdata as any)) {
-          const hv = v as any;
-          if (hv.http_status === 404 || hv.http_status === 410) m.set(id, "deprecated");
-        }
-      }
-    } catch {}
-    return m;
-  } catch {
-    return new Map();
-  }
-}
+
 
 /**
  * Convert OpenAI SSE stream to Anthropic SSE events.
@@ -522,7 +500,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     error: JSON.stringify(errors).slice(0, 500),
   });
 
-  if (config.nodeEnv === "development" && errors.length > 0) {
+  if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development" && errors.length > 0) {
     return c.json(
       {
         id: `msg_mock_${Date.now()}`,

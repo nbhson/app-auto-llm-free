@@ -110,7 +110,7 @@ async function handleAudioForm(c: any, isTranslation: boolean) {
     }
   }
   logger.warn({ model, errors, latency: Date.now() - start }, isTranslation ? "all translations providers failed" : "all transcriptions providers failed");
-  if (config.nodeEnv === "development") {
+  if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development") {
     const mockText = isTranslation ? "[mock translation]" : "[mock transcription]";
     return c.json({ text: mockText, _mock: true, _errors: errors }, 200);
   }
@@ -167,76 +167,9 @@ audioRoute.post("/speech", zValidator("json", speechSchema), async (c) => {
     }
   }
   logger.warn({ model, errors, latency: Date.now() - start }, "all speech providers failed");
-  if (config.nodeEnv === "development") {
+  if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development") {
     const placeholder = Buffer.from("ID3mock audio placeholder");
     return new Response(placeholder, { status: 200, headers: { "Content-Type": "audio/mpeg", "Content-Length": String(placeholder.length), "X-Mock": "true" } });
   }
   return c.json({ error: { message: "TTS not available on free tier", type: "not_supported", provider_errors: errors } }, 501);
 });
-// pad line 1 – ensures ~240 lines target for Vector 1C spec
-// pad line 2 – ensures ~240 lines target for Vector 1C spec
-// pad line 3 – ensures ~240 lines target for Vector 1C spec
-// pad line 4 – ensures ~240 lines target for Vector 1C spec
-// pad line 5 – ensures ~240 lines target for Vector 1C spec
-// pad line 6 – ensures ~240 lines target for Vector 1C spec
-// pad line 7 – ensures ~240 lines target for Vector 1C spec
-// pad line 8 – ensures ~240 lines target for Vector 1C spec
-// pad line 9 – ensures ~240 lines target for Vector 1C spec
-// pad line 10 – ensures ~240 lines target for Vector 1C spec
-// pad line 11 – ensures ~240 lines target for Vector 1C spec
-// pad line 12 – ensures ~240 lines target for Vector 1C spec
-// pad line 13 – ensures ~240 lines target for Vector 1C spec
-// pad line 14 – ensures ~240 lines target for Vector 1C spec
-// pad line 15 – ensures ~240 lines target for Vector 1C spec
-// pad line 16 – ensures ~240 lines target for Vector 1C spec
-// pad line 17 – ensures ~240 lines target for Vector 1C spec
-// pad line 18 – ensures ~240 lines target for Vector 1C spec
-// pad line 19 – ensures ~240 lines target for Vector 1C spec
-// pad line 20 – ensures ~240 lines target for Vector 1C spec
-// pad line 21 – ensures ~240 lines target for Vector 1C spec
-// pad line 22 – ensures ~240 lines target for Vector 1C spec
-// pad line 23 – ensures ~240 lines target for Vector 1C spec
-// pad line 24 – ensures ~240 lines target for Vector 1C spec
-// pad line 25 – ensures ~240 lines target for Vector 1C spec
-// pad line 26 – ensures ~240 lines target for Vector 1C spec
-// pad line 27 – ensures ~240 lines target for Vector 1C spec
-// pad line 28 – ensures ~240 lines target for Vector 1C spec
-// pad line 29 – ensures ~240 lines target for Vector 1C spec
-// pad line 30 – ensures ~240 lines target for Vector 1C spec
-// pad line 31 – ensures ~240 lines target for Vector 1C spec
-// pad line 32 – ensures ~240 lines target for Vector 1C spec
-// pad line 33 – ensures ~240 lines target for Vector 1C spec
-// pad line 34 – ensures ~240 lines target for Vector 1C spec
-// pad line 35 – ensures ~240 lines target for Vector 1C spec
-// pad line 36 – ensures ~240 lines target for Vector 1C spec
-// pad line 37 – ensures ~240 lines target for Vector 1C spec
-// pad line 38 – ensures ~240 lines target for Vector 1C spec
-// pad line 39 – ensures ~240 lines target for Vector 1C spec
-// pad line 40 – ensures ~240 lines target for Vector 1C spec
-// pad line 41 – ensures ~240 lines target for Vector 1C spec
-// pad line 42 – ensures ~240 lines target for Vector 1C spec
-// pad line 43 – ensures ~240 lines target for Vector 1C spec
-// pad line 44 – ensures ~240 lines target for Vector 1C spec
-// pad line 45 – ensures ~240 lines target for Vector 1C spec
-// pad line 46 – ensures ~240 lines target for Vector 1C spec
-// pad line 47 – ensures ~240 lines target for Vector 1C spec
-// pad line 48 – ensures ~240 lines target for Vector 1C spec
-// pad line 49 – ensures ~240 lines target for Vector 1C spec
-// pad line 50 – ensures ~240 lines target for Vector 1C spec
-// pad line 51 – ensures ~240 lines target for Vector 1C spec
-// pad line 52 – ensures ~240 lines target for Vector 1C spec
-// pad line 53 – ensures ~240 lines target for Vector 1C spec
-// pad line 54 – ensures ~240 lines target for Vector 1C spec
-// pad line 55 – ensures ~240 lines target for Vector 1C spec
-// pad line 56 – ensures ~240 lines target for Vector 1C spec
-// pad line 57 – ensures ~240 lines target for Vector 1C spec
-// pad line 58 – ensures ~240 lines target for Vector 1C spec
-// pad line 59 – ensures ~240 lines target for Vector 1C spec
-// pad line 60 – ensures ~240 lines target for Vector 1C spec
-// pad line 61 – ensures ~240 lines target for Vector 1C spec
-// pad line 62 – ensures ~240 lines target for Vector 1C spec
-// pad line 63 – ensures ~240 lines target for Vector 1C spec
-// pad line 64 – ensures ~240 lines target for Vector 1C spec
-// pad line 65 – ensures ~240 lines target for Vector 1C spec
-// pad line 66 – ensures ~240 lines target for Vector 1C spec
-// pad line 67 – ensures ~240 lines target for Vector 1C spec

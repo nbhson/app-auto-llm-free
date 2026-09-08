@@ -1,30 +1,14 @@
 import { Hono } from "hono";
-import { providers } from "../../providers/registry.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveDataPath, readDataJson } from "../../lib/paths.js";
 import { config } from "../../config.js";
 import { isPublicProvider } from "../../lib/router.js";
+import { sanitizeFreellmsName } from "../../lib/sanitize.js";
+import { loadHealthMap as loadHealthMapCached, loadLiveModels as loadLiveModelsCached } from "../../lib/model-store.js";
 
 export const modelsRoute = new Hono();
-
-// Sanitize freellms name like "google: gemma 4 31b (free)" -> "google/gemma-4-31b:free"
-function sanitizeFreellmsName(name: string): string {
-  if (!/[\s()]/.test(name)) return name;
-  const hasFree = /\(free\)|\:free/i.test(name);
-  let s = name.toLowerCase();
-  s = s.replace(/\s*:\s*/g, "/").replace(/\s*\/\s*/g, "/");
-  s = s.replace(/\s+/g, "-");
-  s = s.replace(/[()]/g, "");
-  s = s.replace(/--+/g, "-").replace(/\/-+/g, "/").replace(/-\//g, "/");
-  if (hasFree && !s.includes(":free")) {
-    s = s.replace(/-free$/, ":free");
-    if (!s.includes(":free")) s += ":free";
-  }
-  s = s.replace(/\/free:free$/, ":free").replace(/\/:free$/, ":free");
-  return s;
-}
  // Load freellms free models if available (316 models) — fallback to models.yaml for fresh clone (b930e6d deletes data/*.json)
 function loadFreellmsModels(): any[] {
   const arr = readDataJson<any[]>("freellms-models-free.json", []);
@@ -91,39 +75,12 @@ function loadFreellmsModels(): any[] {
   return [];
 }
 
-function loadVerifiedMap(): Map<string, any> {
-  const data = readDataJson<any>("verified-models.json", null);
-  if (!data) return new Map();
-  const map = new Map<string, any>();
-  for (const m of (data as any).models || []) map.set(m.id, m);
+// Models route needs full verified entry (not just status string)
+function loadVerifiedMapFull(): Map<string, Record<string, unknown>> {
+  const data = readDataJson<{ models?: Array<{ id: string; [k: string]: unknown }> }>("verified-models.json", { models: [] });
+  const map = new Map<string, Record<string, unknown>>();
+  for (const m of data.models || []) map.set(m.id, m as Record<string, unknown>);
   return map;
-}
-function loadHealthMap(): Map<string, any> {
-  const data = readDataJson<Record<string, any>>("model-health.json", {});
-  const map = new Map<string, any>();
-  for (const [id, v] of Object.entries(data || {})) map.set(id, v);
-  return map;
-}
-function loadLiveModels(): any[] {
-  const data = readDataJson<any>("live-models.json", null as any);
-  if (!data || !Array.isArray(data.models)) return [];
-  return data.models.map((m: any) => ({
-    id: m.id,
-    raw_id: m.id,
-    object: "model",
-    owned_by: m.provider || m.id.split("/")[0],
-    provider: m.provider || m.id.split("/")[0],
-    display_name: m.display_name || m.id.split("/").pop(),
-    context_length: m.context_length || 8192,
-    score: 50,
-    tier: "live",
-    freellms_verified: false,
-    no_card: true,
-    capabilities: ["text"],
-    limit: "live",
-    created: 1715433600,
-    live_status: "live",
-  }));
 }
 
 const freellmsModels = loadFreellmsModels();
@@ -207,9 +164,9 @@ modelsRoute.get("/", async (c) => {
     });
   };
   const hasKeyOnly = c.req.query("hasKey") === "1" || c.req.query("has_key") === "1";
-  const verifiedMap = loadVerifiedMap();
-  const healthMap = loadHealthMap();
-  const liveModelsCache = loadLiveModels();
+  const verifiedMap = loadVerifiedMapFull();
+  const healthMap = loadHealthMapCached();
+  const liveModelsCache = loadLiveModelsCached();
 
   const all: any[] = [];
 
@@ -264,9 +221,9 @@ modelsRoute.get("/", async (c) => {
         if (!hasRealKey) continue;
       }
       if (!matchesQ(m.id)) continue;
-      const v = verifiedMap.get(m.id) || verifiedMap.get((m as any).raw_id);
+      const v = (verifiedMap.get(m.id) || verifiedMap.get((m as any).raw_id)) as Record<string, unknown> | undefined;
       const h = healthMap.get(m.id) || healthMap.get((m as any).raw_id);
-      let live_status: string = v ? v.status : "unverified_no_data";
+      let live_status: string = v ? String(v["status"] ?? "unverified_no_data") : "unverified_no_data";
       let persisted404: any = null;
       if (h && (h.http_status === 404 || h.http_status === 410)) {
         live_status = "deprecated";
@@ -277,7 +234,7 @@ modelsRoute.get("/", async (c) => {
         persisted404 = null;
       }
       const annotated = v || h
-        ? { ...m, live_status, live_free: v?.live_free ?? false, live_found: v?.live_found ?? false, last_verified: h?.updated_at || v?.last_verified || null, verified_error: h?.error || v?.error, persisted_404: !!persisted404, health: h }
+        ? { ...m, live_status, live_free: (v as Record<string, unknown>)?.["live_free"] ?? false, live_found: (v as Record<string, unknown>)?.["live_found"] ?? false, last_verified: (h as Record<string, unknown>)?.["updated_at"] || (v as Record<string, unknown>)?.["last_verified"] || null, verified_error: (h as Record<string, unknown>)?.["error"] || (v as Record<string, unknown>)?.["error"], persisted_404: !!persisted404, health: h }
         : { ...m, live_status: "unverified_no_data" as const, last_verified: null };
       if (verifiedFilter) {
         if (verifiedFilter === "free" && annotated.live_status !== "verified_free") continue;
@@ -390,11 +347,11 @@ modelsRoute.get("/", async (c) => {
 
 modelsRoute.get("/:id", (c) => {
   const id = c.req.param("id");
-  const verifiedMap = loadVerifiedMap();
+  const verifiedMap = loadVerifiedMapFull();
   const found = freellmsModels.find((m) => m.id === id);
   if (found) {
-    const v = verifiedMap.get(id);
-    return c.json(v ? { ...found, live_status: v.status, last_verified: v.last_verified, error: v.error } : found);
+    const v = verifiedMap.get(id) as Record<string, unknown> | undefined;
+    return c.json(v ? { ...found, live_status: v["status"], last_verified: v["last_verified"], error: v["error"] } : found);
   }
   return c.json({ id, object: "model", owned_by: id.split("/")[0] || "gateway", created: 1715433600 });
 });

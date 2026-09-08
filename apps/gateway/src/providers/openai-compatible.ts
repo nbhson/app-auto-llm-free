@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { Provider, ChatRequest, ModelInfo, AudioTranscriptionRequest, AudioSpeechRequest, ResponsesRequest } from "./base.js";
 import { translateResponsesToChat } from "../lib/responses-translator.js";
+import { sanitizeFreellmsName } from "../lib/sanitize.js";
 
 function generateSessionId(): string {
   return `ses_${crypto.randomBytes(12).toString("hex")}`;
@@ -40,23 +41,9 @@ export function createOpenAICompatibleProvider(opts: {
       // Extract model after provider prefix (e.g. nvidia-nim/z-ai/glm-5.2 -> z-ai/glm-5.2)
       let rawModel = req.model.includes("/") ? req.model.split("/").slice(1).join("/") : req.model;
       rawModel = rawModel || req.model;
-      // Sanitize freellms names with spaces/parens: "nvidia: nemotron 3 ultra (free)" -> "nvidia/nemotron-3-ultra:free"
-      // Do NOT touch already-valid ids containing :free without spaces
+      // Sanitize freellms names with spaces/parens (shared helper)
       if (/[\s()]/.test(rawModel) && !rawModel.startsWith("@cf/")) {
-        const hasFree = /\(free\)|\:free/i.test(rawModel);
-        let sanitized = rawModel.toLowerCase();
-        sanitized = sanitized.replace(/\s*:\s*/g, "/").replace(/\s*\/\s*/g, "/"); // "nvidia: xxx" -> "nvidia/xxx"
-        sanitized = sanitized.replace(/\s+/g, "-");
-        sanitized = sanitized.replace(/[()]/g, "");
-        sanitized = sanitized.replace(/--+/g, "-");
-        sanitized = sanitized.replace(/\/-+/g, "/").replace(/-\//g, "/");
-        if (hasFree && !sanitized.includes(":free")) {
-          sanitized = sanitized.replace(/-free$/, ":free");
-          if (!sanitized.includes(":free")) sanitized += ":free";
-        }
-        // avoid double :free from earlier slash conversion
-        sanitized = sanitized.replace(/\/free:free$/, ":free").replace(/\/:free$/, ":free");
-        rawModel = sanitized;
+        rawModel = sanitizeFreellmsName(rawModel);
       }
       // Map alias "auto" and generic aliases to provider's default free model
       const autoMap: Record<string, string> = {

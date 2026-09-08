@@ -12,11 +12,12 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.browser },
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "off",
-      "no-empty": "off",
-      "prefer-const": "off",
-      "no-useless-escape": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-explicit-any": "warn",
+      "no-empty": "warn",
+      "prefer-const": "warn",
+      "no-useless-escape": "warn",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   }
 );

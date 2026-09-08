@@ -42,7 +42,6 @@ export const FREELLMS_COST: Record<string, number> = {
   fireworks: 0.07,
   "aion-labs": 0,
   deepseek: 0.14,
-  sambanova_cohere: 0,
   nscale: 0,
   nebius: 0,
 };
@@ -56,11 +55,17 @@ function ensureLatencyWatcher(): void {
   if (latencyWatchInitialized) return;
   latencyWatchInitialized = true;
   try {
-    // async watcher invalidates cache on file change (non-blocking, harness 07 Workflow observability)
     fs.watchFile(STATS_PATH, { interval: 5000 }, () => {
       latencyCache = null;
     });
   } catch {}
+}
+
+export function stopLatencyWatcher(): void {
+  try {
+    fs.unwatchFile(STATS_PATH);
+  } catch {}
+  latencyWatchInitialized = false;
 }
 
 async function loadLatencyData(): Promise<Record<string, any> | null> {

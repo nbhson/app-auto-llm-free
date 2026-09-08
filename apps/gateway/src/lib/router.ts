@@ -4,6 +4,7 @@ import { providers, resolveProvidersForModel } from "../providers/registry.js";
 type Strategy = "round-robin" | "tiered";
 
 let rrIndex = 0;
+let keyIndex = 0;
 
 const ALLOW_NO_KEY = new Set(["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"]);
 
@@ -74,7 +75,7 @@ export function getNextKey(providerId: string): string | null {
     if (ALLOW_NO_KEY.has(providerId)) return "";
     return null;
   }
-  const key = keys[rrIndex % keys.length];
-  rrIndex++;
+  const key = keys[keyIndex % keys.length];
+  keyIndex++;
   return key;
 }

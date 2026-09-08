@@ -17,6 +17,7 @@ import { apiRoute } from "./routes/api.js";
 import { extractBearer } from "./lib/auth.js";
 import { isValidVirtualKeyLive } from "./lib/virtual-keys.js";
 import { initRedis } from "./lib/redis.js";
+import { logger } from "./middleware/logger.js";
 
 export function createApp() {
   const app = new Hono();
@@ -27,32 +28,36 @@ export function createApp() {
   app.use("*", secureHeaders());
   app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id", "X-Session-ID", "X-Parent-Session-ID", "x-session-id", "x-parent-session-id", "anthropic-version", "x-api-key"], maxAge: 86400 }));
   app.use("*", async (c, next) => {
-    // Skip bodyLimit for multipart audio (needs larger)
-    if (c.req.path.startsWith("/v1/audio/")) return next();
+    if (c.req.path.startsWith("/v1/audio/")) {
+      return bodyLimit({ maxSize: 25 * 1024 * 1024 })(c, next);
+    }
     return bodyLimit({ maxSize: 10 * 1024 * 1024 })(c, next);
   });
   app.use("*", requestLogger);
   app.use("*", virtualKeyRateLimit);
 
   // Public bootstrap — expose auto-generated MASTER_KEY for first-time UI binding (local self-hosted)
-  // Frontend will auto-fetch this if localStorage.masterKey is placeholder, so new users always have a valid key on first start.
+  // Secure by default: only exposed when EXPOSE_BOOTSTRAP=1 (explicit opt-in, e.g. dev or private self-hosted)
+  function isBootstrapExposed(): boolean {
+    const v = process.env.EXPOSE_BOOTSTRAP;
+    return v === "1" || v === "true";
+  }
   app.get("/api/bootstrap", (c) => {
-    // Allow disabling via env in public deployments
-    if (process.env.EXPOSE_BOOTSTRAP === "0" || process.env.EXPOSE_BOOTSTRAP === "false") {
+    if (!isBootstrapExposed()) {
       return c.json({ error: { message: "Bootstrap disabled", type: "forbidden" } }, 403);
     }
     return c.json({ masterKey: config.masterKey });
   });
   // Alias for convenience
   app.get("/api/config/master", (c) => {
-    if (process.env.EXPOSE_BOOTSTRAP === "0" || process.env.EXPOSE_BOOTSTRAP === "false") {
+    if (!isBootstrapExposed()) {
       return c.json({ error: { message: "Bootstrap disabled", type: "forbidden" } }, 403);
     }
     return c.json({ masterKey: config.masterKey });
   });
 
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.7.1", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.7.2", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
   app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nPOST /v1/audio/transcriptions\nPOST /v1/audio/speech\nPOST /v1/responses\nPOST /v1/messages (Anthropic)\nGET /v1/health</pre></body></html>`));
 
@@ -105,7 +110,6 @@ export function createApp() {
   app.use("/api/*", async (c, next) => {
     if (c.req.path === "/api/bootstrap" || c.req.path === "/api/config/master") return next();
     const key = extractBearer(c as any);
-    if (c.req.path === "/api/providers" && config.nodeEnv === "development") return next();
     const vk = key ? isValidVirtualKeyLive(key) : null;
     if (!vk) return c.json({ error: { message: "Unauthorized", type: "invalid_api_key" } }, 401);
     // For /api/keys POST/DELETE require admin
@@ -121,7 +125,7 @@ export function createApp() {
   app.notFound((c) => c.json({ error: { message: `Not found: ${c.req.path}`, type: "not_found" } }, 404));
 
   app.onError((err, c) => {
-    console.error(err);
+    logger.error({ err, path: c.req.path }, "unhandled error");
     return c.json({ error: { message: err.message || "Internal error", type: "internal_error" } }, 500);
   });
 
