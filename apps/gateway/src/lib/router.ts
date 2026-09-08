@@ -6,7 +6,7 @@ type Strategy = "round-robin" | "tiered";
 let rrIndex = 0;
 let keyIndex = 0;
 
-const ALLOW_NO_KEY = new Set(["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"]);
+const ALLOW_NO_KEY = new Set(["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf"]);
 
 export function isPublicProvider(providerId: string): boolean {
   return ALLOW_NO_KEY.has(providerId);

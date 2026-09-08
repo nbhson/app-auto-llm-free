@@ -16,8 +16,6 @@ export const baseUrls: Record<string, string> = {
   siliconflow: "https://api.siliconflow.cn/v1",
   "glhf-chat": "https://glhf.chat/api/openai/v1",
   glhf: "https://glhf.chat/api/openai/v1",
-  "hugging-face": "https://router.huggingface.co/v1",
-  huggingface: "https://router.huggingface.co/v1",
   "kilo-code": "https://api.kilo.ai/api/gateway",
   opencode: "https://opencode.ai/zen/v1",
   "llm7-io": "https://api.llm7.io/v1",

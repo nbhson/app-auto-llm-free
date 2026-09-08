@@ -5,7 +5,7 @@ describe("router", () => {
   it("isPublicProvider returns true for pollinations", () => {
     expect(isPublicProvider("pollinations")).toBe(true);
     expect(isPublicProvider("openrouter")).toBe(false);
-    expect(isPublicProvider("hugging-face")).toBe(true);
+    expect(isPublicProvider("glhf-chat")).toBe(true);
   });
 
   it("isPublicProvider returns false for non-public", () => {

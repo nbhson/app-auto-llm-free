@@ -83,7 +83,7 @@ then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEFAULT_MODEL` | `auto` | Model used when the client sends none |
-| `FALLBACK_TIERS` | `[[...]]` | JSON freellms tiers: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
+| `FALLBACK_TIERS` | `[[...]]` | JSON freellms tiers: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]` |
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before opening the circuit |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | Cooldown duration |
 

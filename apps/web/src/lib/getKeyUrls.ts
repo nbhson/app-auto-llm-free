@@ -20,8 +20,6 @@ export const getKeyUrls: Record<string, string> = {
   siliconflow: "https://cloud.siliconflow.cn/account/ak",
   "glhf-chat": "https://glhf.chat",
   glhf: "https://glhf.chat",
-  "hugging-face": "https://huggingface.co/settings/tokens",
-  huggingface: "https://huggingface.co/settings/tokens",
   "kilo-code": "https://kilocode.ai",
   opencode: "https://opencode.ai",
   "agnes-ai": "https://agnes-ai.com",

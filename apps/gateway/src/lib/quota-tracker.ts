@@ -14,7 +14,6 @@ export const FREELLMS_LIMITS: Record<string, { rpm?: number; rpd?: number; tpm?:
   cohere: { rpm: 30 },
   sambanova: { rpm: 30 },
   siliconflow: { rpm: 30 },
-  "hugging-face": { rpm: 30 },
   "llm7-io": { rpm: 30 },
   "chutes-ai": { rpm: 30 },
   "glhf-chat": { rpm: 30 },

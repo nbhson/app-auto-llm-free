@@ -51,7 +51,7 @@ export function getNextKeyManaged(providerId: string): string | null {
   const states = keyStates.get(providerId)!;
   if (states.length === 0) {
     // public providers allow empty
-    if (["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"].includes(providerId)) return "";
+    if (["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf"].includes(providerId)) return "";
     return null;
   }
   // Filter out cooldown

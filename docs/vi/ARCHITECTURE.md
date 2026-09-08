@@ -143,7 +143,7 @@ Học `smart_router.py` + OmniRoute 19 strategies, thực tế freellms tier:
 | Strategy | Mô tả |
 |----------|-------|
 | `round-robin` | Mặc định, phân tán tải |
-| `tiered` | 4-tier từ `.env.example:19` `FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
+| `tiered` | 4-tier từ `.env.example:19` `FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]` |
 | `latency` | Chọn p50 thấp nhất (P3) |
 | `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (xem `registry.ts:42`) |
 | `verified` | Nếu có `data/verified-models.json` + `data/model-health.json` (persisted 404/410), `GET /v1/models?verified=free` loại `deprecated` khỏi pool |

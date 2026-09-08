@@ -40,7 +40,7 @@
 | 16 | **Aion Labs** | `aion-labs` | Permanent | ✅ | ✅ | text | **5 / 5** | all live | Aion 3.0 family |
 | 17 | **SambaNova** | `sambanova` | Permanent | ✅ | ✅ | text,reasoning,image | **4 / 4** | all live | SambaNova |
 | 18 | **Z AI (Zhipu AI)** | `z-ai-zhipu-ai` | Permanent | ✅ | ✅ | text,reasoning,image | **4 / 4** | all live | GLM-4.7-Flash etc |
-| 19 | **Hugging Face** | `hugging-face` | Quota | ✅ | ✅ | text,code | **4 / 4** | public | Inference API |
+| 18 | **OVHCloud AI Endpoints** | `ovhcloud-ai-endpoints` | Quota | ✅ | ✅ | text,code | **2 / 2** | public | Inference API |
 | 20 | **Ollama Cloud** | `ollama-cloud` | Permanent | ✅ | ✅ | text,reasoning,image | **3 / 8** | public | Session/weekly limits, 5 paid |
 | 21 | **Glhf.chat** | `glhf-chat` | Permanent | ✅ | ✅ | text | **2 / 2** | public | Mixtral 8x7B, Llama 3.1 70B |
 | 22 | **SiliconFlow** | `siliconflow` | Permanent | ✅ | ✅ | text,reasoning | **2 / 2** | all live | DeepSeek R1 |
@@ -101,7 +101,7 @@ See all freellms 316 models: `data/freellms-models-free.json` (historical). Live
 FALLBACK_TIERS = [
   ["nvidia-nim", "groq", "cerebras", "google-gemini"],
   ["cloudflare-workers-ai", "cohere", "sambanova", "siliconflow"],
-  ["ovhcloud-ai-endpoints", "modelscope", "llm7-io", "hugging-face"],
+  ["ovhcloud-ai-endpoints", "modelscope", "llm7-io"],
   ["openrouter", "kilo-code", "pollinations"]
 ]
 ```
@@ -148,4 +148,4 @@ python3 scripts/sync-freellms.py  # fetch & regenerate data/ (not latest)
 
 Last freellms scan: **2026-09-06T08:01 UTC** (script `scripts/sync-freellms.py:1`), data `data/verified-models.json:1` (dry-run 314/316 verified, live 5/316 due to missing keys). **Live scan**: `jobs/sync-live-models.ts:1` 2185 total, 882 free, `GET /api/verify/summary` + `GET /api/models/live` — scheduler 24h auto-syncs. See `docs/OPERATIONS.md:1`.
 
-> **Verification & live note:** freellms may list a model as free while live checks show it is already deprecated (e.g. hugging-face 1/4, llm7 4/6 in the public probe). The gateway marks these as `deprecated` and you can filter with `?verified=free` (snapshot) or `?hasKey=1` (live 882 free). **Freellms is now disabled** — use live for accuracy. Persisted 404/410 saved in `data/model-health.json` + `hide404` pill, rate-limit for list endpoints increased to 4x (200) + 400ms debounce.
+> **Verification & live note:** freellms may list a model as free while live checks show it is already deprecated (e.g. llm7 4/6 in the public probe). The gateway marks these as `deprecated` and you can filter with `?verified=free` (snapshot) or `?hasKey=1` (live 882 free). **Freellms is now disabled** — use live for accuracy. Persisted 404/410 saved in `data/model-health.json` + `hide404` pill, rate-limit for list endpoints increased to 4x (200) + 400ms debounce.

@@ -21,7 +21,7 @@ export async function probeModel(providerId: string, fullModelId: string, timeou
   if (!provider) return { id: fullModelId, provider: providerId, model: fullModelId, status: "error", error: "unknown provider" };
 
   const keys = config.providerKeys[providerId] || [];
-  const isPublic = ["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"].includes(providerId);
+  const isPublic = ["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf"].includes(providerId);
   if (keys.length === 0 && !isPublic) {
     return { id: fullModelId, provider: providerId, model: fullModelId, status: "no-key", error: "no API key configured" };
   }

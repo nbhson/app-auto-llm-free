@@ -11,7 +11,7 @@ function hasRealKey(providerId: string): boolean {
 }
 
 function isPublic(providerId: string): boolean {
-  return ["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf", "modelscope", "ovhcloud-ai-endpoints", "sambanova", "chutes", "aion-labs", "freeai"].includes(providerId);
+  return ["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf", "modelscope", "ovhcloud-ai-endpoints", "sambanova", "chutes", "aion-labs", "freeai"].includes(providerId);
 }
 
 export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ total: number; providers: number; liveModels: any[]; totalFetched?: number; filtered?: number }> {

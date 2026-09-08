@@ -64,8 +64,6 @@ export function createOpenAICompatibleProvider(opts: {
         siliconflow: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "glhf-chat": "hf:meta-llama/Llama-3.1-70B",
         glhf: "hf:meta-llama/Llama-3.1-70B",
-        "hugging-face": "meta-llama/Llama-3.1-8B-Instruct",
-        huggingface: "meta-llama/Llama-3.1-8B-Instruct",
         "kilo-code": "stepfun/step-3.7-flash:free",
         opencode: "opencode/mimo-v2.5-free",
         "llm7-io": "minimax-m2.7",

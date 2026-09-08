@@ -37,7 +37,7 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
     providerOrder = [pinned, ...getProvidersForRequest(model, "tiered").filter((p) => p !== pinned)];
   } else {
     // Prefer embedding-capable providers first
-    const embeddingPreferred = ["cohere", "nvidia-nim", "cloudflare-workers-ai", "openrouter", "hugging-face", "modelscope"];
+    const embeddingPreferred = ["cohere", "nvidia-nim", "cloudflare-workers-ai", "openrouter", "modelscope"];
     const base = getProvidersForRequest(model, "tiered");
     providerOrder = [...embeddingPreferred.filter((p) => base.includes(p)), ...base.filter((p) => !embeddingPreferred.includes(p))];
     // If model is generic, ensure embedding providers are tried first

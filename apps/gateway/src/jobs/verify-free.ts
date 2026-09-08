@@ -92,7 +92,7 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
     const keys = config.providerKeys[providerId] || [];
     const hasKey = keys.length > 0;
     // Special: pollinations/llm7 allow no key
-    const allowNoKey = ["pollinations", "llm7-io", "hugging-face"].includes(providerId);
+    const allowNoKey = ["pollinations", "llm7-io"].includes(providerId);
 
     if (!dryRun && !hasKey && !allowNoKey) {
       // Mark all freellms models for this provider as unverified_no_key (live needs key)

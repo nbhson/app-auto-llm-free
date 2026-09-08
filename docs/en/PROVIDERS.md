@@ -40,7 +40,6 @@
 | **LLM7.io** | `llm7-io` | `https://api.llm7.io/v1` | 6 | live public | — | text,reasoning | `LLM7_API_KEYS` |
 | **Cerebras** | `cerebras` | `https://api.cerebras.ai/v1` | 5 | live | 15 RPM/30K TPM/1M TPD, 128K ctx | text,reasoning | `CEREBRAS_API_KEYS` |
 | **Groq** | `groq` | `https://api.groq.com/openai/v1` | 7 / 23 total | live | 30 RPM/250 RPD primary, 14.4K RPD large | text,reasoning | `GROQ_API_KEYS` |
-| **Hugging Face** (quota) | `hugging-face` | `https://router.huggingface.co/v1` | 4 | live public | IP limit | text,code | `HUGGINGFACE_API_KEYS` |
 | **OpenCode Zen** | `opencode` | `https://opencode.ai/zen/v1` | 8 | live | — | reasoning,vision | `OPENCODE_API_KEYS` |
 | **Ollama Cloud** | `ollama-cloud` | `https://api.ollama.com` | 3 / 8 total | live public | Session/weekly limits | text,reasoning | `OLLAMA_CLOUD_API_KEYS` |
 | **Groq xAI** | `grok-xai` / `xai` | `https://api.x.ai/v1` | 2 | live | — | text | `GROK_API_KEYS` / `XAI_API_KEYS` |
@@ -52,7 +51,6 @@
 | **GitHub Models** | `github-models` | 13 | filtered via freellms list | PAT, quota | `GITHUB_TOKENS` |
 | **Mistral AI** | `mistral-ai` / `mistral` | 9 | filtered | 5 RPS free | `MISTRAL_API_KEYS` |
 | **Kilo Code** | `kilo-code` | 8 | `:free` suffix | ~200 req/hr, `:free` suffix | `KILO_CODE_API_KEYS` |
-| **Hugging Face** | `hugging-face` | 4 | public | — | `HUGGINGFACE_API_KEYS` |
 
 ### Legacy / Extra (still supported)
 
@@ -97,7 +95,7 @@ The Dashboard at `/models` (Vite) and `GET /v1/models?hasKey=1` are served from 
 ```
 auto           -> nvidia-nim, groq, cerebras, google-gemini, cloudflare
 gpt-4 / gpt4   -> groq, cerebras, google-gemini, openrouter, nvidia-nim
-claude-3       -> cohere, hugging-face, openrouter, mistral-ai
+claude-3       -> cohere, openrouter, mistral-ai
 gemini-flash   -> google-gemini
 llama          -> groq, cerebras, nvidia-nim, sambanova, ovhcloud
 qwen           -> modelscope, ovhcloud, siliconflow, alibaba
@@ -110,7 +108,7 @@ Top 30 by score: see `docs/FREELLMS_FREE_TIER.md:1` (historical).
 ## 4. Fallback Tiers (updated in .env.example & config.ts)
 
 ```env
-FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]
+FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]
 ```
 
 The router `apps/gateway/src/lib/router.ts:1` uses this tier along with `providerMeta` to fall back on 429/timeout. `hasKey` filter (`!xxx`, length>20) determines live cache usage.

@@ -2502,16 +2502,6 @@ models:
     no_card: true
     capabilities: [text]
     limit: "Up to 40 RPM"
-  - id: "hugging-face/qwen2.5-7b-instruct"
-    display_name: "qwen2.5-7b-instruct"
-    provider: hugging-face
-    context_length: 131000
-    score: 40
-    tier: quota
-    verified: false
-    no_card: true
-    capabilities: [text]
-    limit: "Credit-metered"
   - id: "grok-xai/grok-2-mini"
     display_name: "grok-2-mini"
     provider: grok-xai
@@ -2736,16 +2726,6 @@ models:
     verified: true
     no_card: false
     capabilities: [text]
-  - id: "hugging-face/qwen2.5-coder-7b-instruct"
-    display_name: "qwen2.5-coder-7b-instruct"
-    provider: hugging-face
-    context_length: 131000
-    score: 34
-    tier: quota
-    verified: false
-    no_card: true
-    capabilities: [text, code]
-    limit: "Credit-metered"
   - id: "modelscope/qwen/qwen3-next-80b-a3b-thinking"
     display_name: "qwen/qwen3-next-80b-a3b-thinking"
     provider: modelscope
@@ -2771,16 +2751,6 @@ models:
     tier: permanent
     verified: true
     no_card: false
-  - id: "hugging-face/meta-llama-3.1-8b-instruct"
-    display_name: "meta-llama-3.1-8b-instruct"
-    provider: hugging-face
-    context_length: 128000
-    score: 34
-    tier: quota
-    verified: true
-    no_card: true
-    capabilities: [text]
-    limit: "Credit-metered"
   - id: "modelscope/mistralai/mistral-large-instruct-2407"
     display_name: "mistralai/mistral-large-instruct-2407"
     provider: modelscope
@@ -2806,26 +2776,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
-  - id: "hugging-face/gemma-3-4b-it"
-    display_name: "gemma-3-4b-it"
-    provider: hugging-face
-    context_length: 131000
-    score: 33
-    tier: quota
-    verified: false
-    no_card: true
-    capabilities: [text]
-    limit: "Credit-metered"
-  - id: "modelscope/qwen/qwen3-30b-a3b-thinking-2507"
-    display_name: "qwen/qwen3-30b-a3b-thinking-2507"
-    provider: modelscope
-    context_length: 8192
-    score: 32
-    tier: permanent
-    verified: true
-    no_card: false
-    capabilities: [reasoning]
-  - id: "nvidia-nim/meta/llama-3.1-8b-instruct"
+  - id: "meta/llama-3.1-8b-instruct"
     display_name: "meta/llama-3.1-8b-instruct"
     provider: nvidia-nim
     context_length: 8192

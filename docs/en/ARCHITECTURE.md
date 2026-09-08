@@ -143,7 +143,7 @@ Based on `smart_router.py` + OmniRoute 19 strategies, actual freellms tiers:
 | Strategy | Description |
 |----------|-------------|
 | `round-robin` | Default, distribute load |
-| `tiered` | 4-tier from `.env.example:19` `FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
+| `tiered` | 4-tier from `.env.example:19` `FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]` |
 | `latency` | Pick lowest p50 (P3) |
 | `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (see `registry.ts:42`) |
 | `verified` | If `data/verified-models.json` + `data/model-health.json` (persisted 404/410) exists, `GET /v1/models?verified=free` removes `deprecated` from pool |

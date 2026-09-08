@@ -322,7 +322,7 @@ modelsRoute.get("/", async (c) => {
   const verifiedSummary = readDataJson<any>("verified-summary.json", null);
 
   // Pagination: limit 25/50 LOV, page 1-indexed
-  // Deduplicate by id (fix duplicate keys like hugging-face/Qwen/Qwen2.5-VL-72B-Instruct)
+  // Deduplicate by id (fix duplicate keys like openrouter/Qwen/Qwen2.5-VL-72B-Instruct)
   const seen = new Set<string>();
   const deduped = all.filter((m) => { if (seen.has(m.id)) return false; seen.add(m.id); return true; });
   const total = deduped.length;

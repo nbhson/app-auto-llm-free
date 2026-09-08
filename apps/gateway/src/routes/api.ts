@@ -47,7 +47,7 @@ apiRoute.get("/providers", (c) => {
     detailed = detailed.filter((p) => {
       const keys = config.providerKeys[p.id] || [];
       const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me"));
-      const isPublic = ["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat", "glhf"].includes(p.id);
+      const isPublic = ["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf"].includes(p.id);
       return hasRealKey || isPublic;
     });
   }
@@ -82,7 +82,7 @@ apiRoute.get("/providers/health", async (c) => {
     providerIds.map(async (id) => {
       const keys = config.providerKeys[id] || [];
       const hasKey = keys.length > 0;
-      const isPublic = ["pollinations", "llm7-io", "hugging-face", "huggingface", "ollama-cloud", "glhf-chat"].includes(id);
+      const isPublic = ["pollinations", "llm7-io", "ollama-cloud", "glhf-chat"].includes(id);
       if (!hasKey && !isPublic) {
         results.push({ id, status: "no-key", keys: 0, latency_ms: 0, breaker: breakers[id]?.state || "closed" });
         return;

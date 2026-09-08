@@ -24,8 +24,6 @@ export const FREELLMS_COST: Record<string, number> = {
   cohere: 0,
   sambanova: 0,
   siliconflow: 0,
-  "hugging-face": 0,
-  huggingface: 0,
   "llm7-io": 0,
   pollinations: 0,
   openrouter: 0.1,

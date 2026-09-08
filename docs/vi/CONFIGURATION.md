@@ -83,7 +83,7 @@ sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/
 | Biến | Mặc định | Mô tả |
 |------|----------|-------|
 | `DEFAULT_MODEL` | `auto` | model khi client không truyền |
-| `FALLBACK_TIERS` | `[[...]]` | JSON tiers freellms: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io","hugging-face"],["openrouter","kilo-code","pollinations"]]` |
+| `FALLBACK_TIERS` | `[[...]]` | JSON tiers freellms: `[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]` |
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | fails để open |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | — |
 

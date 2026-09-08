@@ -37,7 +37,7 @@ imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => 
     }
     providerOrder = [pinned, ...getProvidersForRequest(model, "tiered").filter((p) => p !== pinned)];
   } else {
-    const imagePreferred = ["agnes-ai", "cloudflare-workers-ai", "hugging-face", "nvidia-nim", "openrouter"];
+    const imagePreferred = ["agnes-ai", "cloudflare-workers-ai", "nvidia-nim", "openrouter"];
     const base = getProvidersForRequest(model, "tiered");
     providerOrder = [...imagePreferred.filter((p) => base.includes(p)), ...base.filter((p) => !imagePreferred.includes(p))];
     if (!model || model === "auto") {

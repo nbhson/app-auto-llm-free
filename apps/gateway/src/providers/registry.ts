@@ -28,8 +28,6 @@ export const providers: Record<string, Provider> = {
   chutes: OPENAI({ id: "chutes", baseUrl: "https://llm.chutes.ai/v1" }), // alias legacy
   sambanova: OPENAI({ id: "sambanova", baseUrl: "https://api.sambanova.ai/v1" }), // 4
   siliconflow: OPENAI({ id: "siliconflow", baseUrl: "https://api.siliconflow.cn/v1" }), // 2
-  "hugging-face": OPENAI({ id: "hugging-face", baseUrl: "https://router.huggingface.co/v1" }), // 4, quota
-  huggingface: OPENAI({ id: "hugging-face", baseUrl: "https://router.huggingface.co/v1" }),
   "kilo-code": OPENAI({ id: "kilo-code", baseUrl: "https://api.kilo.ai/api/gateway" }), // 6 free 2026-08
   opencode: OPENAI({ id: "opencode", baseUrl: "https://opencode.ai/zen/v1" }), // 8
   "llm7-io": OPENAI({ id: "llm7-io", baseUrl: "https://api.llm7.io/v1" }), // 6
@@ -95,7 +93,6 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   "experiential-cloud": { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   experiential_cloud: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   sambanova: { name: "SambaNova", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
-  "hugging-face": { name: "Hugging Face", tier: "Quota", tier_type: "quota", caps: ["text","code"], noCard: true },
   "ollama-cloud": { name: "Ollama Cloud", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   "chutes-ai": { name: "Chutes.ai", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   "grok-xai": { name: "Grok (xAI)", tier: "Permanent Free", tier_type: "permanent", caps: ["text"], noCard: false },
@@ -115,8 +112,6 @@ export const modelAliases: Record<string, string[]> = {
   "free-llm-gateway/auto": [
     "pollinations",
     "llm7-io",
-    "hugging-face",
-    "experientiallabs",
     "kilo-code",
     "nvidia-nim",
     "agnes-ai",
@@ -185,10 +180,10 @@ export const modelAliases: Record<string, string[]> = {
   "auto/coding": ["kilo-code", "opencode", "cohere"],
   "aion-labs/aion-3.0": ["aion-labs"],
   "minimax-m2.7": ["llm7-io", "sambanova"],
-  "gpt-oss": ["llm7-io", "cerebras", "ollama-cloud", "hugging-face"],
+  "gpt-oss": ["llm7-io", "cerebras", "ollama-cloud"],
   "gpt-4": ["groq", "cerebras", "google-gemini", "openrouter", "nvidia-nim"],
   "gpt-3.5": ["groq", "pollinations", "ovhcloud-ai-endpoints", "modelscope"],
-  "claude-3": ["cohere", "hugging-face", "openrouter", "mistral-ai"],
+  "claude-3": ["cohere", "openrouter", "mistral-ai"],
   gemini: ["google-gemini"],
   "gemini-flash": ["google-gemini"],
   llama: ["groq", "cerebras", "nvidia-nim", "sambanova", "ovhcloud-ai-endpoints"],

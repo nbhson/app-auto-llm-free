@@ -44,8 +44,6 @@ Gateway: http://localhost:18089
 | google-gemini | offline | 458ms | closed |
 | grok-xai | offline | 545ms | closed |
 | groq | offline | 355ms | closed |
-| hugging-face | online | 506ms | closed |
-| huggingface | online | 485ms | closed |
 | kilo-code | online | 599ms | closed |
 | llm7-io | online | 574ms | closed |
 | mistral | offline | 465ms | closed |
@@ -195,15 +193,7 @@ Gateway: http://localhost:18089
       "latency_ms": 0
     },
     {
-      "id": "hugging-face",
-      "freellms_free": 4,
-      "live_models": 4,
-      "verified_free": 4,
-      "deprecated": 0,
-      "unverified_no_key": false,
-      "latency_ms": 0
-    },
-    {
+
       "id": "kilo-code",
       "freellms_free": 8,
       "live_models": 8,
