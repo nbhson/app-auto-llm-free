@@ -141,9 +141,10 @@ function openAIStreamToAnthropicStream(openAIStream: ReadableStream<Uint8Array>,
 
 export const anthropicRoute = new Hono();
 
-// Claude Code sends model "auto" -> map to default claude model
+// Claude Code sends model "auto" -> map to default claude model; gateway-llm/auto is kept as is for custom routing
 function normalizeAnthropicModel(m: string): string {
   if (!m || m === "auto") return "claude-3-5-sonnet-20241022";
+  if (m === "gateway-llm/auto") return "gateway-llm/auto";
   // already anthropic/claude... -> strip prefix handled later
   return m;
 }
