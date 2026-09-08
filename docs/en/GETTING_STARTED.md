@@ -6,7 +6,7 @@
 
 ## 1. What Do You Need?
 
-- **Docker Desktop** (recommended) **or** Node 20+ (`node -v`)
+- **Docker Desktop** (recommended) **or** Node >= 22 (`node -v`) + npm >= 10 (`npm -v`)
 - **No manual key generation:** `MASTER_KEY` (single API key for `/v1/*` + `/api/*`) and `ENCRYPTION_KEY` (internal AES-256-GCM) are **auto-generated** on first boot if missing/placeholder and persisted to `.env` (or `data/.gateway-keys.json` when running Docker without `.env`) — check `docker compose logs gateway | grep MASTER_KEY`.
 - **Provider keys are optional:** you can leave them empty and still run `pollinations` (20b) via `auto`. With real keys you get live models via `?hasKey=1` (live sync 882 free).
 - **Docs:** Root `README.md` default English, `README.vi.md` Vietnamese; you are in `docs/en/` (English banner). UI has `VI/EN` selector in header (persists `localStorage lang`) — `lib/i18n.tsx:1`.
@@ -145,7 +145,32 @@ Without keys → `auto` still falls back to `pollinations` (20b) after ~10s and 
 
 1. Go to freellms.org/providers/nvidia-nim → **Get API Key** → create `nvapi-...`
 2. Paste it into `.env` on the `NVIDIA_API_KEYS=nvapi-...` line (multiple keys separated by `,`) — real-key needs `length>20` and not `xxx`/`change-me` for `hasRealKey` `api.ts:27`
-3. **Restart gateway to reload `.env`** (gateway reads `.env` only at boot `config.ts:22`): `docker compose restart gateway` (Docker) or `pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; npm run dev:gateway` (npm — `tsx watch` does not watch `.env`)
+3. **Restart gateway to reload `.env`** (gateway reads `.env` only at boot `config.ts:22`, `tsx watch` does **not** watch `.env`):
+   - **Docker (any OS):** `docker compose restart gateway`
+   - **macOS / Linux (npm):**
+     ```bash
+     pkill -f "tsx watch"
+     lsof -ti:7373 | xargs kill -9
+     sleep 2
+     lsof -i :7373   # should be empty
+     npm run dev:gateway
+     ```
+   - **Windows PowerShell (run as Administrator if needed):**
+     ```powershell
+     netstat -ano | findstr :7373
+     taskkill /PID <PID> /F
+     # or kill all Node dev servers
+     taskkill /F /IM node.exe
+     # one-liner
+     Stop-Process -Id (Get-NetTCPConnection -LocalPort 7373).OwningProcess -Force -ErrorAction SilentlyContinue
+     npm run dev:gateway
+     ```
+   - **Windows CMD / Git Bash:**
+     ```cmd
+     netstat -ano | findstr :7373
+     taskkill /PID <PID> /F
+     npm run dev:gateway
+     ```
 4. Sync live: click **Sync Live Now** on `/providers` or `/models` (both call `POST /api/models/live/sync {freeOnly:true}` `sync-live-models.ts:17` → `provider.models()` → `data/live-models.json`) or `curl -X POST /api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'` — then `GET /v1/models?hasKey=1` returns live cache, `GET /api/providers?hasKey=1` highlights green
 5. Check `GET /api/providers/health` — that provider will switch to `online`, and `GET /api/verify/summary` will increase `verified_free`
 
@@ -162,7 +187,7 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 
 ## 8. Common Errors
 
-> **Node 20–26 & `better-sqlite3`**: gateway uses `better-sqlite3@^13.0.3` (`apps/gateway/package.json:34`) with prebuilds for Node 20–26 (ABI 115–147). If `npm install` fails with `gyp ERR!` / `v8-internal.h: concept/requires` on Node 26, run `rm -rf node_modules package-lock.json && npm install` after upgrading — Docker (`node:20-alpine`) is unaffected.
+> **Node 22–26 & `better-sqlite3`**: gateway uses `better-sqlite3@^13.0.3` (`apps/gateway/package.json:34`) with prebuilds for Node 22–26 (ABI 127–147). Requires **Node >= 22**. If `npm install` fails with `gyp ERR!` / `v8-internal.h: concept/requires`, run `rm -rf node_modules package-lock.json && npm install` after upgrading to Node 22 LTS — Docker (`node:22-alpine`) is unaffected.
 
 | Error | Cause | Fix |
 |-----|-------|-----|
@@ -176,13 +201,19 @@ Table of 30 providers + key links: see `docs/PROVIDERS.md:1` (column **Base URL*
 | `verified 0/316` | Missing real provider keys, scheduler not yet run | Wait 5s after starting the gateway (scheduler auto-verifies + syncLiveModels dry-run) or `POST /api/verify` / `POST /api/models/live/sync` with `{"freeOnly":true}` — `ENCRYPTION_KEY` is auto-generated, no manual step |
 | `npm i` fails `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + old `better-sqlite3@9` has no prebuild (ABI 147) | Fixed at `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. If still fails, use Node 22 LTS (`brew install node@22`) or `npm i --build-from-source` with Xcode CLT `xcode-select --install` |
 | `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` | Behind corporate SSL-inspection proxy (Zscaler) | Dev: uncomment `NODE_TLS_REJECT_UNAUTHORIZED=0` in `.env` (commented by default), prod: use `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` to keep verification |
-| `EADDRINUSE :::7373` on `npm run dev` | Old gateway still running (`nohup npm run dev:gateway` or `tsx watch` not killed) | `pkill -f "tsx watch"; lsof -ti:7373 \| xargs kill -9; sleep 2; lsof -i :7373` (empty) then `npm run dev` |
+| `EADDRINUSE :::7373` on `npm run dev` | Old gateway still running (`nohup npm run dev:gateway` or `tsx watch` not killed) | **macOS/Linux:** `pkill -f "tsx watch"; lsof -ti:7373 \| xargs kill -9; sleep 2; lsof -i :7373` (empty) then `npm run dev` <br> **Windows PowerShell:** `netstat -ano \| findstr :7373` → `taskkill /PID <PID> /F` or `taskkill /F /IM node.exe` <br> **Windows CMD/Git Bash:** same `netstat` + `taskkill` |
 
 ## 9. Useful Commands
 
 ```bash
 # Kill old gateway if EADDRINUSE :::7373
+# macOS / Linux:
 pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; sleep 2; lsof -i :7373
+# Windows PowerShell:
+# netstat -ano | findstr :7373
+# taskkill /PID <PID> /F
+# taskkill /F /IM node.exe
+# Stop-Process -Id (Get-NetTCPConnection -LocalPort 7373).OwningProcess -Force
 
 # Health
 curl http://localhost:7373/v1/health

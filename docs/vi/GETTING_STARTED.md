@@ -6,7 +6,7 @@
 
 ## 1. Bạn cần gì?
 
-- **Docker Desktop** (khuyến nghị) **hoặc** Node 20+ (`node -v`)
+- **Docker Desktop** (khuyến nghị) **hoặc** Node >= 22 (`node -v`) + npm >= 10 (`npm -v`)
 - **Không cần tạo key thủ công:** `MASTER_KEY` (1 key duy nhất cho `/v1/*` + `/api/*`) và `ENCRYPTION_KEY` (nội bộ AES-256-GCM) sẽ **tự sinh** lần đầu nếu thiếu/placeholder và lưu vào `.env` (hoặc `data/.gateway-keys.json` khi chạy Docker không có `.env`) — xem `docker compose logs gateway | grep MASTER_KEY`.
 - **Provider keys là tùy chọn:** để trống vẫn chạy được `pollinations` (20b) qua `auto`. Có key sẽ hiện live models qua `?hasKey=1` (live sync 882 free).
 - **Docs:** Root `README.md` mặc định English, `README.vi.md` Vietnamese; bạn đang ở `docs/vi/` (banner Tiếng Việt). UI có selector `VI/EN` ở header (persist `localStorage lang`) — `lib/i18n.tsx:1`.
@@ -139,7 +139,32 @@ Không có key → `auto` vẫn fallback tới `pollinations` (20b) sau ~10s và
 
 1. Vào freellms.org/providers/nvidia-nim → **Get API Key** → tạo `nvapi-...`
 2. Dán vào `.env` dòng `NVIDIA_API_KEYS=nvapi-...` (nhiều key cách nhau `,`) — real-key cần `length>20` và không chứa `xxx`/`change-me` mới tính `hasRealKey` `api.ts:27`
-3. **Restart gateway để nạp lại `.env`** (gateway chỉ đọc `.env` lúc boot `config.ts:22`): `docker compose restart gateway` (Docker) hoặc `pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; npm run dev:gateway` (npm — `tsx watch` không watch `.env`)
+3. **Restart gateway để nạp lại `.env`** (gateway chỉ đọc `.env` lúc boot `config.ts:22`, `tsx watch` **không** watch `.env`):
+   - **Docker (mọi OS):** `docker compose restart gateway`
+   - **macOS / Linux (npm):**
+     ```bash
+     pkill -f "tsx watch"
+     lsof -ti:7373 | xargs kill -9
+     sleep 2
+     lsof -i :7373   # phải trống
+     npm run dev:gateway
+     ```
+   - **Windows PowerShell (chạy quyền Admin nếu cần):**
+     ```powershell
+     netstat -ano | findstr :7373
+     taskkill /PID <PID> /F
+     # hoặc kill toàn bộ Node dev server
+     taskkill /F /IM node.exe
+     # one-liner
+     Stop-Process -Id (Get-NetTCPConnection -LocalPort 7373).OwningProcess -Force -ErrorAction SilentlyContinue
+     npm run dev:gateway
+     ```
+   - **Windows CMD / Git Bash:**
+     ```cmd
+     netstat -ano | findstr :7373
+     taskkill /PID <PID> /F
+     npm run dev:gateway
+     ```
 4. Đồng bộ live: bấm **Sync Live Now** ở `/providers` hoặc `/models` (cùng gọi `POST /api/models/live/sync {freeOnly:true}` `sync-live-models.ts:17` → `provider.models()` → `data/live-models.json`) hoặc `curl -X POST /api/models/live/sync -H "Authorization: Bearer $MASTER" -d '{"freeOnly":true}'` — sau đó `GET /v1/models?hasKey=1` trả live cache, `GET /api/providers?hasKey=1` highlight xanh
 5. Kiểm tra `GET /api/providers/health` — provider đó sẽ chuyển `online`, `GET /api/verify/summary` sẽ tăng `verified_free`
 
@@ -156,7 +181,7 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 
 ## 8. Lỗi thường gặp
 
-> **Node 20–26 & `better-sqlite3`**: gateway dùng `better-sqlite3@^13.0.3` (`apps/gateway/package.json:34`) với prebuild cho Node 20–26 (ABI 115–147). Nếu `npm install` báo `gyp ERR!` / `v8-internal.h: concept/requires` trên Node 26, chạy `rm -rf node_modules package-lock.json && npm install` sau khi upgrade — Docker (`node:20-alpine`) không ảnh hưởng.
+> **Node 22–26 & `better-sqlite3`**: gateway dùng `better-sqlite3@^13.0.3` (`apps/gateway/package.json:34`) với prebuild cho Node 22–26 (ABI 127–147). Yêu cầu **Node >= 22**. Nếu `npm install` báo `gyp ERR!` / `v8-internal.h: concept/requires`, chạy `rm -rf node_modules package-lock.json && npm install` sau khi upgrade lên Node 22 LTS — Docker (`node:22-alpine`) không ảnh hưởng.
 
 | Lỗi | Nguyên nhân | Sửa |
 |-----|-------------|-----|
@@ -170,13 +195,19 @@ Bảng 30 providers + link lấy key: xem `docs/PROVIDERS.md:1` (cột **Base UR
 | `verified 0/316` | Chưa có provider keys thật, scheduler chưa chạy | Đợi 5s sau khi start gateway (scheduler tự verify + syncLiveModels dry-run) hoặc `POST /api/verify` / `POST /api/models/live/sync` với `{"freeOnly":true}` — `ENCRYPTION_KEY` đã tự sinh, không cần nhập tay |
 | `npm i` lỗi `better-sqlite3` / `node-gyp` / `v8-internal.h: concept` | Node 26 + `better-sqlite3@9` cũ không có prebuild (ABI 147) | Đã fix ở `^13.0.3`: `rm -rf node_modules package-lock.json && npm i`. Nếu vẫn lỗi, dùng Node 22 LTS (`brew install node@22`) hoặc `npm i --build-from-source` với Xcode CLT `xcode-select --install` |
 | `UNABLE_TO_VERIFY_LEAF_SIGNATURE` / `SELF_SIGNED_CERT_IN_CHAIN` | Sau corporate proxy SSL inspection (Zscaler) | Dev tạm uncomment `NODE_TLS_REJECT_UNAUTHORIZED=0` trong `.env` (mặc định comment), prod dùng `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` để giữ verify |
-| `EADDRINUSE :::7373` khi `npm run dev` | Gateway cũ vẫn chạy (`nohup npm run dev:gateway` hoặc `tsx watch` chưa kill) | `pkill -f "tsx watch"; lsof -ti:7373 \| xargs kill -9; sleep 2; lsof -i :7373` (trống) rồi `npm run dev` lại |
+| `EADDRINUSE :::7373` khi `npm run dev` | Gateway cũ vẫn chạy (`nohup npm run dev:gateway` hoặc `tsx watch` chưa kill) | **macOS/Linux:** `pkill -f "tsx watch"; lsof -ti:7373 \| xargs kill -9; sleep 2; lsof -i :7373` (trống) rồi `npm run dev` <br> **Windows PowerShell:** `netstat -ano \| findstr :7373` → `taskkill /PID <PID> /F` hoặc `taskkill /F /IM node.exe` <br> **Windows CMD/Git Bash:** `netstat -ano \| findstr :7373` → `taskkill /PID <PID> /F` |
 
 ## 9. Lệnh hữu ích
 
 ```bash
 # Kill gateway cũ nếu EADDRINUSE :::7373
+# macOS / Linux:
 pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; sleep 2; lsof -i :7373
+# Windows PowerShell:
+# netstat -ano | findstr :7373
+# taskkill /PID <PID> /F
+# taskkill /F /IM node.exe
+# Stop-Process -Id (Get-NetTCPConnection -LocalPort 7373).OwningProcess -Force
 
 # Health
 curl http://localhost:7373/v1/health

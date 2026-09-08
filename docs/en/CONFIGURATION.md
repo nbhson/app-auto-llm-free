@@ -62,7 +62,13 @@ AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # usually not needed
 ```
 
-Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` for `hasRealKey` `api.ts:27`. **Changing `.env` requires restarting the gateway** (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) because `config.ts:22` reads only at boot, then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live-models.json`. See the full table in `docs/PROVIDERS.md:1`.
+Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` for `hasRealKey` `api.ts:27`. **Changing `.env` requires killing old process & restarting** because `config.ts:22` reads only at boot (`tsx watch` does not watch `.env`):
+- **Docker (any OS):** `docker compose restart gateway`
+- **macOS/Linux:** `pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; npm run dev:gateway`
+- **Windows PowerShell:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F` (or `taskkill /F /IM node.exe`)
+- **Windows CMD/Git Bash:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F`
+
+then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live-models.json`. See the full table in `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -167,10 +173,10 @@ export default defineConfig({
 });
 ```
 
-Migrate:
+Migrate (Node >= 22, npm):
 
 ```bash
-bun run db:generate
-bun run db:migrate
-bun run db:studio   # GUI
+npm run db:generate
+npm run db:migrate
+npm run db:studio   # GUI
 ```

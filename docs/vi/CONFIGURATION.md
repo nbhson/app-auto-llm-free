@@ -62,7 +62,13 @@ AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # thường không cần
 ```
 
-Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` cho `hasRealKey` `api.ts:27`. **Đổi `.env` phải restart gateway** (`docker compose restart gateway` hoặc `pkill -f "tsx watch"; npm run dev:gateway`) vì `config.ts:22` chỉ đọc lúc boot, sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/live-models.json`. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
+Để trống provider nào thì provider đó bị disable (trừ `pollinations`/`llm7-io` scraped tự động enable). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` cho `hasRealKey` `api.ts:27`. **Đổi `.env` phải kill process cũ & restart** vì `config.ts:22` chỉ đọc lúc boot (`tsx watch` không watch `.env`):
+- **Docker (mọi OS):** `docker compose restart gateway`
+- **macOS/Linux:** `pkill -f "tsx watch"; lsof -ti:7373 | xargs kill -9; npm run dev:gateway`
+- **Windows PowerShell:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F` (hoặc `taskkill /F /IM node.exe`)
+- **Windows CMD/Git Bash:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F`
+
+sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/live-models.json`. Xem bảng đầy đủ trong `docs/PROVIDERS.md:1`.
 
 ### Router
 
@@ -167,10 +173,10 @@ export default defineConfig({
 });
 ```
 
-Migrate:
+Migrate (Node >= 22, npm):
 
 ```bash
-bun run db:generate
-bun run db:migrate
-bun run db:studio   # GUI
+npm run db:generate
+npm run db:migrate
+npm run db:studio   # GUI
 ```

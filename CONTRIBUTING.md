@@ -5,7 +5,7 @@ Cảm ơn bạn quan tâm đóng góp cho `app-auto-llm-free`!
 ## Quy trình
 
 1. Fork repo, tạo branch `feat/<ten-tinh-nang>` hoặc `fix/<ten-loi>`.
-2. Cài đặt: `npm install && cp .env.example .env` (hoặc `bun install` nếu dùng Bun) — điền ít nhất 1 provider key để test live.
+2. Cài đặt: `npm install && cp .env.example .env` — yêu cầu **Node >= 22** (`node -v`) + npm >= 10 — điền ít nhất 1 provider key để test live.
 3. Code + test local:
 
 ```bash

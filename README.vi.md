@@ -3,7 +3,7 @@
 > **Một endpoint duy nhất cho mọi LLM miễn phí.** Tương tự OmniRoute / 9Router / FreeLLMAPI — tự host, OpenAI-compatible, gom toàn bộ provider & model free vào một gateway.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Stack: Hono + Bun](https://img.shields.io/badge/Stack-Hono%20%2B%20Bun-orange)](https://hono.dev)
+[![Stack: Hono + Node](https://img.shields.io/badge/Stack-Hono%20%2B%20Node-green)](https://hono.dev)
 [![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/vi/API.md)
 [![MIỄN PHÍ](https://img.shields.io/badge/MIỄN_PHÍ-43_Provider-00c853?style=flat-square)](docs/vi/PROVIDERS.md)
 [![MIỄN PHÍ](https://img.shields.io/badge/MIỄN_PHÍ-324_Model-00c853?style=flat-square)](models.yaml)
@@ -49,7 +49,7 @@
 
 ```
 Client (OpenAI SDK / Vercel AI SDK) 
-  → Hono Gateway (Bun/Node/Cloudflare Workers)
+  → Hono Gateway (Node/Cloudflare Workers)
     → Middleware: auth, rate-limit, body-limit, logger
     → Smart Router (model → provider pool)
     → Provider Adapters (OpenAI/Gemini/Anthropic/Scraped) + format-translator
@@ -63,7 +63,7 @@ Chi tiết xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 ## 🚀 Quick Start — người mới xem **[GETTING_STARTED.md](docs/GETTING_STARTED.md) 5 phút** (từ 0 tới gọi API đầu tiên)
 
 ### Yêu cầu
-- Bun >= 1.1 hoặc Node >= 20
+- Node >= 22 (`node -v`) + npm >= 10 (`npm -v`)
 - Docker (khuyến nghị) hoặc Redis + Postgres/SQLite
 
 ### 1. Clone & cài đặt
@@ -89,9 +89,46 @@ docker compose up -d
 ### 3. Chạy dev local
 
 ```bash
-bun install
-bun run dev:gateway   # Hono @ http://localhost:7373
-bun run dev:web       # Vite @ http://localhost:5173
+npm install
+npm run dev:gateway   # Hono @ http://localhost:7373
+npm run dev:web       # Vite @ http://localhost:5173
+```
+
+> **⚠️ Sau khi sửa `.env` phải kill gateway cũ rồi chạy lại** — gateway chỉ đọc `.env` lúc boot (`config.ts:22`), `tsx watch` **không** tự reload `.env`. Xem **Kill process cũ → restart** bên dưới.
+
+#### 🔄 Kill process cũ & restart sau khi sửa `.env`
+
+**Docker (mọi OS):**
+```bash
+docker compose restart gateway
+```
+
+**macOS / Linux (npm):**
+```bash
+pkill -f "tsx watch"
+lsof -ti:7373 | xargs kill -9
+sleep 2
+lsof -i :7373          # phải trống
+npm run dev:gateway
+```
+
+**Windows (PowerShell — chạy quyền Admin nếu cần):**
+```powershell
+netstat -ano | findstr :7373
+taskkill /PID <PID> /F
+# hoặc kill toàn bộ Node (đóng hết dev server npm)
+taskkill /F /IM node.exe
+
+# one-liner PowerShell
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 7373).OwningProcess -Force -ErrorAction SilentlyContinue
+npm run dev:gateway
+```
+
+**Windows (Git Bash / CMD):**
+```cmd
+netstat -ano | findstr :7373
+taskkill /PID <PID> /F
+npm run dev:gateway
 ```
 
 ### 4. Gọi API (OpenAI SDK)
@@ -196,7 +233,7 @@ Chi tiết [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## 🤝 Đóng góp
 
-PRs welcome! Xem [CONTRIBUTING.md](CONTRIBUTING.md). Vui lòng chạy `bun run lint` + `bun run test` trước khi push.
+PRs welcome! Xem [CONTRIBUTING.md](CONTRIBUTING.md). Vui lòng chạy `npm run lint` + `npm test` trước khi push. Yêu cầu Node >= 22.
 
 ## 📜 License
 

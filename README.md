@@ -3,7 +3,7 @@
 > **One endpoint for all free LLMs.** Like OmniRoute / 9Router / FreeLLMAPI — self-hosted, OpenAI-compatible, aggregating all free providers & models into a single gateway.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Stack: Hono + Bun](https://img.shields.io/badge/Stack-Hono%20%2B%20Bun-orange)](https://hono.dev)
+[![Stack: Hono + Node](https://img.shields.io/badge/Stack-Hono%20%2B%20Node-green)](https://hono.dev)
 [![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/en/API.md)
 [![FREE](https://img.shields.io/badge/FREE-43_Providers-00c853?style=flat-square)](docs/en/PROVIDERS.md)
 [![FREE](https://img.shields.io/badge/FREE-324_Models-00c853?style=flat-square)](models.yaml)
@@ -53,7 +53,7 @@
 
 ```
 Client (OpenAI SDK / Vercel AI SDK) 
-  → Hono Gateway (Bun/Node/Cloudflare Workers)
+  → Hono Gateway (Node/Cloudflare Workers)
     → Middleware: auth, rate-limit, body-limit, logger
     → Smart Router (model → provider pool, sanitize spaces/colon)
     → Provider Adapters (OpenAI/Gemini/Anthropic/Scraped) + format-translator
@@ -67,7 +67,7 @@ See [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md)
 ## 🚀 Quick Start — new users see **[GETTING_STARTED.md](docs/en/GETTING_STARTED.md) 5 min** (from 0 to first API call)
 
 ### Requirements
-- Bun >= 1.1 or Node >= 20
+- Node >= 22 (`node -v`) + npm >= 10 (`npm -v`)
 - Docker (recommended) or Redis + Postgres/SQLite
 
 ### 1. Clone & install
@@ -93,9 +93,48 @@ docker compose up -d
 ### 3. Run dev locally
 
 ```bash
-bun install
-bun run dev:gateway   # Hono @ http://localhost:7373
-bun run dev:web       # Vite @ http://localhost:5173
+npm install
+npm run dev:gateway   # Hono @ http://localhost:7373
+npm run dev:web       # Vite @ http://localhost:5173
+```
+
+> **⚠️ After updating `.env` you must kill the old gateway and restart** — gateway reads `.env` only at boot (`config.ts:22`), `tsx watch` does **not** watch `.env`. See **Kill old process → restart** below.
+
+#### 🔄 Kill old process & restart after `.env` change
+
+**Docker (any OS):**
+```bash
+docker compose restart gateway
+```
+
+**macOS / Linux (npm):**
+```bash
+# kill tsx watch + any process on 7373, then restart
+pkill -f "tsx watch"
+lsof -ti:7373 | xargs kill -9
+sleep 2
+lsof -i :7373          # should be empty
+npm run dev:gateway
+```
+
+**Windows (PowerShell — run as Administrator if needed):**
+```powershell
+# Find PID using port 7373 then kill it
+netstat -ano | findstr :7373
+taskkill /PID <PID> /F
+# or kill all Node processes (closes all npm dev servers)
+taskkill /F /IM node.exe
+
+# alternative PowerShell one-liner
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 7373).OwningProcess -Force -ErrorAction SilentlyContinue
+npm run dev:gateway
+```
+
+**Windows (Git Bash / CMD):**
+```cmd
+netstat -ano | findstr :7373
+taskkill /PID <PID> /F
+npm run dev:gateway
 ```
 
 ### 4. Call API (OpenAI SDK)
@@ -200,7 +239,7 @@ See [docs/en/ROADMAP.md](docs/en/ROADMAP.md).
 
 ## 🤝 Contributing
 
-PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md). Please run `bun run lint` + `bun run test` before push.
+PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md). Please run `npm run lint` + `npm test` before push. Requires Node >= 22.
 
 ## 📜 License
 
