@@ -164,6 +164,8 @@ export const config = {
   fallbackTiers: parseTiers(),
   circuitBreakerThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || "5", 10),
   circuitBreakerCooldownMs: parseInt(process.env.CIRCUIT_BREAKER_COOLDOWN_MS || "30000", 10),
+  // Experiential Labs OpenAI-compatible base (used in registry)
+  experientialApiBase: process.env.EXPERIENTIAL_API_BASE || "https://api.experientiallabs.ai/v1",
   // Vector 2 flags
   semanticCacheEnabled: process.env.SEMANTIC_CACHE_ENABLED === "1" || process.env.SEMANTIC_CACHE_ENABLED === "true",
   semanticCacheThreshold: parseFloat(process.env.SEMANTIC_THRESHOLD || "0.92"),
@@ -192,6 +194,10 @@ export const config = {
     "chutes-ai": parseKeys(process.env.CHUTES_API_KEYS),
     chutes: parseKeys(process.env.CHUTES_API_KEYS), // alias
     "z-ai-zhipu-ai": parseKeys(process.env.Z_AI_API_KEYS),
+    experientiallabs: parseKeys(process.env.EXPERIENTIAL_API_KEYS || process.env.EXPERIENTIAL_LABS_API_KEYS),
+    experiential: parseKeys(process.env.EXPERIENTIAL_API_KEYS || process.env.EXPERIENTIAL_LABS_API_KEYS),
+    "experiential-cloud": parseKeys(process.env.EXPERIENTIAL_API_KEYS || process.env.EXPERIENTIAL_LABS_API_KEYS),
+    experiential_cloud: parseKeys(process.env.EXPERIENTIAL_API_KEYS || process.env.EXPERIENTIAL_LABS_API_KEYS),
     "agnes-ai": parseKeys(process.env.AGNES_API_KEYS),
     "mistral-ai": parseKeys(process.env.MISTRAL_API_KEYS),
     mistral: parseKeys(process.env.MISTRAL_API_KEYS),

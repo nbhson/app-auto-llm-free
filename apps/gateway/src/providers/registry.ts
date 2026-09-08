@@ -36,6 +36,10 @@ export const providers: Record<string, Provider> = {
   "agnes-ai": OPENAI({ id: "agnes-ai", baseUrl: "https://apihub.agnes-ai.com/v1" }), // 5, 30 RPM
   "aion-labs": OPENAI({ id: "aion-labs", baseUrl: "https://api.aionlabs.ai/v1" }), // 5
   "z-ai-zhipu-ai": OPENAI({ id: "z-ai-zhipu-ai", baseUrl: "https://open.bigmodel.cn/api/paas/v4" }), // 4 GLM
+  "experientiallabs": OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // 3 free promotional (qwen3.8-27b, deepseek-v4-flash, gpt-5.6-luna) — OpenAI compatible
+  experiential: OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // alias
+  "experiential-cloud": OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // alias hyphen
+  experiential_cloud: OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // alias underscore (catalog id)
   "grok-xai": OPENAI({ id: "grok-xai", baseUrl: "https://api.x.ai/v1" }), // 2, needs card (no free)
   deepseek: OPENAI({ id: "deepseek", baseUrl: "https://api.deepseek.com/v1" }),
   openrouter: OPENAI({ id: "openrouter", baseUrl: "https://openrouter.ai/api/v1" }), // 17 free
@@ -86,6 +90,10 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   "agnes-ai": { name: "Agnes AI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","vision"], noCard: true },
   "aion-labs": { name: "Aion Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text"], noCard: true },
   "z-ai-zhipu-ai": { name: "Z AI (Zhipu AI)", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
+  experientiallabs: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  experiential: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  "experiential-cloud": { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  experiential_cloud: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   sambanova: { name: "SambaNova", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   "hugging-face": { name: "Hugging Face", tier: "Quota", tier_type: "quota", caps: ["text","code"], noCard: true },
   "ollama-cloud": { name: "Ollama Cloud", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
@@ -108,6 +116,7 @@ export const modelAliases: Record<string, string[]> = {
     "pollinations",
     "llm7-io",
     "ollama-cloud",
+    "experientiallabs",
     "kilo-code",
     "nvidia-nim",
     "agnes-ai",
@@ -126,6 +135,13 @@ export const modelAliases: Record<string, string[]> = {
     "freeai",
     "cline",
   ],
+  // Experiential Labs — promotional free (https://platform.experientiallabs.ai/models)
+  "qwen3.8-27b": ["experientiallabs", "orcarouter", "modelscope"],
+  "deepseek-v4-flash": ["experientiallabs", "cline", "deepseek", "nvidia-nim"],
+  "gpt-5.6-luna": ["experientiallabs", "openrouter"],
+  "experientiallabs/qwen3.8-27b": ["experientiallabs"],
+  "experientiallabs/deepseek-v4-flash": ["experientiallabs"],
+  "experientiallabs/gpt-5.6-luna": ["experientiallabs"],
   // Opencode custom — agnes
   "agnes-2.5-flash": ["agnes-ai"],
   // Opencode custom — openrouter free tier
@@ -158,7 +174,6 @@ export const modelAliases: Record<string, string[]> = {
   "nemotron-3-ultra-free": ["opencode", "nvidia-nim"],
   "mimo-v2.5-free": ["opencode"],
   "ling-3.0-flash-fin-free": ["opencode", "kilo-code"],
-  "deepseek-v4-flash": ["cline", "deepseek", "nvidia-nim"],
   "glm-5.3-flash": ["cline", "z-ai-zhipu-ai"],
   // Google custom gemini
   "gemini-3.5-flash-lite": ["google-gemini"],
