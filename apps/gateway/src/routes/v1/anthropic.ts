@@ -14,6 +14,9 @@ import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
+import { compressWithMetrics } from "../../lib/compression.js";
+import { rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
+import { semanticCache } from "../../lib/semantic-cache.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -214,9 +217,55 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     providerOrder = providerOrder.filter((p) => p !== prefix);
   }
 
+  // harness 06 Decide Tools: cost-aware re-ranking (parity with chat.ts)
+  if (config.costRoutingEnabled && !pinned && providerOrder.length > 1) {
+    try {
+      providerOrder = rankProvidersByCostAndLatency(providerOrder);
+      logger.info({ providerOrder }, "cost routing re-ranked (anthropic)");
+    } catch {}
+  }
+
   const estimated = estimateMessagesTokens(body.messages as any) + (body.max_tokens || 0);
   const startAll = Date.now();
   const errors: any[] = [];
+
+  // harness 01 Retrieve: semantic cache check (non-stream only, parity) - query includes system
+  if (config.semanticCacheEnabled && !body.stream) {
+    try {
+      const q = JSON.stringify({ system: body.system, messages: body.messages });
+      const hit = await semanticCache.get(q, model, { vkId: vk?.id, tools: body.tools, temperature: body.temperature });
+      if (hit) {
+        logger.info({ model, vkId: vk?.id }, "semantic cache hit (anthropic)");
+        addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimateMessagesTokens(body.messages as any), totalTokens: estimated, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
+        return c.json({
+          id: `msg_cache_${Date.now()}`,
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: hit }],
+          model,
+          stop_reason: "end_turn",
+          stop_sequence: null,
+          usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: estimateTokens(hit) },
+        });
+      }
+    } catch {}
+  }
+
+  // harness 02 Build Context: compression (parity with chat.ts)
+  let messagesToSend: any = body.messages;
+  let compressionRatio: number | undefined;
+  let compressedTokens: number | undefined;
+  if (config.compressionEnabled && body.messages?.length > 6) {
+    const maxTokens = (config as any).compressionMaxTokens || 4096;
+    const promptTokens = estimateMessagesTokens(body.messages as any);
+    const comp = compressWithMetrics(body.messages as any, { maxTokens: promptTokens > maxTokens ? maxTokens : undefined });
+    if (comp.metrics.applied) {
+      messagesToSend = comp.messages;
+      compressionRatio = comp.ratio;
+      compressedTokens = Math.max(0, estimated - comp.savedTokens);
+      logger.info({ model, original: body.messages.length, compressed: messagesToSend.length, ratio: comp.ratio, savedTokens: comp.savedTokens }, "compression applied (anthropic)");
+    }
+  }
 
   for (const pid of providerOrder) {
     const provider = allProviders[pid];
@@ -237,7 +286,8 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
       continue;
     }
 
-    const quota = checkQuota(pid, key, estimated);
+    const estimatedForQuota = estimateMessagesTokens(messagesToSend as any) + (body.max_tokens || 0);
+    const quota = checkQuota(pid, key, estimatedForQuota);
     if (!quota.allowed) {
       errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
       if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
@@ -251,10 +301,11 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     }
 
     try {
-      // Build AnthropicRequest
+      // Build AnthropicRequest — use compressed messages if applied (parity with chat upstream)
+      const effectiveAnthMessages = messagesToSend || body.messages;
       const anthReq = {
         model,
-        messages: body.messages as any,
+        messages: effectiveAnthMessages as any,
         max_tokens: body.max_tokens,
         system: body.system,
         temperature: body.temperature,
@@ -273,12 +324,13 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
         isAnthropicUpstream = true;
         res = await provider.anthropic(anthReq, key);
       } else if (provider.chat) {
-        // Translate Anthropic -> OpenAI ChatRequest
+        // Translate Anthropic -> OpenAI ChatRequest (use compressed messages if applied)
+        const effectiveMessages = messagesToSend || body.messages;
         const chatReq = {
           model,
           messages: [
             ...(body.system ? [{ role: "system" as const, content: body.system }] : []),
-            ...body.messages.map((m: any) => ({ role: m.role, content: m.content })),
+            ...effectiveMessages.map((m: any) => ({ role: m.role, content: m.content })),
           ],
           temperature: body.temperature,
           max_tokens: body.max_tokens,
@@ -327,6 +379,8 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           latencyMs: latency,
           status: 200,
           verifiedStatus: vStatus,
+          compressedTokens,
+          compressionRatio,
         });
 
         // Stream translation
@@ -377,7 +431,14 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           latencyMs: latency,
           status: 200,
           verifiedStatus: vStatus,
+          compressedTokens,
+          compressionRatio,
         });
+        // harness 01: store cache background (tenant-aware) - query includes system
+        if (config.semanticCacheEnabled && !body.stream) {
+          const text = data.content?.[0]?.text || data.content || "";
+          if (text) semanticCache.setBackground({ model, query: JSON.stringify({ system: body.system, messages: body.messages }), tools: body.tools, temperature: body.temperature, vkId: vk?.id }, String(text));
+        }
         c.header("X-Provider", pid);
         c.header("X-Verified", vStatus);
         return c.json(data);
@@ -428,7 +489,13 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           latencyMs: latency,
           status: 200,
           verifiedStatus: vStatus,
+          compressedTokens,
+          compressionRatio,
         });
+        if (config.semanticCacheEnabled && !body.stream) {
+          const text = anthData.content?.[0]?.text || "";
+          if (text) semanticCache.setBackground({ model, query: JSON.stringify({ system: body.system, messages: body.messages }), tools: body.tools, temperature: body.temperature, vkId: vk?.id }, String(text));
+        }
         c.header("X-Provider", pid);
         c.header("X-Verified", vStatus);
         return c.json(anthData);

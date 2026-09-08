@@ -133,10 +133,35 @@ export function getQuotaState(provider: string, key: string) {
     tpd: tpdWindows.get(k),
   };
 }
+function getWorstHeadroomForProvider(provider: string): number {
+  const limits = FREELLMS_LIMITS[provider];
+  if (!limits) return 1;
+  const prefix = `${provider}:`;
+  let worst = 1;
+  let found = false;
+  const consider = (map: Map<string, Window>, limit?: number) => {
+    if (!limit) return;
+    for (const [k, w] of map.entries()) {
+      if (!k.startsWith(prefix)) continue;
+      found = true;
+      const h = Math.max(0, 1 - w.count / limit);
+      worst = Math.min(worst, h);
+    }
+  };
+  consider(rpmWindows, limits.rpm);
+  consider(tpmWindows, limits.tpm);
+  consider(rpdWindows, limits.rpd);
+  consider(tpdWindows, limits.tpd);
+  return found ? worst : 1;
+}
 export function getQuotaHeadroom(provider: string, key: string): number {
   const limits = FREELLMS_LIMITS[provider];
   if (!limits) return 1;
+  // empty key => aggregate across all keys for provider (fix cost-router always 1 bug)
+  if (!key) return getWorstHeadroomForProvider(provider);
   const st = getQuotaState(provider, key);
+  // if no window yet for this specific key but other keys exist, fall back to worst
+  if (!st.rpm && !st.tpm && !st.rpd && !st.tpd) return getWorstHeadroomForProvider(provider);
   let headroom = 1;
   if (limits.rpm && st.rpm) headroom = Math.min(headroom, 1 - st.rpm.count / limits.rpm);
   if (limits.tpm && st.tpm) headroom = Math.min(headroom, 1 - st.tpm.count / limits.tpm);

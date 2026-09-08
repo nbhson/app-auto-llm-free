@@ -65,11 +65,11 @@ async function tryEmbedWithModel(text: string, model: string, timeoutMs = 4000):
  * Tries EMBEDDING_MODEL primary first, then EMBEDDING_FALLBACKS, returns first success.
  * If all fail, returns null so caller can fallback to hash exact match.
  */
-export async function embedWithFallback(text: string): Promise<{ embedding: number[]; model: string } | null> {
+export async function embedWithFallback(text: string, timeoutMs = 2000): Promise<{ embedding: number[]; model: string } | null> {
   if (!text) return null;
   const models = getEmbeddingModels();
   for (const m of models) {
-    const emb = await tryEmbedWithModel(text, m);
+    const emb = await tryEmbedWithModel(text, m, timeoutMs);
     if (emb) {
       logger.info({ model: m, dim: emb.length }, "[embeddings] success");
       return { embedding: emb, model: m };

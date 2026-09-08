@@ -11,9 +11,10 @@ import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
-import { config as cfg } from "../../config.js";
-import { compressMessages } from "../../lib/compression.js";
+import { compressWithMetrics } from "../../lib/compression.js";
 import { logGenAI } from "../../lib/otel.js";
+import { FREELLMS_COST, rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
+import { semanticCache } from "../../lib/semantic-cache.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -102,10 +103,9 @@ chatRoute.post(
       providerOrder = providerOrder.filter((p) => p !== prefix);
     }
 
-    // Vector 2: cost-aware re-ranking
-    if (cfg.costRoutingEnabled && providerOrder.length > 1) {
+    // Vector 2: cost-aware re-ranking (skip if x-router pinned)
+    if (config.costRoutingEnabled && !pinned && providerOrder.length > 1) {
       try {
-        const { rankProvidersByCostAndLatency } = await import("../../lib/cost-router.js");
         providerOrder = rankProvidersByCostAndLatency(providerOrder);
         logger.info({ providerOrder }, "cost routing re-ranked");
       } catch {}
@@ -116,15 +116,18 @@ chatRoute.post(
     const errors: any[] = [];
 
     // Vector 2: semantic cache check first (cheapest) - only for non-stream
+    // harness 01 Retrieve: tenant-aware key (vkId + tools + temperature) prevents poisoning
     let cacheHitContent: string | null = null;
-    if (cfg.semanticCacheEnabled && !body.stream) {
+    if (config.semanticCacheEnabled && !body.stream) {
       try {
-        const { SemanticCache } = await import("../../lib/semantic-cache.js");
-        const sc: any = new (SemanticCache as any)();
         const q = JSON.stringify(body.messages);
-        cacheHitContent = await sc.get(q, model);
+        cacheHitContent = await semanticCache.get(q, model, {
+          vkId: vk?.id,
+          tools: body.tools,
+          temperature: body.temperature,
+        });
         if (cacheHitContent) {
-          logger.info({ model }, "semantic cache hit");
+          logger.info({ model, vkId: vk?.id }, "semantic cache hit");
           logGenAI("chat", { model, provider: "cache", promptTokens: estimated.prompt, latencyMs: Date.now() - startAll, cacheHit: true });
           addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimated.prompt, completionTokens: estimateChatTokens({ messages: [{ role: "assistant", content: cacheHitContent }] as any }).prompt, totalTokens: estimated.prompt + 20, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
           return c.json({ id: `chatcmpl-cache-${Date.now()}`, object: "chat.completion", created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, message: { role: "assistant", content: cacheHitContent }, finish_reason: "stop" }], usage: { prompt_tokens: estimated.prompt, completion_tokens: 20, total_tokens: estimated.prompt + 20 } });
@@ -132,17 +135,19 @@ chatRoute.post(
       } catch {}
     }
 
-    // Vector 2: optional compression (only on cache miss) - reduces history/tools
+    // Vector 2: optional compression (only on cache miss) - harness 02 Build Context pipeline
+    // Workflow Stage: metrics + guard + token budget
     let messagesToSend: any = body.messages;
     let compressionRatio: number | undefined;
     let compressedTokens: number | undefined;
-    if (cfg.compressionEnabled && body.messages?.length > 6) {
-      const comp = compressMessages(body.messages as any);
-      if (comp.ratio < 0.95) {
+    if (config.compressionEnabled && body.messages?.length > 6) {
+      const maxTokens = (config as any).compressionMaxTokens || 4096;
+      const comp = compressWithMetrics(body.messages as any, { maxTokens: estimated.prompt > maxTokens ? maxTokens : undefined });
+      if (comp.metrics.applied) {
         messagesToSend = comp.messages;
         compressionRatio = comp.ratio;
-        compressedTokens = Math.round(estimated.prompt * comp.ratio);
-        logger.info({ model, original: (body.messages as any).length, compressed: messagesToSend.length, ratio: comp.ratio }, "compression applied");
+        compressedTokens = Math.max(0, estimated.prompt - comp.savedTokens);
+        logger.info({ model, original: (body.messages as any).length, compressed: messagesToSend.length, ratio: comp.ratio, savedTokens: comp.savedTokens, durationMs: comp.metrics.durationMs }, "compression applied");
       }
     }
     const estimatedForQuota = estimateChatTokens({ messages: messagesToSend as any, max_tokens: body.max_tokens });
@@ -231,6 +236,8 @@ chatRoute.post(
 
         if (body.stream) {
           const contentType = res.headers.get("content-type") || "text/event-stream";
+          const per1M = FREELLMS_COST[pid] ?? 0.05;
+          const streamCost = (estimated.total / 1_000_000) * per1M;
           addLog({
             id: `req-${Date.now()}`,
             timestamp: new Date().toISOString(),
@@ -245,7 +252,7 @@ chatRoute.post(
             verifiedStatus: vStatus,
             compressedTokens,
             compressionRatio,
-            cost: estimated.total * 0.00000005,
+            cost: Number(streamCost.toFixed(6)),
           });
           return new Response(res.body, {
             status: 200,
@@ -267,6 +274,8 @@ chatRoute.post(
           const usage = data.usage;
           const total = usage?.total_tokens || estimated.total;
           if (usage?.total_tokens) recordUsage(pid, key, total);
+          const per1M2 = FREELLMS_COST[pid] ?? 0.05;
+          const actualCost = (total / 1_000_000) * per1M2;
           addLog({
             id: `req-${Date.now()}`,
             timestamp: new Date().toISOString(),
@@ -282,18 +291,17 @@ chatRoute.post(
             verifiedStatus: vStatus,
             compressedTokens,
             compressionRatio,
-            cost: total * 0.00000005,
+            cost: Number(actualCost.toFixed(6)),
           });
-          // Vector 2: store in semantic cache if enabled
-          if (cfg.semanticCacheEnabled) {
-            try {
-              const text = data.choices?.[0]?.message?.content || "";
-              if (text) {
-                const { SemanticCache } = await import("../../lib/semantic-cache.js");
-                const sc: any = new (SemanticCache as any)();
-                await sc.set(JSON.stringify(body.messages), model, String(text));
-              }
-            } catch {}
+          // Vector 2: store in semantic cache if enabled - background async (harness 10 Automation, non-blocking)
+          if (config.semanticCacheEnabled) {
+            const text = data.choices?.[0]?.message?.content || "";
+            if (text) {
+              semanticCache.setBackground(
+                { model, query: JSON.stringify(body.messages), tools: body.tools, temperature: body.temperature, vkId: vk?.id },
+                String(text),
+              );
+            }
           }
           return c.json(data);
         }

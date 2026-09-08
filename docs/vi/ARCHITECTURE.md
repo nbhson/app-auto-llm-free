@@ -147,7 +147,7 @@ Học `smart_router.py` + OmniRoute 19 strategies, thực tế freellms tier:
 | `latency` | Chọn p50 thấp nhất (P3) |
 | `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (xem `registry.ts:42`) |
 | `verified` | Nếu có `data/verified-models.json` + `data/model-health.json` (persisted 404/410), `GET /v1/models?verified=free` loại `deprecated` khỏi pool |
-| `cost-aware` | Khi `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-rank pool theo `FREELLMS_COST` ($/1M tokens) + latency EMA từ `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*1 + latency*0.01 - headroom*0.2`, sort asc; `syncPricing()` sync từ LiteLLM CDN `model_prices_and_context_window.json` |
+| `cost-aware` | Khi `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-rank pool theo `FREELLMS_COST` ($/1M tokens) + latency EMA từ `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*COST_WEIGHT(5) + latency*LATENCY_WEIGHT(0.0005) - headroom*HEADROOM_WEIGHT(0.3)`, sort asc (env override); `syncPricing()` sync từ LiteLLM CDN `model_prices_and_context_window.json` |
 
 Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config.ts:30`). Mid-stream SSE error → emit `data: {"error": ...}\n\n` rồi close. Persisted `model-health.json` được `chat.ts:22` merge để skip `deprecated` ngay cả khi chưa `verify`. Với cost-routing, pool đã sort sẽ được duyệt theo thứ tự tiết kiệm + nhanh nhất.
 

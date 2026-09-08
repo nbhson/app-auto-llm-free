@@ -90,7 +90,15 @@ export function getStats() {
       costByProvider.set(l.provider, (costByProvider.get(l.provider) || 0) + l.cost);
     }
     if (l.cacheHit) cacheHits++;
-    if (l.compressedTokens && l.totalTokens) compressedSaved += Math.max(0, l.totalTokens - l.compressedTokens);
+    // fixed: compressedTokens is promptTokens after compression, so saved = prompt - compressed
+    // fallback to totalTokens diff for backward compat with old logs
+    if (l.compressedTokens !== undefined && l.promptTokens !== undefined) {
+      compressedSaved += Math.max(0, l.promptTokens - l.compressedTokens);
+    } else if (l.compressedTokens && l.totalTokens) {
+      compressedSaved += Math.max(0, l.totalTokens - l.compressedTokens);
+    } else if (l.compressionRatio && l.promptTokens) {
+      compressedSaved += Math.round(l.promptTokens * (1 - l.compressionRatio));
+    }
   }
   // All-time tokens
   let allTimeTokens = 0;

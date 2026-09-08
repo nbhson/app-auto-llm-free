@@ -151,6 +151,12 @@ function parseKeys(env: string | undefined): string[] {
   return env.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+function parseBoolEnv(v: string | undefined): boolean {
+  if (!v) return false;
+  const s = v.trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes" || s === "on";
+}
+
 export const config = {
   port: parseInt(process.env.PORT || "7373", 10),
   nodeEnv: process.env.NODE_ENV || "development",
@@ -166,16 +172,62 @@ export const config = {
   circuitBreakerCooldownMs: parseInt(process.env.CIRCUIT_BREAKER_COOLDOWN_MS || "30000", 10),
   // Experiential Labs OpenAI-compatible base (used in registry)
   experientialApiBase: process.env.EXPERIENTIAL_API_BASE || "https://api.experientiallabs.ai/v1",
-  // Vector 2 flags
-  semanticCacheEnabled: process.env.SEMANTIC_CACHE_ENABLED === "1" || process.env.SEMANTIC_CACHE_ENABLED === "true",
-  semanticCacheThreshold: parseFloat(process.env.SEMANTIC_THRESHOLD || "0.92"),
-  semanticCacheTtlSec: parseInt(process.env.CACHE_TTL_S || "3600", 10),
+  // Vector 2 flags - validated with safe defaults
+  semanticCacheEnabled: parseBoolEnv(process.env.SEMANTIC_CACHE_ENABLED),
+  semanticCacheThreshold: (() => {
+    const v = parseFloat(process.env.SEMANTIC_THRESHOLD || "0.92");
+    if (isNaN(v) || v < 0 || v > 1) {
+      console.warn(`[config] Invalid SEMANTIC_THRESHOLD=${process.env.SEMANTIC_THRESHOLD}, fallback to 0.92 (must be 0..1)`);
+      return 0.92;
+    }
+    return v;
+  })(),
+  semanticCacheTtlSec: (() => {
+    const v = parseInt(process.env.CACHE_TTL_S || "3600", 10);
+    if (isNaN(v) || v <= 0) {
+      console.warn(`[config] Invalid CACHE_TTL_S=${process.env.CACHE_TTL_S}, fallback to 3600`);
+      return 3600;
+    }
+    return Math.min(v, 86400 * 7); // cap 7 days
+  })(),
   embeddingModel: (process.env.EMBEDDING_MODEL || "cohere/embed-english-v3.0").split(",")[0].trim(),
   embeddingModels: (process.env.EMBEDDING_MODEL || "cohere/embed-english-v3.0").split(",").map((s) => s.trim()).filter(Boolean),
   embeddingFallbacks: (process.env.EMBEDDING_FALLBACKS || "nvidia-nim/nvidia/nv-embed-v1,cloudflare-workers-ai/@cf/baai/bge-large-en-v1.5").split(",").map((s) => s.trim()).filter(Boolean),
-  compressionEnabled: process.env.COMPRESSION_ENABLED === "1" || process.env.COMPRESSION_ENABLED === "true",
-  costRoutingEnabled: process.env.COST_ROUTING_ENABLED === "1" || process.env.COST_ROUTING_ENABLED === "true",
-  analyticsRetentionDays: parseInt(process.env.ANALYTICS_RETENTION_DAYS || "30", 10),
+  compressionEnabled: parseBoolEnv(process.env.COMPRESSION_ENABLED),
+  // token budget for compression pipeline (harness 02 Build Context) - default 80% of context
+  compressionMaxTokens: (() => {
+    const v = parseInt(process.env.COMPRESSION_MAX_TOKENS || "4096", 10);
+    if (isNaN(v) || v <= 0) return 4096;
+    return Math.min(v, 32000);
+  })(),
+  costRoutingEnabled: parseBoolEnv(process.env.COST_ROUTING_ENABLED),
+  // configurable weights for cost-router (harness 06 Decide Tools) - env overrides fix doc/code drift
+  costWeight: (() => {
+    const v = parseFloat(process.env.COST_WEIGHT || "5");
+    return isNaN(v) || v < 0 ? 5 : v;
+  })(),
+  latencyWeight: (() => {
+    const v = parseFloat(process.env.LATENCY_WEIGHT || "0.0005");
+    return isNaN(v) || v < 0 ? 0.0005 : v;
+  })(),
+  headroomWeight: (() => {
+    const v = parseFloat(process.env.HEADROOM_WEIGHT || "0.3");
+    return isNaN(v) || v < 0 ? 0.3 : v;
+  })(),
+  // semantic cache advanced flags (harness 01 Retrieve)
+  semanticCacheMaxMemEntries: (() => {
+    const v = parseInt(process.env.SEMANTIC_CACHE_MAX_MEM || "1000", 10);
+    return isNaN(v) || v <= 0 ? 1000 : Math.min(v, 10000);
+  })(),
+  semanticCacheScanCap: (() => {
+    const v = parseInt(process.env.SEMANTIC_CACHE_SCAN_CAP || "200", 10);
+    return isNaN(v) || v <= 0 ? 200 : Math.min(v, 1000);
+  })(),
+  analyticsRetentionDays: (() => {
+    const v = parseInt(process.env.ANALYTICS_RETENTION_DAYS || "30", 10);
+    if (isNaN(v) || v <= 0) return 30;
+    return Math.min(v, 365);
+  })(),
   providerKeys: {
     // freellms ids use hyphen, config keys use same slug
     "nvidia-nim": parseKeys(process.env.NVIDIA_API_KEYS),

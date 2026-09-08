@@ -5,6 +5,7 @@ import { listVirtualKeys, createVirtualKey, deleteVirtualKey } from "../lib/virt
 import { getLogs, getStats, onLog } from "../lib/request-log.js";
 import { getAllStates } from "../lib/circuit-breaker.js";
 import { readDataJson, resolveDataPath } from "../lib/paths.js";
+import { semanticCache } from "../lib/semantic-cache.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -323,8 +324,14 @@ apiRoute.get("/config", (c) => {
     CACHE_TTL_S: config.semanticCacheTtlSec,
     EMBEDDING_MODEL: (config as any).embeddingModels ? (config as any).embeddingModels.join(",") : config.embeddingModel,
     EMBEDDING_FALLBACKS: (config as any).embeddingFallbacks ? (config as any).embeddingFallbacks.join(",") : "",
+    SEMANTIC_CACHE_MAX_MEM: (config as any).semanticCacheMaxMemEntries,
+    SEMANTIC_CACHE_SCAN_CAP: (config as any).semanticCacheScanCap,
     COMPRESSION_ENABLED: config.compressionEnabled ? 1 : 0,
+    COMPRESSION_MAX_TOKENS: (config as any).compressionMaxTokens,
     COST_ROUTING_ENABLED: config.costRoutingEnabled ? 1 : 0,
+    COST_WEIGHT: (config as any).costWeight,
+    LATENCY_WEIGHT: (config as any).latencyWeight,
+    HEADROOM_WEIGHT: (config as any).headroomWeight,
     ANALYTICS_RETENTION_DAYS: config.analyticsRetentionDays,
     _source: ".env",
   });
@@ -367,9 +374,7 @@ apiRoute.get("/analytics", async (c) => {
 
 apiRoute.get("/cache/stats", async (c) => {
   try {
-    const { SemanticCache } = await import("../lib/semantic-cache.js");
-    const sc: any = new (SemanticCache as any)();
-    const stats = await sc.getStats();
+    const stats = await semanticCache.getStats();
     return c.json({ enabled: config.semanticCacheEnabled, ...stats });
   } catch (e: any) {
     return c.json({ enabled: config.semanticCacheEnabled, error: e.message }, 500);
@@ -378,9 +383,7 @@ apiRoute.get("/cache/stats", async (c) => {
 
 apiRoute.delete("/cache", async (c) => {
   try {
-    const { SemanticCache } = await import("../lib/semantic-cache.js");
-    const sc: any = new (SemanticCache as any)();
-    await sc.clear();
+    await semanticCache.clear();
     return c.json({ cleared: true });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);

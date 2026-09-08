@@ -147,7 +147,7 @@ Based on `smart_router.py` + OmniRoute 19 strategies, actual freellms tiers:
 | `latency` | Pick lowest p50 (P3) |
 | `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (see `registry.ts:42`) |
 | `verified` | If `data/verified-models.json` + `data/model-health.json` (persisted 404/410) exists, `GET /v1/models?verified=free` removes `deprecated` from pool |
-| `cost-aware` | When `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-ranks pool by `FREELLMS_COST` ($/1M tokens) + latency EMA from `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*1 + latency*0.01 - headroom*0.2`, sort asc; `syncPricing()` syncs from LiteLLM CDN `model_prices_and_context_window.json` |
+| `cost-aware` | When `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-ranks pool by `FREELLMS_COST` ($/1M tokens) + latency EMA from `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*COST_WEIGHT(5) + latency*LATENCY_WEIGHT(0.0005) - headroom*HEADROOM_WEIGHT(0.3)`, sort asc (env overrides); `syncPricing()` syncs from LiteLLM CDN `model_prices_and_context_window.json` |
 
 Fallback: Tiered fallback with circuit breaker (5 fails / 30s cooldown, `config.ts:30`). Mid-stream SSE error → emit `data: {"error": ...}\n\n` then close. Persisted `model-health.json` is merged by `chat.ts:22` to skip `deprecated` even before `verify`. With cost-routing, sorted pool is iterated in cheapest + fastest order.
 
