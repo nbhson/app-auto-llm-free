@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.1] - 2026-09-09
+
+### Fixed
+- **Flags quality**: `config.ts:151` `parseBoolEnv` hỗ trợ `1/true/yes/on` cho `SEMANTIC_CACHE_ENABLED`/`COMPRESSION_ENABLED`/`COST_ROUTING_ENABLED`; `cost-router.ts:137` thay `eval(require)` bằng `import {config}` + `syncPricing` cooldown khi fail; `semantic-cache.ts:116` xóa dead `keyword boost` + scan LRU `reverse()`; `routes/v1/chat.ts:4,14` + `anthropic.ts:4,16` xóa duplicate `config as cfg`; `anthropic.ts:258,304` parity compression `maxTokens` + dùng `messagesToSend` cho `provider.anthropic` + `estimatedForQuota`
+- **Docs**: `docs/en|vi/ARCHITECTURE.md:150` fix cost-aware formula `cost*5 + latency*0.0005 - headroom*0.3` (env override)
+
+### Changed
+- **Version bump**: `package.json:5` `apps/gateway:5` `apps/web:5` `0.7.0→0.7.1`, `main.tsx:100` badge `v0.7.1`, `app.ts:55` + `health.ts:10` `version 0.7.1`
+
 ## [0.7.0] - 2026-09-08
 
 ### Added
