@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom";
-import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown, Settings as SettingsIcon, RotateCcw } from "lucide-react";
+import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown, Settings as SettingsIcon } from "lucide-react";
 import Dashboard from "./pages/Dashboard.tsx";
 import Models from "./pages/Models.tsx";
 import Providers from "./pages/Providers.tsx";
@@ -173,17 +173,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 </button>
                 <button type="button" onClick={handleCopyMasterKey} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors" title="Copy">
                   {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-                <button type="button" onClick={() => {
-                  fetch("/api/bootstrap").then(r=>r.ok?r.json():null).then(d=>{
-                    const k=d?.masterKey;
-                    if(k && k.startsWith("fgk-master-")){
-                      localStorage.setItem("masterKey", k);
-                      setMasterKey(k);
-                    }
-                  }).catch(()=>{});
-                }} className="p-1 text-amber-600 hover:text-amber-700 rounded transition-colors" title="Sync from server (GET /api/bootstrap)">
-                  <RotateCcw className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
