@@ -192,8 +192,6 @@ export const config = {
     orcarouter: parseKeys(process.env.ORCAROUTER_API_KEYS),
     freeai: parseKeys(process.env.FREEAI_API_KEYS),
     cline: parseKeys(process.env.CLINE_API_KEYS),
-    "9router": parseKeys(process.env.NINEROUTER_API_KEYS || process.env["9ROUTER_API_KEYS"]),
-    omniroute: parseKeys(process.env.OMNIROUTE_API_KEYS),
     // legacy / scraped
     nvidia: parseKeys(process.env.NVIDIA_API_KEYS),
     together: parseKeys(process.env.TOGETHER_API_KEYS),

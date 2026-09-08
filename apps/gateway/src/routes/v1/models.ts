@@ -122,19 +122,9 @@ const opencodeSupplement: any[] = [
   { id: "llm7-io/minimax-m2.7", owned_by: "llm7-io", provider: "llm7-io", display_name: "minimax-m2.7", context_length: 128000, score: 69, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "llm7 free" },
   { id: "llm7-io/gpt-oss", owned_by: "llm7-io", provider: "llm7-io", display_name: "gpt-oss", context_length: 131072, score: 65, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "llm7 free" },
   { id: "llm7-io/gemini-3.1-flash-lite", owned_by: "llm7-io", provider: "llm7-io", display_name: "gemini-3.1-flash-lite", context_length: 1048576, score: 59, tier: "permanent", live_status: "alias", capabilities: ["text","image","video","audio"], limit: "llm7 free" },
-  // 9router-custom -> 9router
-  { id: "9router/ag/gemini-3.7-flash-high", owned_by: "9router", provider: "9router", display_name: "ag/gemini-3.7-flash-high", context_length: 1048576, score: 75, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
-  { id: "9router/kc/minimax/minimax-m3:free", owned_by: "9router", provider: "9router", display_name: "kc/minimax/minimax-m3:free", context_length: 262144, score: 88, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
-  { id: "9router/kr/claude-haiku-4.5", owned_by: "9router", provider: "9router", display_name: "kr/claude-haiku-4.5", context_length: 200000, score: 72, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "custom" },
-  { id: "ag/gemini-3.7-flash-high", owned_by: "9router", provider: "9router", display_name: "ag/gemini-3.7-flash-high", context_length: 1048576, score: 75, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
-  { id: "kc/minimax/minimax-m3:free", owned_by: "9router", provider: "9router", display_name: "kc/minimax/minimax-m3:free", context_length: 262144, score: 88, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "custom" },
-  { id: "kr/claude-haiku-4.5", owned_by: "9router", provider: "9router", display_name: "kr/claude-haiku-4.5", context_length: 200000, score: 72, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "custom" },
   // freeai-custom -> freeai
   { id: "freeai/qwen3-8b", owned_by: "freeai", provider: "freeai", display_name: "qwen3-8b", context_length: 131072, score: 60, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "free" },
   { id: "qwen3-8b", owned_by: "freeai", provider: "freeai", display_name: "qwen3-8b", context_length: 131072, score: 60, tier: "custom", live_status: "alias", capabilities: ["text"], limit: "free" },
-  // omniroute-custom -> omniroute
-  { id: "omniroute/auto/coding", owned_by: "omniroute", provider: "omniroute", display_name: "auto/coding", context_length: 262144, score: 65, tier: "custom", live_status: "alias", capabilities: ["text","code"], limit: "custom" },
-  { id: "auto/coding", owned_by: "omniroute", provider: "omniroute", display_name: "auto/coding", context_length: 262144, score: 65, tier: "custom", live_status: "alias", capabilities: ["text","code"], limit: "custom" },
   // myOpenCodeZen-custom -> opencode
   { id: "opencode/nemotron-3.5-lightning-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3.5-lightning-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
   { id: "opencode/nemotron-3-ultra-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3-ultra-free", context_length: 1000000, score: 74, tier: "permanent", live_status: "alias", capabilities: ["reasoning"], limit: "free" },

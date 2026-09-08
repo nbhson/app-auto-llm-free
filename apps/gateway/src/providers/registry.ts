@@ -49,10 +49,6 @@ export const providers: Record<string, Provider> = {
   freeai: OPENAI({ id: "freeai", baseUrl: "https://api.free.ai/v1" }),
   cline: OPENAI({ id: "cline", baseUrl: "https://api.cline.bot/api/v1" }),
 
-  // Custom local gateways from user's opencode.json
-  "9router": OPENAI({ id: "9router", baseUrl: "http://localhost:20127/v1" }),
-  omniroute: OPENAI({ id: "omniroute", baseUrl: "http://localhost:20128/v1" }),
-
   // Legacy / extra
   together: OPENAI({ id: "together", baseUrl: "https://api.together.xyz/v1" }),
   fireworks: OPENAI({ id: "fireworks", baseUrl: "https://api.fireworks.ai/inference/v1" }),
@@ -96,8 +92,6 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   orcarouter: { name: "OrcaRouter", tier: "Custom", tier_type: "custom", caps: ["text","reasoning"], noCard: true },
   freeai: { name: "FreeAI", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
   cline: { name: "Cline", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
-  "9router": { name: "9Router", tier: "Custom", tier_type: "custom", caps: ["text","reasoning"], noCard: true },
-  omniroute: { name: "OmniRoute", tier: "Custom", tier_type: "custom", caps: ["text"], noCard: true },
 };
 
 // Alias map for smart routing (freellms-aware + custom opencode) — auto includes full 4-tier + public fallback
@@ -187,9 +181,6 @@ export const modelAliases: Record<string, string[]> = {
   "gemini-3.1-flash-lite": ["google-gemini", "llm7-io"],
   "qwen3-8b": ["freeai", "modelscope"],
   "auto/coding": ["kilo-code", "opencode", "cohere"],
-  "ag/gemini-3.7-flash-high": ["9router", "openrouter", "google-gemini"],
-  "kc/minimax/minimax-m3:free": ["9router", "openrouter", "kilo-code"],
-  "kr/claude-haiku-4.5": ["9router", "openrouter", "cohere"],
   "aion-labs/aion-3.0": ["aion-labs"],
   "minimax-m2.7": ["llm7-io", "sambanova"],
   "gpt-oss": ["llm7-io", "cerebras", "hugging-face", "ollama-cloud"],
