@@ -119,29 +119,29 @@ function parseTiers(): string[][] {
     if (!raw)
       return [
         [
-          "nvidia-nim",
-          "llm7-io",
           "pollinations",
+          "llm7-io",
+          "kilo-code",
+          "nvidia-nim",
+          "agnes-ai",
           "hugging-face",
           "orcarouter",
-          "kilo-code",
           "openrouter",
-          "agnes-ai",
         ],
       ];
     return JSON.parse(raw);
   } catch {
     return [
       [
-        "nvidia-nim",
-        "llm7-io",
-        "pollinations",
-        "hugging-face",
-        "orcarouter",
-        "kilo-code",
-        "openrouter",
-        "agnes-ai",
-      ],
+          "pollinations",
+          "llm7-io",
+          "kilo-code",
+          "nvidia-nim",
+          "agnes-ai",
+          "hugging-face",
+          "orcarouter",
+          "openrouter",
+        ],
     ];
   }
 }
