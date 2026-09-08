@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { providers } from "../../providers/registry.js";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveDataPath, readDataJson } from "../../lib/paths.js";
 import { config } from "../../config.js";
 import { isPublicProvider } from "../../lib/router.js";
@@ -23,29 +25,70 @@ function sanitizeFreellmsName(name: string): string {
   s = s.replace(/\/free:free$/, ":free").replace(/\/:free$/, ":free");
   return s;
 }
- // Load freellms free models if available (316 models)
+ // Load freellms free models if available (316 models) — fallback to models.yaml for fresh clone (b930e6d deletes data/*.json)
 function loadFreellmsModels(): any[] {
   const arr = readDataJson<any[]>("freellms-models-free.json", []);
-  if (arr.length === 0) return [];
-  return arr.map((m: any) => {
-    const sanitized = sanitizeFreellmsName(m.name);
-    return {
-      id: `${m.slug}/${sanitized}`,
-      raw_id: `${m.slug}/${m.name}`,
-      object: "model",
-      owned_by: m.slug,
-      provider: m.slug,
-      display_name: m.name,
-      context_length: parseInt(m.context) || 8192,
-      score: parseInt(m.score) || 0,
-      tier: m.tier_type,
-      freellms_verified: m.verified,
-      no_card: m.nocard,
-      capabilities: m.modality,
-      limit: m.limit,
-      created: 1715433600,
-    };
-  });
+  if (arr.length > 0) {
+    return arr.map((m: any) => {
+      const sanitized = sanitizeFreellmsName(m.name);
+      return {
+        id: `${m.slug}/${sanitized}`,
+        raw_id: `${m.slug}/${m.name}`,
+        object: "model",
+        owned_by: m.slug,
+        provider: m.slug,
+        display_name: m.name,
+        context_length: parseInt(m.context) || 8192,
+        score: parseInt(m.score) || 0,
+        tier: m.tier_type,
+        freellms_verified: m.verified,
+        no_card: m.nocard,
+        capabilities: m.modality,
+        limit: m.limit,
+        created: 1715433600,
+      };
+    });
+  }
+  // Fallback: read models.yaml snapshot at repo root (316 models) — regex parse to avoid yaml dep
+  try {
+    const candidates = [
+      path.resolve("models.yaml"),
+      path.resolve(process.cwd(), "models.yaml"),
+      path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../../models.yaml")),
+      resolveDataPath("models.yaml"),
+      resolveDataPath("../models.yaml"),
+    ];
+    let yamlPath: string | null = null;
+    for (const p of candidates) if (fs.existsSync(p)) { yamlPath = p; break; }
+    if (!yamlPath) return [];
+    const raw = fs.readFileSync(yamlPath, "utf-8");
+    // Parse models.yaml: each entry has id, provider, display_name, context_length, score, tier, verified, capabilities, limit
+    // Use block regex to extract each model entry
+    const blocks = raw.split(/\n\s*-\s+id:\s*/);
+    const out: any[] = [];
+    for (let i = 1; i < blocks.length; i++) {
+      const blk = blocks[i];
+      const idMatch = blk.match(/^"([^"]+)"/);
+      if (!idMatch) continue;
+      const id = idMatch[1];
+      const provider = (blk.match(/provider:\s*([^\n]+)/)?.[1] || id.split("/")[0]).trim();
+      const display_name = (blk.match(/display_name:\s*"([^"]+)"/)?.[1] || id).trim();
+      const context_length = parseInt(blk.match(/context_length:\s*(\d+)/)?.[1] || "8192", 10);
+      const score = parseInt(blk.match(/score:\s*(\d+)/)?.[1] || "50", 10);
+      const tier = (blk.match(/tier:\s*([^\n]+)/)?.[1] || "permanent").trim();
+      const verified = blk.includes("verified: true");
+      const no_card = !blk.includes("no_card: false");
+      const capsRaw = blk.match(/capabilities:\s*\[([^\]]+)\]/)?.[1] || "text";
+      const capabilities = capsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+      const limit = (blk.match(/limit:\s*"([^"]+)"/)?.[1] || "").trim();
+      out.push({ id, raw_id: id, object: "model", owned_by: provider, provider, display_name, context_length, score, tier, freellms_verified: verified, no_card, capabilities, limit, created: 1715433600 });
+    }
+    if (out.length > 0) return out;
+    // Final fallback regex for id only
+    const ids = [...raw.matchAll(/-\s+id:\s*"([^"]+)"/g)].map((m) => m[1]);
+    return ids.map((id) => ({ id, raw_id: id, object: "model", owned_by: id.split("/")[0], provider: id.split("/")[0], display_name: id, context_length: 8192, score: 50, tier: "permanent", freellms_verified: false, no_card: true, capabilities: ["text"], limit: "", created: 1715433600 }));
+  } catch {}
+  return [];
 }
 
 function loadVerifiedMap(): Map<string, any> {

@@ -2,6 +2,11 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.1] - 2026-09-08
+
+### Fixed
+- **6 models by default (b930e6d regression)**: `apps/gateway/src/routes/v1/models.ts:27` fallback `data/freellms-models-free.json` (deleted, fresh clone empty) → `models.yaml` (312–316 snapshot) nếu json thiếu. Trước fix `loadFreellmsModels()` trả `[]` → fallback `staticModels` 6 models (`groq/llama-3.3-70b` etc.). Sau fix `GET /v1/models?limit=1000` trả `354` total (hasKey OFF, freellms 316 + supplement + pollinations) và `819` khi `?hasKey=1` (live 788). Đã khôi phục `data/*.json` cục bộ để test nhưng code mới xử `fresh clone` không cần data.
+
 ## [0.5.0] - 2026-09-08
 
 ### Fixed
