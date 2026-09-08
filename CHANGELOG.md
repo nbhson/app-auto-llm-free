@@ -2,6 +2,17 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.1] - 2026-09-08
+
+### Fixed
+- **Settings embedding check**: `Settings.tsx:132` Check `EMBEDDING_MODEL` + `EMBEDDING_FALLBACKS` via `POST /v1/embeddings` 8s → border `green-500` ok / `red-500` error + chips `✓/✗` như `Models` page, `i18n.tsx:186` `settings.check/checking` VI/EN
+- **Master key input + Keys Step 1**: `main.tsx:157` `MASTER` input `disabled=false readOnly=false` + `KeyGen` `genOpen=true` mặc định expand, `Sync from server` cạnh `Use in UI` `Keys.tsx:138` `GET /api/bootstrap` thay vì header refresh, fix `Admin required` `app.ts:91` khi `localStorage` lệch BE
+- **Providers**: thêm `claude-code` (Anthropic clone `caps code/vision`) + `codex` (`api.openai.com/v1` `caps code`) `registry.ts:63` `providerMeta:claude-code/codex`, `config.ts:203` `CLAUDE_CODE_API_KEYS`/`CODEX_API_KEYS`/`OPENAI_API_KEYS`, `FALLBACK_TIERS` tier 5 `anthropic/claude-code/codex/agnes-ai`, `getKeyUrls.ts:44`, `.env.example:32`
+- **startTime shadowing**: `Settings.tsx:143` rename `const t=setTimeout` → `timer` tránh ghi đè `t("settings.*")` i18n gây `VM3108 startTime` `motion` error
+
+### Changed
+- **Version bump**: `package.json:4` `apps/gateway:4` `apps/web:4` `0.6.0→0.6.1`, `main.tsx:100` badge `v0.6.1`, `app.ts:55` `version 0.6.1`
+
 ## [0.6.0] - 2026-09-08
 
 ### Added
