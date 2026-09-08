@@ -184,6 +184,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.copied": "Copied",
     "settings.overridden": "• overridden",
     "settings.default": "• default",
+    "settings.check": "Check",
+    "settings.checking": "Kiểm tra...",
   },
   en: {
     "nav.dashboard": "Dashboard",
@@ -366,6 +368,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.copied": "Copied",
     "settings.overridden": "• overridden",
     "settings.default": "• default",
+    "settings.check": "Check",
+    "settings.checking": "Checking...",
   },
 };
 

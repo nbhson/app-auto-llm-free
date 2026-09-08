@@ -117,6 +117,60 @@ ANALYTICS_RETENTION_DAYS=${form.ANALYTICS_RETENTION_DAYS}`;
     setTimeout(() => setCopiedEnv(false), 2000);
   };
 
+  // Check embedding models like Models page: POST /v1/embeddings -> green border if ok else red
+  const [embStatus, setEmbStatus] = useState<"idle" | "checking" | "ok" | "error">("idle");
+  const [fallbackStatuses, setFallbackStatuses] = useState<Record<string, "idle" | "checking" | "ok" | "error">>({});
+
+  const checkOneEmbedding = async (model: string, setStatus: (s: "checking" | "ok" | "error") => void) => {
+    const m = model.trim();
+    if (!m) { setStatus("error"); return; }
+    setStatus("checking");
+    const key = localStorage.getItem("masterKey") || "fgk-master-dev-key";
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch("/v1/embeddings", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: m, input: "hello" }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (res.ok) setStatus("ok");
+      else setStatus("error");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const checkPrimary = () => checkOneEmbedding(form.EMBEDDING_MODEL, (s) => setEmbStatus(s as any));
+  const checkFallbacks = async () => {
+    const list = form.EMBEDDING_FALLBACKS.split(",").map((s) => s.trim()).filter(Boolean);
+    if (list.length === 0) return;
+    const next: Record<string, "checking" | "ok" | "error"> = {};
+    list.forEach((m) => (next[m] = "checking"));
+    setFallbackStatuses({ ...next } as any);
+    const key = localStorage.getItem("masterKey") || "fgk-master-dev-key";
+    await Promise.all(
+      list.map(async (m) => {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 8000);
+          const res = await fetch("/v1/embeddings", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: m, input: "hello" }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          setFallbackStatuses((prev) => ({ ...prev, [m]: res.ok ? "ok" : "error" }));
+        } catch {
+          setFallbackStatuses((prev) => ({ ...prev, [m]: "error" }));
+        }
+      })
+    );
+  };
+
   const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
     <button
       type="button"
@@ -182,15 +236,37 @@ ANALYTICS_RETENTION_DAYS=${form.ANALYTICS_RETENTION_DAYS}`;
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700">{t("settings.embeddingModel")}</label>
-            <input type="text" value={form.EMBEDDING_MODEL} onChange={(e) => update({ EMBEDDING_MODEL: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-amber-500" />
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700">{t("settings.embeddingModel")}</label>
+              <button onClick={checkPrimary} disabled={embStatus === "checking"} className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${embStatus === "ok" ? "bg-emerald-50 border-emerald-300 text-emerald-700" : embStatus === "error" ? "bg-red-50 border-red-300 text-red-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"} ${embStatus === "checking" ? "opacity-70" : ""}`}>
+                {embStatus === "checking" ? (t("settings.checking") || "Checking...") : embStatus === "ok" ? "✓ OK" : embStatus === "error" ? "✗ Fail" : (t("settings.check") || "Check")}
+              </button>
+            </div>
+            <input type="text" value={form.EMBEDDING_MODEL} onChange={(e) => { update({ EMBEDDING_MODEL: e.target.value }); setEmbStatus("idle"); }} className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 ${embStatus === "ok" ? "border-green-500 ring-green-500 bg-green-50/30" : embStatus === "error" ? "border-red-500 ring-red-500 bg-red-50/30" : "border-slate-200 focus:ring-amber-500"}`} />
             <p className="text-xs text-slate-400 mt-1">{t("settings.embeddingFallbackDesc")}</p>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700">{t("settings.embeddingFallbacks")} <span className="font-normal text-slate-500">(comma-separated)</span></label>
-            <input type="text" value={form.EMBEDDING_FALLBACKS} onChange={(e) => update({ EMBEDDING_FALLBACKS: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500" placeholder="nvidia-nim/nvidia/nv-embed-v1,cloudflare-..." />
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700">{t("settings.embeddingFallbacks")} <span className="font-normal text-slate-500">(comma-separated)</span></label>
+              <button onClick={checkFallbacks} className="px-2.5 py-1 rounded-lg text-xs font-bold border bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                {Object.values(fallbackStatuses).some((v) => v === "checking") ? (t("settings.checking") || "Checking...") : (t("settings.check") || "Check")}
+              </button>
+            </div>
+            <input type="text" value={form.EMBEDDING_FALLBACKS} onChange={(e) => { update({ EMBEDDING_FALLBACKS: e.target.value }); setFallbackStatuses({}); }} className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 ${Object.keys(fallbackStatuses).length > 0 && Object.values(fallbackStatuses).every((v) => v === "ok") ? "border-green-500 ring-green-500 bg-green-50/30" : Object.values(fallbackStatuses).some((v) => v === "error") ? "border-red-500 ring-red-500 bg-red-50/30" : "border-slate-200 focus:ring-amber-500"}`} placeholder="nvidia-nim/nvidia/nv-embed-v1,cloudflare-..." />
             <p className="text-xs text-slate-400 mt-1">{t("settings.embeddingFallbacksDesc")}</p>
+            {Object.keys(fallbackStatuses).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {form.EMBEDDING_FALLBACKS.split(",").map((s) => s.trim()).filter(Boolean).map((m) => {
+                  const st = fallbackStatuses[m] || "idle";
+                  return (
+                    <span key={m} className={`px-2 py-0.5 rounded-full text-xs font-mono border ${st === "ok" ? "bg-green-50 border-green-300 text-green-700" : st === "error" ? "bg-red-50 border-red-300 text-red-700" : st === "checking" ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-slate-100 border-slate-200 text-slate-600"}`}>
+                      {m} {st === "ok" ? "✓" : st === "error" ? "✗" : st === "checking" ? "…" : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
