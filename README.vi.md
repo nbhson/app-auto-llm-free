@@ -21,8 +21,17 @@
 >
 > Smart routing `auto` → model free tốt nhất + fallback + `x-router` pin + verify live 24h. **Cứ free ngoài kia là có ở đây.** → `POST /v1/chat/completions` với mọi OpenAI SDK. Full list: [docs/vi/PROVIDERS.md](docs/vi/PROVIDERS.md) • live probe: `POST /api/verify`
 
-> #### ⚙️ **Cài đặt & Đa-Client — Dashboard `/settings` + Claude Code / OpenCode / Copilot / Codex**
-> **Settings** ngoài cùng phải (`/settings`, default `.env` `GET /api/config` → `localStorage`, live Check `EMBEDDING_MODEL`/`EMBEDDING_FALLBACKS` xanh/đỏ, `SEMANTIC_CACHE`/`COMPRESSION`/`COST_ROUTING` toggle) • **Claude Code** `ANTHROPIC_BASE_URL=http://localhost:7373` `ANTHROPIC_AUTH_TOKEN=fgk-...` `POST /v1/messages` (`free-llm-gateway/auto` strict 8 `pollinations,llm7-io,kilo-code,nvidia-nim,agnes-ai,orcarouter,openrouter`) • **OpenCode/Cline/OrcaRouter** (`OPENCODE_API_KEYS`/`CLINE_API_KEYS`/`ORCAROUTER_API_KEYS`) • **GitHub Copilot / Codex** (`codex` provider `https://api.openai.com/v1` `OPENAI_API_KEYS`/`CODEX_API_KEYS` `model: codex/gpt-5`) • Mọi OpenAI SDK (Vercel AI, LangChain)
+> #### ⚙️ **Cài đặt & Đa-Client**
+>
+> **Dashboard Settings** — Trang `/settings` load mặc định từ `.env` qua `GET /api/config`, lưu vào `localStorage`. Kiểm tra sống `EMBEDDING_MODEL`/`EMBEDDING_FALLBACKS` (xanh/đỏ), bật/tắt `SEMANTIC_CACHE`/`COMPRESSION`/`COST_ROUTING`.
+>
+> **Claude Code** — Set `ANTHROPIC_BASE_URL=http://localhost:7373` và `ANTHROPIC_AUTH_TOKEN=fgk-...`, dùng `POST /v1/messages` với model `free-llm-gateway/auto` (strict 8 fallback: pollinations, llm7-io, kilo-code, nvidia-nim, agnes-ai, orcarouter, openrouter).
+>
+> **OpenCode / Cline / OrcaRouter** — Cấu hình qua biến môi trường `OPENCODE_API_KEYS`, `CLINE_API_KEYS`, `ORCAROUTER_API_KEYS`.
+>
+> **GitHub Copilot / Codex** — Dùng provider `codex` tại `https://api.openai.com/v1` với `OPENAI_API_KEYS`/`CODEX_API_KEYS`, model `codex/gpt-5`.
+>
+> **Mọi OpenAI SDK** — Hoạt động với Vercel AI SDK, LangChain, v.v. qua `baseURL` + `apiKey` chuẩn.
 
 **Languages / Ngôn ngữ:** 🇻🇳 [Tiếng Việt](docs/vi/GETTING_STARTED.md) | 🇬🇧 [English](docs/en/GETTING_STARTED.md) | [Docs Index](docs/README.md)
 
@@ -38,16 +47,16 @@
 
 ## ✨ Tính năng
 
-| Nhóm | Chi tiết |
-|------|----------|
-| **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — dùng trực tiếp với OpenAI SDK |
-| **Provider Hybrid (30)** | **Permanent Free**: NVIDIA NIM (97), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), SambaNova, SiliconFlow, Groq (7), Cerebras (5), Z AI, Agnes, Aion, LLM7, Chutes, Glhf… <br> **Quota**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4) <br> **Scraped**: Pollinations, LLM7.io, Ollama Cloud (3 free) — Nguồn: freellms.org (316 free models) |
-| **Smart Routing** | Tiered 15 (real key → public free), alias (`auto`/`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router`, skip `deprecated`/`quota`/`breaker` |
-| **Resilience** | Executor `tryProviders` dùng chung (6 routes), sliding-window quota/rate-limit (Redis Lua, hết boundary spike), breaker 5/30s half-open (chỉ đếm 5xx/429/exception), TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight |
-| **Key Pool** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, `rotate-keys.ts` |
-| **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (sticky, `providers` trước `models`), **Dashboard** 4 cards + 3 charts (byProvider/latency/verify) + tokens, **Providers** `Get Key ↗` + live health, **Models** 316 checkbox + `Check Live` + `Used/Limit`, **Keys** `fgk-...` CRUD + Key Generator (thay openssl) + Quick Test, **Logs** charts + SSE |
-| **Vector 1+2 (2026-09-08)** | **Audio** `POST /v1/audio/transcriptions`/`translations`/`speech` (Groq/Cerebras/OpenAI, multipart) • **Responses** `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API) • **Anthropic** `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls` giữ nguyên, `ANTHROPIC_API_KEYS`) • **Semantic Cache** (`SEMANTIC_CACHE_ENABLED=0`, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL=cohere/embed-english-v3.0`, cosine, Redis/in-memory, embedding fallback song song) • **Compression** (`COMPRESSION_ENABLED=0`, query-aware `relevanceKeep` + tools minify + dedup chuẩn hóa) • **Cost Routing** (`COST_ROUTING_ENABLED=0`, `cost*5 + latency*0.0005 - headroom*0.3 - success*2`, `SUCCESS_WEIGHT=2`) • **Analytics** (`ANALYTICS_RETENTION_DAYS=30`, `costByProvider`/`cacheHitRate`/`p95`/`errorsByProvider`, `GET /api/analytics/*` — payload thật từ 0.9.0) |
-| **Observability** | Pino pretty, OTel GenAI (`gen_ai.*`), token estimator, `request-log` 1000 + `X-Verified`, `PROVIDER_TEST_RESULTS` benchmark |
+| Danh mục | Tính năng |
+|----------|----------|
+| **API Thống nhất (OpenAI-Compatible)** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/responses`, `/v1/conversations`, `/v1/messages` (Anthropic) — dùng ngay với OpenAI SDK, Vercel AI, LangChain |
+| **41 Provider Miễn Phí (324 Model)** | **Permanent Free (26)**: NVIDIA NIM (81+), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), OpenRouter (17), SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf…<br>**Quota Free (4)**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4)<br>**Scraped/Unlimited (3)**: Pollinations, LLM7.io, Ollama Cloud<br>**Custom Free (3)**: OrcaRouter, FreeAI, Cline |
+| **Routing Thông Minh & Fallback** | Fallback theo tier (key thật → public free), alias model (`auto`, `gpt-4`, `glm`, `qwen`, `code` → free tốt nhất), header `x-router` pin, bỏ qua `deprecated`/`quota`/`breaker`, filter `hasKey` |
+| **Resilience v2 (0.9.0)** | Executor `tryProviders` chung (6 routes), Redis Lua sliding-window quota/rate-limit (không spike biên), circuit breaker 5/30s half-open (chỉ 5xx/429/exception), quota TPM/RPM (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
+| **Quản Lý Key An Toàn** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, script xoay key |
+| **Dashboard (5 Trang)** | **Dashboard**: 4 stat cards + 3 biểu đồ + token overview<br>**Providers**: phân trang 25/50, sticky header, filter `hasKey` (mặc định TẮT), `Sync Live Now`, `Get Key ↗`, live health<br>**Models**: phân trang 25/50, Filters dropdown (`hasKey` TẮT, `Hide 404`/`credits`/`invalid` BẬT), `Check Live (n)`, `Sync Live Now`, `Refresh`, `Used/Limit`, strikethrough persisted qua `POST /api/models/health/mark`<br>**Keys**: `fgk-...` CRUD + Generator + Quick Test<br>**Logs**: biểu đồ + SSE stream |
+| **Vector 1+2 (2026-09-08)** | **Audio**: `POST /v1/audio/transcriptions|translations|speech` (Groq/Cerebras/OpenAI, multipart)<br>**Responses**: `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API)<br>**Anthropic**: `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls` giữ nguyên)<br>**Semantic Cache**: `SEMANTIC_CACHE_ENABLED=0`, ngưỡng 0.92, TTL 3600s, Cohere embeddings, cosine, Redis/in-memory, parallel embedding fallbacks<br>**Compression**: `COMPRESSION_ENABLED=0`, `relevanceKeep` query-aware (BM25-lite), tools minify, code dedup chuẩn hóa<br>**Cost Routing**: `COST_ROUTING_ENABLED=0`, score = cost×5 + latency×0.0005 − headroom×0.3 − success×2, `SUCCESS_WEIGHT=2`<br>**Analytics**: `ANALYTICS_RETENTION_DAYS=30`, `costByProvider`, `cacheHitRate`, `p95`, `errorsByProvider`, `GET /api/analytics/*` |
+| **Observability** | Pino pretty logs, OpenTelemetry GenAI (`gen_ai.*`), token estimator, request log (1000 entries + `X-Verified`), provider benchmark `PROVIDER_TEST_RESULTS` |
 
 ## 🏗️ Kiến trúc
 

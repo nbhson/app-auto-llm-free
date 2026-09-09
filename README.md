@@ -21,8 +21,17 @@
 >
 > Smart routing `auto` → best free with fallback + `x-router` pin + 24h live verify. **If it's free out there, it's here.** → `POST /v1/chat/completions` with any OpenAI SDK. Full list: [docs/en/PROVIDERS.md](docs/en/PROVIDERS.md) • live probe: `POST /api/verify`
 
-> #### ⚙️ **Settings & Multi-Client Ready — Dashboard `/settings` + Claude Code / OpenCode / Copilot / Codex**
-> **Settings** far right (`/settings`, defaults `.env` `GET /api/config` → `localStorage`, live Check `EMBEDDING_MODEL`/`EMBEDDING_FALLBACKS` green/red, `SEMANTIC_CACHE`/`COMPRESSION`/`COST_ROUTING` toggles) • **Claude Code** `ANTHROPIC_BASE_URL=http://localhost:7373` `ANTHROPIC_AUTH_TOKEN=fgk-...` `POST /v1/messages` (`free-llm-gateway/auto` strict 8 fallback `pollinations,llm7-io,kilo-code,nvidia-nim,agnes-ai,orcarouter,openrouter`) • **OpenCode/Cline/OrcaRouter** (`OPENCODE_API_KEYS`/`CLINE_API_KEYS`/`ORCAROUTER_API_KEYS`) • **GitHub Copilot / Codex** (`codex` provider `https://api.openai.com/v1` `OPENAI_API_KEYS`/`CODEX_API_KEYS` `model: codex/gpt-5`) • Any OpenAI SDK (Vercel AI, LangChain)
+> #### ⚙️ **Settings & Multi-Client Ready**
+>
+> **Dashboard Settings** — `/settings` page loads defaults from `.env` via `GET /api/config`, saves to `localStorage`. Live health checks for `EMBEDDING_MODEL`/`EMBEDDING_FALLBACKS` (green/red), toggles for `SEMANTIC_CACHE`/`COMPRESSION`/`COST_ROUTING`.
+>
+> **Claude Code** — Set `ANTHROPIC_BASE_URL=http://localhost:7373` and `ANTHROPIC_AUTH_TOKEN=fgk-...`, uses `POST /v1/messages` with model `free-llm-gateway/auto` (strict 8 fallback: pollinations, llm7-io, kilo-code, nvidia-nim, agnes-ai, orcarouter, openrouter).
+>
+> **OpenCode / Cline / OrcaRouter** — Configure via `OPENCODE_API_KEYS`, `CLINE_API_KEYS`, `ORCAROUTER_API_KEYS` environment variables.
+>
+> **GitHub Copilot / Codex** — Uses `codex` provider at `https://api.openai.com/v1` with `OPENAI_API_KEYS`/`CODEX_API_KEYS`, model `codex/gpt-5`.
+>
+> **Any OpenAI SDK** — Works with Vercel AI SDK, LangChain, etc. via standard `baseURL` + `apiKey`.
 
 **Languages:** 🇬🇧 [English](README.md) | 🇻🇳 [Tiếng Việt](README.vi.md) | [Docs Index](docs/README.md) — Docs: [🇬🇧 EN](docs/en/GETTING_STARTED.md) | [🇻🇳 VI](docs/vi/GETTING_STARTED.md)
 
@@ -42,16 +51,16 @@
 
 ## ✨ Features
 
-| Group | Details |
-|------|----------|
-| **Unified Endpoint** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations` — works directly with OpenAI SDK |
-| **Provider Hybrid (41 ids)** | **Permanent Free**: NVIDIA NIM (81 live), ModelScope, Cloudflare, Gemini (3.6), OVH, Cohere, SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf… <br> **Quota**: GitHub Models, Mistral, Kilo Code, HuggingFace <br> **Scraped**: Pollinations, LLM7.io, Ollama Cloud — Source: live provider APIs (freellms.org snapshot disabled, not latest) |
-| **Smart Routing** | Tiered fallback (real key → public free), aliases (`auto`/`gpt-4`/`glm`/`qwen`/`code` → best free), header `x-router`, skip `deprecated`/`quota`/`breaker`, `hasKey` filter |
-| **Resilience** | Shared `tryProviders` executor (6 routes), sliding-window quota/rate-limit (Redis Lua, no boundary spike), breaker 5/30s half-open (5xx/429/exceptions only), TPM/RPM quota (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
-| **Key Pool** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, `rotate-keys.ts` |
-| **Dashboard (5 routes)** | Nav `Dashboard → Providers → Models → Keys → Logs` (header 2 rows, centered nav), **Dashboard** 4 cards + 3 charts + tokens, **Providers** pagination 25/50 sticky + `hasKey` filter (**default OFF**, `hasKeyOnly:0`) + `Sync Live Now` (shared `POST /api/models/live/sync` with Models) + `Get Key ↗` + live health, **Models** pagination 25/50 sticky + **Filters** dropdown (`hasKey` default OFF + `Hide 404`/`Hide credits`/`Hide invalid` default ON) + `Check Live (n)`/`Sync Live Now`/`Refresh` (Refresh resets `hasKeyOnly:false`, Check requires filter) + `Used/Limit` + strikethrough persist (`200 usable` keeps non-red after reload via `POST /api/models/health/mark`), **Keys** `fgk-...` CRUD + Key Generator + Quick Test, **Logs** charts + SSE |
-| **Vector 1+2 (2026-09-08)** | **Audio** `POST /v1/audio/transcriptions`/`translations`/`speech` (Groq/Cerebras/OpenAI, multipart) • **Responses** `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API) • **Anthropic** `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls` preserved, `ANTHROPIC_API_KEYS`) • **Semantic Cache** (`SEMANTIC_CACHE_ENABLED=0`, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL=cohere/embed-english-v3.0`, cosine, Redis/in-memory, parallel embedding fallbacks) • **Compression** (`COMPRESSION_ENABLED=0`, query-aware `relevanceKeep` + tools minify + normalized code dedup) • **Cost Routing** (`COST_ROUTING_ENABLED=0`, `cost*5 + latency*0.0005 - headroom*0.3 - success*2`, `SUCCESS_WEIGHT=2`) • **Analytics** (`ANALYTICS_RETENTION_DAYS=30`, `costByProvider`/`cacheHitRate`/`p95`/`errorsByProvider`, `GET /api/analytics/*` — real payload since 0.9.0) |
-| **Observability** | Pino pretty, OTel GenAI (`gen_ai.*`), token estimator, `request-log` 1000 + `X-Verified`, `PROVIDER_TEST_RESULTS` benchmark |
+| Category | Features |
+|----------|----------|
+| **Unified OpenAI-Compatible API** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/responses`, `/v1/conversations`, `/v1/messages` (Anthropic) — drop-in for OpenAI SDK, Vercel AI, LangChain |
+| **41 Free Providers (324 Models)** | **Permanent Free (26)**: NVIDIA NIM (81+), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), OpenRouter (17), SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf…<br>**Quota Free (4)**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4)<br>**Scraped/Unlimited (3)**: Pollinations, LLM7.io, Ollama Cloud<br>**Custom Free (3)**: OrcaRouter, FreeAI, Cline |
+| **Smart Routing & Fallback** | Tiered fallback (real key → public free), model aliases (`auto`, `gpt-4`, `glm`, `qwen`, `code` → best free), header `x-router` pin, skips `deprecated`/`quota`/`breaker`, `hasKey` filter |
+| **Resilience v2 (0.9.0)** | Shared `tryProviders` executor (6 routes), Redis Lua sliding-window quota/rate-limit (no boundary spikes), circuit breaker 5/30s half-open (5xx/429/exceptions only), TPM/RPM quotas (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
+| **Secure Key Management** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM limits), `fgk-master-...` admin, key rotation script |
+| **Dashboard (5 Pages)** | **Dashboard**: 4 stat cards + 3 charts + token overview<br>**Providers**: pagination 25/50, sticky header, `hasKey` filter (default OFF), `Sync Live Now`, `Get Key ↗`, live health<br>**Models**: pagination 25/50, Filters dropdown (`hasKey` OFF, `Hide 404`/`credits`/`invalid` ON), `Check Live (n)`, `Sync Live Now`, `Refresh`, `Used/Limit`, persisted strikethrough via `POST /api/models/health/mark`<br>**Keys**: `fgk-...` CRUD + Generator + Quick Test<br>**Logs**: charts + SSE stream |
+| **Vector 1+2 (2026-09-08)** | **Audio**: `POST /v1/audio/transcriptions|translations|speech` (Groq/Cerebras/OpenAI, multipart)<br>**Responses**: `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API)<br>**Anthropic**: `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls` preserved)<br>**Semantic Cache**: `SEMANTIC_CACHE_ENABLED=0`, threshold 0.92, TTL 3600s, Cohere embeddings, cosine similarity, Redis/in-memory, parallel embedding fallbacks<br>**Compression**: `COMPRESSION_ENABLED=0`, query-aware `relevanceKeep` (BM25-lite), tools minify, normalized code dedup<br>**Cost Routing**: `COST_ROUTING_ENABLED=0`, score = cost×5 + latency×0.0005 − headroom×0.3 − success×2, `SUCCESS_WEIGHT=2`<br>**Analytics**: `ANALYTICS_RETENTION_DAYS=30`, `costByProvider`, `cacheHitRate`, `p95`, `errorsByProvider`, `GET /api/analytics/*` |
+| **Observability** | Pino pretty logs, OpenTelemetry GenAI (`gen_ai.*`), token estimator, request log (1000 entries + `X-Verified`), provider benchmark `PROVIDER_TEST_RESULTS` |
 
 ## 🏗️ Architecture
 
