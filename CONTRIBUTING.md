@@ -1,57 +1,57 @@
 # Contributing
 
-Cảm ơn bạn quan tâm đóng góp cho `app-auto-llm-free`!
+Thanks for your interest in contributing to `app-auto-llm-free`!
 
-## Quy trình
+## Process
 
-1. Fork repo, tạo branch `feat/<ten-tinh-nang>` hoặc `fix/<ten-loi>`.
-2. Cài đặt: `npm install && cp .env.example .env` — yêu cầu **Node >= 22** (`node -v`) + npm >= 10 — điền ít nhất 1 provider key để test live.
-3. Code + test local:
+1. Fork the repo, create a branch `feat/<feature-name>` or `fix/<bug-name>`.
+2. Setup: `npm install && cp .env.example .env` — requires **Node >= 22** (`node -v`) + npm >= 10 — add at least 1 provider key for live testing.
+3. Code + local testing:
 
 ```bash
-npm run typecheck        # hoặc tsc --noEmit -p apps/gateway/tsconfig.json
+npm run typecheck        # or tsc --noEmit -p apps/gateway/tsconfig.json
 npm run build -w apps-gateway
 npm run verify:free:dry -w apps-gateway  # dry-run verify 316 models
-npm run dev:gateway      # kiểm tra /v1/health, /v1/models?verified=free
+npm run dev:gateway      # test /v1/health, /v1/models?verified=free
 ```
 
-4. Thêm provider mới: xem `docs/PROVIDERS.md:1` section 5.
-5. Commit theo Conventional Commits: `feat(gateway): add groq adapter`, `fix(router): fallback on 429`.
-6. Push và mở PR vào `main`, mô tả rõ provider/model thêm, kèm test `curl` hoặc SDK snippet, và kết quả `verify:free`.
-7. CI phải pass (`typecheck`, `build`), cần ít nhất 1 review.
+4. Adding a new provider: see `docs/PROVIDERS.md:1` section 5.
+5. Commit using Conventional Commits: `feat(gateway): add groq adapter`, `fix(router): fallback on 429`.
+6. Push and open PR to `main`, describe the provider/model added, include test `curl` or SDK snippet, and `verify:free` results.
+7. CI must pass (`typecheck`, `build`), at least 1 review required.
 
-## Thêm provider mới
+## Adding a New Provider
 
-Xem `docs/PROVIDERS.md:1` section 5. Yêu cầu:
+See `docs/PROVIDERS.md:1` section 5. Requirements:
 
-* Implement `Provider` interface (`apps/gateway/src/providers/base.ts:1`), có `models()` và `health()` test được (hỗ trợ no-key nếu là public như LLM7).
-* Thêm env vào `.env.example` (ví dụ `MY_PROVIDER_API_KEYS`) và vào `apps/gateway/src/config.ts:19` `providerKeys`.
-* Đăng ký trong `apps/gateway/src/providers/registry.ts:1` (kèm `providerMeta` caps/tier).
-* Chạy `python scripts/sync-freellms.py` nếu provider có trên freellms.org để cập nhật `data/` + `models.yaml`.
-* Chạy `npm run verify:free:dry -w apps-gateway` và kiểm tra `data/verified-models.json` không tăng `deprecated` bất thường.
-* Thêm test trong `apps/gateway/tests/providers/<id>.test.ts` (nếu có).
-* Cập nhật `docs/PROVIDERS.md:1` bảng và `docs/FREELLMS_FREE_TIER.md:1` nếu cần.
+* Implement `Provider` interface (`apps/gateway/src/providers/base.ts:1`), with `models()` and `health()` (support no-key for public like LLM7).
+* Add env to `.env.example` (e.g. `MY_PROVIDER_API_KEYS`) and to `apps/gateway/src/config.ts:19` `providerKeys`.
+* Register in `apps/gateway/src/providers/registry.ts:1` (with `providerMeta` caps/tier).
+* Run `python scripts/sync-freellms.py` if provider is on freellms.org to update `data/` + `models.yaml`.
+* Run `npm run verify:free:dry -w apps-gateway` and check `data/verified-models.json` for unexpected `deprecated` increases.
+* Add test in `apps/gateway/tests/providers/<id>.test.ts` (if applicable).
+* Update `docs/PROVIDERS.md:1` table and `docs/FREELLMS_FREE_TIER.md:1` if needed.
 
 ## Sync freellms (24h)
 
 ```bash
 python scripts/sync-freellms.py          # fetch freellms.org -> data/*.json + models.yaml
-npm run verify:free -w apps-gateway      # live probe (cần .env keys)
-npm run verify:free:dry -w apps-gateway  # dry-run cho CI
+npm run verify:free -w apps-gateway      # live probe (needs .env keys)
+npm run verify:free:dry -w apps-gateway  # dry-run for CI
 ```
 
-Xem `docs/OPERATIONS.md:1` để hiểu 2-layer sync (freellms + live verify) và scheduler 24h.
+See `docs/OPERATIONS.md:1` for 2-layer sync (freellms + live verify) and 24h scheduler.
 
-## Báo lỗi
+## Bug Reports
 
-Mở Issue với: mô tả, steps to reproduce, `curl` request, logs gateway (`docker compose logs`), và output `GET /api/verify/summary` nếu liên quan free tier.
+Open an Issue with: description, steps to reproduce, `curl` request, gateway logs (`docker compose logs`), and `GET /api/verify/summary` output if related to free tier.
 
-## Code style
+## Code Style
 
 * TypeScript strict, `eslint` + `prettier`.
-* Ưu tiên `fetch` native + `hono/proxy`, không thêm `axios`/`got`.
-* Không commit secret (`*.env`, `data.db`, `data/verified-models.json` nếu chứa key — hiện chỉ chứa status, an toàn).
+* Prefer native `fetch` + `hono/proxy`, avoid adding `axios`/`got`.
+* No secrets in commits (`*.env`, `data.db`, `data/verified-models.json` if containing keys — currently only status, safe).
 
 ## License
 
-Đóng góp của bạn sẽ được cấp phép Apache-2.0 như repo.
+Your contribution will be licensed under Apache-2.0, same as the repo.
