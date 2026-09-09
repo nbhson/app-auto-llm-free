@@ -21,7 +21,7 @@ See the full `.env.example` (30 providers from freellms.org, live sync is now so
 | `NODE_TLS_REJECT_UNAUTHORIZED` | _(unset)_ | Dev-only behind corporate SSL-inspection proxy (Zscaler) if you hit `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` disables verification → MITM risk, **never in prod**. Safer: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 | `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler for verify + live sync |
 | `DISABLE_SCHEDULER` | `0` | Set to `1` to disable scheduler |
-| `EXPOSE_BOOTSTRAP` | `1` (enabled) | Public `GET /api/bootstrap` + `/api/config/master` returning `MASTER_KEY` for first-time UI auto-bind (`app.ts:23`); set `0`/`false` to disable in public deployments |
+| `EXPOSE_BOOTSTRAP` | `1` (enabled by default) | Public `GET /api/bootstrap` + `/api/config/master` returning `MASTER_KEY` for first-time UI auto-bind (`app.ts:23`); set `0`/`false`/`no` to disable in public deployments |
 
 ### Provider Keys (pooled, comma-separated) — 30 freellms providers, live via real keys
 
@@ -181,7 +181,7 @@ In the `virtual_keys` table:
 
 ## Bootstrap — auto-bind MASTER_KEY
 
-`apps/gateway/src/app.ts:23` public `GET /api/bootstrap` (alias `/api/config/master`) returns `{masterKey}` for first-time UI binding. Frontend `apps/web/src/main.tsx:34` fetches when `localStorage masterKey` is placeholder (`fgk-master-dev-key`/`change-me`/len<16) and re-bootstraps on `401`. Disable in public via `EXPOSE_BOOTSTRAP=0`/`false`.
+`apps/gateway/src/app.ts:23` public `GET /api/bootstrap` (alias `/api/config/master`) returns `{masterKey}` for first-time UI binding. Enabled by default (`EXPOSE_BOOTSTRAP=1`). Frontend `apps/web/src/main.tsx:34` fetches when `localStorage masterKey` is placeholder (`fgk-master-dev-key`/`change-me`/len<16) and re-bootstraps on `401`. Disable in public via `EXPOSE_BOOTSTRAP=0`/`false`/`no`.
 
 ## Fresh clone data
 

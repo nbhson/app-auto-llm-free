@@ -37,10 +37,10 @@ export function createApp() {
   app.use("*", virtualKeyRateLimit);
 
   // Public bootstrap — expose auto-generated MASTER_KEY for first-time UI binding (local self-hosted)
-  // Secure by default: only exposed when EXPOSE_BOOTSTRAP=1 (explicit opt-in, e.g. dev or private self-hosted)
+  // Enabled by default (EXPOSE_BOOTSTRAP=1): only disabled when EXPOSE_BOOTSTRAP=0/false/no (e.g. public deployment)
   function isBootstrapExposed(): boolean {
-    const v = process.env.EXPOSE_BOOTSTRAP;
-    return v === "1" || v === "true";
+    const v = (process.env.EXPOSE_BOOTSTRAP ?? "1").toLowerCase().trim();
+    return !(v === "0" || v === "false" || v === "no" || v === "off" || v === "");
   }
   app.get("/api/bootstrap", (c) => {
     if (!isBootstrapExposed()) {

@@ -308,7 +308,7 @@ Không cần auth, trả status gateway + provider pool.
 
 | Method | Path | Mô tả |
 |--------|------|-------|
-| `GET` | `/api/bootstrap` | **Mới `8f1b3b7`**: Public, không cần auth — trả `{masterKey}` tự sinh (`config.masterKey`) để UI lần đầu tự bind (`main.tsx:34`); tắt bằng `EXPOSE_BOOTSTRAP=0`/`false` (`app.ts:23`) |
+| `GET` | `/api/bootstrap` | **Mới `8f1b3b7`**: Public, không cần auth — bật mặc định (`EXPOSE_BOOTSTRAP=1`), trả `{masterKey}` tự sinh (`config.masterKey`) để UI lần đầu tự bind (`main.tsx:34`); tắt bằng `EXPOSE_BOOTSTRAP=0`/`false` (`app.ts:23`) |
 | `GET` | `/api/config/master` | Alias cho `/api/bootstrap` |
 | `POST` | `/api/keys` | Tạo virtual key `fgk-...` (hash SHA256, scopes, RPM) |
 | `GET` | `/api/keys` | List keys + `requestCount` |

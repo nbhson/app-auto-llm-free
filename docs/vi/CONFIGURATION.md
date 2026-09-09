@@ -21,7 +21,7 @@ Xem `.env.example` đầy đủ (30 providers freellms.org, live sync là source
 | `NODE_TLS_REJECT_UNAUTHORIZED` | _(không đặt)_ | Chỉ dev sau proxy SSL inspection (Zscaler) khi gặp `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. `0` tắt verify → MITM, **không bao giờ prod**. An toàn hơn: `NODE_EXTRA_CA_CERTS=/path/to/ca.crt` |
 | `SYNC_INTERVAL_MS` | `86400000` | 24h scheduler cho verify + live sync |
 | `DISABLE_SCHEDULER` | `0` | Đặt `1` để tắt scheduler |
-| `EXPOSE_BOOTSTRAP` | `1` (bật) | Public `GET /api/bootstrap` + `/api/config/master` trả `MASTER_KEY` cho UI tự điền lần đầu (`app.ts:23`); đặt `0`/`false` để tắt khi deploy public |
+| `EXPOSE_BOOTSTRAP` | `1` (bật mặc định) | Public `GET /api/bootstrap` + `/api/config/master` trả `MASTER_KEY` cho UI tự điền lần đầu (`app.ts:23`); đặt `0`/`false`/`no` để tắt khi deploy public |
 
 ### Provider Keys (pool, phân tách dấu phẩy) — freellms 30 providers, live via real keys
 
@@ -181,7 +181,7 @@ Trong `virtual_keys` table:
 
 ## Bootstrap — tự điền MASTER_KEY
 
-`apps/gateway/src/app.ts:23` public `GET /api/bootstrap` (alias `/api/config/master`) trả `{masterKey}` để UI lần đầu tự bind. Frontend `apps/web/src/main.tsx:34` fetch khi `localStorage masterKey` placeholder (`fgk-master-dev-key`/`change-me`/len<16) và re-bootstrap khi `401`. Tắt khi public bằng `EXPOSE_BOOTSTRAP=0`/`false`.
+`apps/gateway/src/app.ts:23` public `GET /api/bootstrap` (alias `/api/config/master`) trả `{masterKey}` để UI lần đầu tự bind. Bật mặc định (`EXPOSE_BOOTSTRAP=1`). Frontend `apps/web/src/main.tsx:34` fetch khi `localStorage masterKey` placeholder (`fgk-master-dev-key`/`change-me`/len<16) và re-bootstrap khi `401`. Tắt khi public bằng `EXPOSE_BOOTSTRAP=0`/`false`/`no`.
 
 ## Clone mới — data trống
 

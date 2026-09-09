@@ -308,7 +308,7 @@ No auth required; returns gateway status and provider pool.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/bootstrap` | **New `8f1b3b7`**: Public, no auth — returns `{masterKey}` auto-generated (`config.masterKey`) for first-time UI auto-bind (`main.tsx:34`); disable via `EXPOSE_BOOTSTRAP=0`/`false` (`app.ts:23`) |
+| `GET` | `/api/bootstrap` | **New `8f1b3b7`**: Public, no auth — enabled by default (`EXPOSE_BOOTSTRAP=1`), returns `{masterKey}` auto-generated (`config.masterKey`) for first-time UI auto-bind (`main.tsx:34`); disable via `EXPOSE_BOOTSTRAP=0`/`false` (`app.ts:23`) |
 | `GET` | `/api/config/master` | Alias for `/api/bootstrap` |
 | `POST` | `/api/keys` | Create virtual key `fgk-...` (SHA256 hash, scopes, RPM) |
 | `GET` | `/api/keys` | List keys + `requestCount` |

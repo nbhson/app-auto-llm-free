@@ -26,7 +26,7 @@ services:
     environment:
       PORT: 7373
       NODE_ENV: production
-      EXPOSE_BOOTSTRAP: ${EXPOSE_BOOTSTRAP:-0}
+      EXPOSE_BOOTSTRAP: ${EXPOSE_BOOTSTRAP:-1}
       # override DATABASE_URL to postgres when using compose
       DATABASE_URL: postgres://gateway:gateway@postgres:5432/gateway
       REDIS_URL: redis://redis:6379
