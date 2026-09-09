@@ -12,14 +12,9 @@ describe("paths", () => {
     expect(readDataJson("definitely-missing-xyz.json", { a: 1 })).toEqual({ a: 1 });
   });
 
-  it("readDataJson reads existing repo data file when tracked", () => {
-    // data/freellms-providers.json is intentionally gitignored (see .gitignore line 24);
-    // fresh clones don't ship it — test that the fallback path works instead
+  it("readDataJson returns fallback when file is absent (CI/fresh clone)", () => {
+    // data/freellms-providers.json is gitignored — CI clones fresh without it
     const providers = readDataJson<FreellmsModelEntry[] | null>("freellms-providers.json", null);
-    expect(Array.isArray(providers)).toBe(true);
-    // Either file exists locally (dev) or returns fallback null (CI/fresh clone)
-    if (providers !== null && typeof providers === "object") {
-      expect(providers.length).toBeGreaterThan(0);
-    }
+    expect(providers).toBeNull();
   });
 });
