@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveDataPath, readDataJson } from "./paths.js";
+import type { FreellmsModelEntry } from "./types.js";
 
 describe("paths", () => {
   it("resolveDataPath ends with filename", () => {
