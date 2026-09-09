@@ -99,15 +99,20 @@ then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live
 | `SEMANTIC_THRESHOLD` | `0.92` | Cosine similarity threshold for cache hit (0.0–1.0, higher = stricter). Tuned for `cohere/embed-english-v3.0` |
 | `CACHE_TTL_S` | `3600` | TTL in seconds for cached completions (1 hour). Evicted via Redis TTL or in-memory sweep |
 | `EMBEDDING_MODEL` | `cohere/embed-english-v3.0` | Embedding model for semantic cache. Uses Cohere embeddings; swap to any compatible endpoint |
-| `COMPRESSION_ENABLED` | `0` | Enable token compression (history truncation + tools minify, 12-engine pattern like OmniRoute) to reduce cost |
-| `COST_ROUTING_ENABLED` | `0` | Enable cost-aware routing — prefers cheapest free provider first (ties broken by latency/verified) |
+| `COMPRESSION_ENABLED` | `0` | Enable token compression: query-aware `relevanceKeep` (BM25-lite vs last user message, keeps system + 3 recent + top-5 relevant) + tools minify + normalized code dedup |
+| `COST_ROUTING_ENABLED` | `0` | Enable cost-aware routing — score `cost*COST_WEIGHT + latency*LATENCY_WEIGHT - headroom*HEADROOM_WEIGHT - successRate*SUCCESS_WEIGHT` (success from request-log last100, default 1 when no data) |
 | `ANALYTICS_RETENTION_DAYS` | `30` | Days to retain admin analytics rollups (cost tracking, savings, per-key billing, `costByProvider`, `cacheHitRate`, `p95` latency) |
+| `SUCCESS_WEIGHT` | `2` | Cost-router weight for rolling success rate — demotes flaky providers before the breaker opens (`0` disables) |
 
 Flags are off by default (`0`) for backwards compatibility. Enable individually via `.env` and restart gateway (see kill/restart notes above).
 
 ### Rate Limit
 
-`middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) get 4x (`Math.max(rpmLimit*4, 200)`), frontend debounces search `q` by 400ms (Models/Providers) to reduce 429.
+`middleware/rate-limit.ts` — sliding-window-counter over Redis Lua when available (atomic check+commit, shared across instances, no boundary spike), in-memory fixed window otherwise. List endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) get 4x (`Math.max(rpmLimit*4, 200)`), frontend debounces search `q` by 400ms (Models/Providers) to reduce 429.
+
+### Quota
+
+`lib/quota-tracker.ts` — same sliding-window engine for provider quotas (RPM/TPM per minute, RPD/TPD per day). `checkQuotaAsync` probes Redis once per request and falls back wholesale to in-memory when Redis is down; `recordUsage` dual-writes (in-memory mirror keeps `getQuotaHeadroom`/cost-router working). Note: a provider with both TPM and TPD trips TPM first by design (per-minute binds tighter).
 
 ## models.yaml — 316 free models (freellms snapshot, historical) + live-models.json (882 free)
 

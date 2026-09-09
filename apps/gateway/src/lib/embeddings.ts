@@ -71,17 +71,19 @@ function asNumberArray(v: unknown): number[] | null {
 
 /**
  * Embed text with automatic fallback chain.
- * Tries EMBEDDING_MODEL primary first, then EMBEDDING_FALLBACKS, returns first success.
+ * All candidates fire in parallel; the first success in priority order wins
+ * (serial chain would stack timeouts: 3 models x timeoutMs worst case).
  * If all fail, returns null so caller can fallback to hash exact match.
  */
 export async function embedWithFallback(text: string, timeoutMs = 2000): Promise<{ embedding: number[]; model: string } | null> {
   if (!text) return null;
   const models = getEmbeddingModels();
-  for (const m of models) {
-    const emb = await tryEmbedWithModel(text, m, timeoutMs);
+  const pending = models.map((m) => tryEmbedWithModel(text, m, timeoutMs));
+  for (let i = 0; i < models.length; i++) {
+    const emb = await pending[i];
     if (emb) {
-      logger.info({ model: m, dim: emb.length }, "[embeddings] success");
-      return { embedding: emb, model: m };
+      logger.info({ model: models[i], dim: emb.length }, "[embeddings] success");
+      return { embedding: emb, model: models[i] };
     }
   }
   logger.warn({ models }, "[embeddings] all fallbacks failed, will use hash fallback");

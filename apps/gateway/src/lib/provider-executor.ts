@@ -1,0 +1,105 @@
+import type { Provider } from "../providers/base.js";
+import { providers } from "../providers/registry.js";
+import { getNextKeyManaged, markRateLimited, markSuccess } from "./key-manager.js";
+import { checkQuotaAsync, recordUsage } from "./quota-tracker.js";
+import { isOpen, recordSuccess, recordFailureIfRetryable } from "./circuit-breaker.js";
+import { logger } from "../middleware/logger.js";
+import { isPublicProvider } from "./provider-keys.js";
+import { errMessage, type ProviderError } from "./types.js";
+
+/**
+ * Shared provider fallback executor — single implementation of the
+ * breaker → key → quota → skip → call → bookkeeping loop previously
+ * duplicated across chat/anthropic/responses/embeddings/images/audio.
+ *
+ * Behavior preserved per route via options:
+ * - quotaTokens: estimated tokens for quota pre-check + usage commit.
+ *   Omit to skip quota entirely (embeddings/images/audio legacy behavior).
+ * - shouldSkip: per-provider veto (e.g. deprecated model) returning a reason.
+ */
+
+export interface ProviderAttempt {
+  providerId: string;
+  provider: Provider;
+  key: string;
+}
+
+export interface TryProvidersOpts {
+  providerOrder: string[];
+  quotaTokens?: number;
+  shouldSkip?: (providerId: string) => string | null;
+  call: (attempt: ProviderAttempt) => Promise<Response>;
+}
+
+export type TryProvidersResult =
+  | { ok: true; providerId: string; key: string; res: Response }
+  | { ok: false; errors: ProviderError[] };
+
+export async function tryProviders(opts: TryProvidersOpts): Promise<TryProvidersResult> {
+  const errors: ProviderError[] = [];
+  for (const pid of opts.providerOrder) {
+    const provider = providers[pid];
+    if (!provider) continue;
+
+    if (isOpen(pid)) {
+      errors.push({ provider: pid, error: "circuit open (cooldown)" });
+      continue;
+    }
+
+    const key = getNextKeyManaged(pid);
+    if (key === null) {
+      errors.push({ provider: pid, error: `no key configured (set ${pid.toUpperCase().replace(/-/g, "_")}_API_KEYS)` });
+      continue;
+    }
+    if (!key && !isPublicProvider(pid)) {
+      errors.push({ provider: pid, error: "missing key" });
+      continue;
+    }
+
+    if (opts.quotaTokens !== undefined) {
+      const quota = await checkQuotaAsync(pid, key, opts.quotaTokens);
+      if (!quota.allowed) {
+        errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
+        if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
+        continue;
+      }
+    }
+
+    if (opts.shouldSkip) {
+      const reason = opts.shouldSkip(pid);
+      if (reason) {
+        errors.push({ provider: pid, error: reason });
+        continue;
+      }
+    }
+
+    try {
+      const res = await opts.call({ providerId: pid, provider, key });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        // 429 carries Retry-After so callers can back off precisely
+        let retryAfterMs: number | undefined;
+        if (res.status === 429) {
+          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
+          retryAfterMs = Number.isNaN(retry) ? 60000 : retry;
+          markRateLimited(pid, key, retryAfterMs);
+        }
+        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600), retryAfterMs });
+        // 4xx (except 429) is a client/request error — not provider fault, don't trip breaker
+        recordFailureIfRetryable(pid, res.status);
+        continue;
+      }
+      recordSuccess(pid);
+      markSuccess(pid, key);
+      if (opts.quotaTokens !== undefined) recordUsage(pid, key, opts.quotaTokens);
+      return { ok: true, providerId: pid, key, res };
+    } catch (e) {
+      const msg = errMessage(e);
+      logger.warn({ provider: pid, err: msg }, "provider failed, trying next");
+      errors.push({ provider: pid, error: msg });
+      recordFailureIfRetryable(pid);
+      continue;
+    }
+  }
+  return { ok: false, errors };
+}

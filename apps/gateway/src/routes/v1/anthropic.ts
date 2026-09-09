@@ -2,21 +2,19 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
-import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
+import { getProvidersForRequest } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
-import { anthropicProvider } from "../../providers/anthropic.js";
 import { logger } from "../../middleware/logger.js";
-import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
 import { estimateTokens, estimateMessagesTokens } from "../../lib/token-estimator.js";
-import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
-import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { recordUsage } from "../../lib/quota-tracker.js";
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { compressWithMetrics } from "../../lib/compression.js";
 import { rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
 import { loadVerifiedMap } from "../../lib/model-store.js";
-import { getRequestVk, errMessage, type ProviderError, type UpstreamChatCompletion, type UpstreamAnthropicMessage, type CompressibleMessage } from "../../lib/types.js";
+import { tryProviders } from "../../lib/provider-executor.js";
+import { getRequestVk, type UpstreamChatCompletion, type UpstreamAnthropicMessage, type CompressibleMessage } from "../../lib/types.js";
 import type { AnthropicRequest, ChatRequest } from "../../providers/base.js";
 
 const anthropicSchema = z.object({
@@ -182,9 +180,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     }
   }
 
-  // Also inject anthropic provider if not in registry but imported directly
-  const allProviders: Record<string, (typeof providers)[string] | undefined> = { ...providers };
-  if (!allProviders["anthropic"]) allProviders["anthropic"] = anthropicProvider;
+  // Registry already carries the anthropic provider; executor resolves from it.
   if (model.toLowerCase().includes("claude") && !providerOrder.includes("anthropic")) {
     providerOrder.unshift("anthropic");
   }
@@ -206,7 +202,6 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
 
   const estimated = estimateMessagesTokens(body.messages) + (body.max_tokens || 0);
   const startAll = Date.now();
-  const errors: ProviderError[] = [];
 
   // harness 01 Retrieve: semantic cache check (non-stream only, parity) - query includes system
   if (config.semanticCacheEnabled && !body.stream) {
@@ -246,40 +241,19 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     }
   }
 
-  for (const pid of providerOrder) {
-    const provider = allProviders[pid];
-    if (!provider) continue;
+  const estimatedForQuotaBase = estimateMessagesTokens(messagesToSend) + (body.max_tokens || 0);
 
-    if (isOpen(pid)) {
-      errors.push({ provider: pid, error: "circuit open (cooldown)" });
-      continue;
-    }
-
-    const key = getNextKeyManaged(pid);
-    if (key === null) {
-      errors.push({ provider: pid, error: "no key configured (set " + pid.toUpperCase().replace(/-/g, "_") + "_API_KEYS)" });
-      continue;
-    }
-    if (!key && !isPublicProvider(pid)) {
-      errors.push({ provider: pid, error: "missing key" });
-      continue;
-    }
-
-    const estimatedForQuota = estimateMessagesTokens(messagesToSend) + (body.max_tokens || 0);
-    const quota = checkQuota(pid, key, estimatedForQuota);
-    if (!quota.allowed) {
-      errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
-      if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
-      continue;
-    }
-
-    const fullId = model.includes("/") ? model : `${pid}/${model}`;
-    if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
-      errors.push({ provider: pid, error: "model deprecated per verified-models.json" });
-      continue;
-    }
-
-    try {
+  const result = await tryProviders({
+    providerOrder,
+    quotaTokens: estimatedForQuotaBase,
+    shouldSkip: (pid) => {
+      const fullId = model.includes("/") ? model : `${pid}/${model}`;
+      if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
+        return "model deprecated per verified-models.json";
+      }
+      return null;
+    },
+    call: async ({ provider, key }) => {
       // Build AnthropicRequest — use compressed messages if applied (parity with chat upstream)
       const effectiveAnthMessages = messagesToSend || body.messages;
       const anthReq = {
@@ -296,13 +270,10 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
         stop_sequences: body.stop_sequences,
       };
 
-      let res: Response;
-      let isAnthropicUpstream = false;
-
       if (provider.anthropic) {
-        isAnthropicUpstream = true;
-        res = await provider.anthropic(anthReq, key);
-      } else if (provider.chat) {
+        return provider.anthropic(anthReq, key);
+      }
+      if (provider.chat) {
         // Translate Anthropic -> OpenAI ChatRequest (use compressed messages if applied)
         const effectiveMessages = messagesToSend || body.messages;
         const chatReq = {
@@ -320,27 +291,17 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           top_k: body.top_k,
           stop: body.stop_sequences,
         };
-        res = await provider.chat(chatReq as unknown as ChatRequest, key);
-        isAnthropicUpstream = false;
-      } else {
-        errors.push({ provider: pid, error: "provider has no anthropic or chat method" });
-        continue;
+        return provider.chat(chatReq as unknown as ChatRequest, key);
       }
+      throw new Error("provider has no anthropic or chat method");
+    },
+  });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-        recordFailure(pid);
-        if (res.status === 429) {
-          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-        }
-        continue;
-      }
-
-      recordSuccess(pid);
-      markSuccess(pid, key);
-      recordUsage(pid, key, estimated);
+  if (result.ok) {
+    const { providerId: pid, key, res } = result;
+    {
+      const fullId = model.includes("/") ? model : `${pid}/${model}`;
+      const isAnthropicUpstream = !!providers[pid]?.anthropic;
       const latency = Date.now() - startAll;
       const vStatus = verifiedMap.get(fullId) || "unknown";
 
@@ -489,13 +450,10 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
         c.header("X-Verified", vStatus);
         return c.json(anthData);
       }
-    } catch (e) {
-      logger.warn({ provider: pid, err: errMessage(e) }, "anthropic provider failed, trying next");
-      errors.push({ provider: pid, error: errMessage(e) });
-      recordFailure(pid);
-      continue;
     }
   }
+
+  const errors = result.errors;
 
   addLog({
     id: `req-${Date.now()}`,

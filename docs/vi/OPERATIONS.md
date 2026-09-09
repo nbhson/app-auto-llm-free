@@ -183,3 +183,4 @@ Gateway sẽ:
 
 - Frontend: `qDebounced` 400ms `setTimeout` trong `Models.tsx`/`Providers.tsx` — giảm request khi gõ
 - Backend: `middleware/rate-limit.ts` `isListEndpoint` (`/v1/models`, `/api/providers`, `/api/models/health`) → `effectiveLimit = max(vk.rpmLimit*4, 200)` — tăng 4x cho list/pagination/search
+- Engine (0.9.0): Redis Lua sliding-window-counter (`lib/sliding-window.ts`) — atomic check+commit, dùng chung mọi instance gateway, hết boundary spike của fixed window; fallback in-memory khi mất Redis. Cùng engine cho quota provider qua `checkQuotaAsync` (`lib/quota-tracker.ts`); `recordUsage` ghi kép để `getQuotaHeadroom`/cost-routing vẫn chạy. Entry 429 trong `provider_errors` giờ kèm `retryAfterMs`.

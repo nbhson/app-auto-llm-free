@@ -248,6 +248,11 @@ export const config = {
     const v = parseFloat(process.env.HEADROOM_WEIGHT || "0.3");
     return isNaN(v) || v < 0 ? 0.3 : v;
   })(),
+  // success-rate weight: demote providers failing often even before breaker opens
+  successWeight: (() => {
+    const v = parseFloat(process.env.SUCCESS_WEIGHT || "2");
+    return isNaN(v) || v < 0 ? 2 : v;
+  })(),
   // semantic cache advanced flags (harness 01 Retrieve)
   semanticCacheMaxMemEntries: (() => {
     const v = parseInt(process.env.SEMANTIC_CACHE_MAX_MEM || "1000", 10);

@@ -123,12 +123,15 @@ describe("api misc read endpoints", () => {
     expect(Array.isArray(data.data)).toBe(true);
   });
 
-  it("GET /analytics echoes interval/groupBy with breakdowns", async () => {
+  it("GET /analytics echoes interval/groupBy with real computed payload", async () => {
     const data: any = await (await apiRoute.request("/analytics?interval=hour&groupBy=model&limit=5")).json();
     expect(data.interval).toBe("hour");
     expect(data.groupBy).toBe("model");
     expect(data).toHaveProperty("cost");
     expect(data).toHaveProperty("generated_at");
+    // awaited (not dangling Promises): analytics is a computed object
+    expect(typeof data.analytics.totalRequests).toBe("number");
+    expect(typeof data.savings.hitRate).toBe("number");
   });
 
   it("GET /cache/stats + DELETE /cache lifecycle", async () => {

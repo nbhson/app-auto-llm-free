@@ -38,7 +38,6 @@ export function decrypt(ciphertext: string): string {
 // In-memory round-robin + rate-limit skip + per-key cooldown
 type KeyState = { key: string; failCount: number; cooldownUntil: number; lastUsed: number };
 const keyStates = new Map<string, KeyState[]>(); // provider -> states
-const rrIndex = new Map<string, number>();
 
 function ensure(providerId: string) {
   if (keyStates.has(providerId)) return;
@@ -47,7 +46,6 @@ function ensure(providerId: string) {
     providerId,
     keys.map((k) => ({ key: k, failCount: 0, cooldownUntil: 0, lastUsed: 0 }))
   );
-  rrIndex.set(providerId, 0);
 }
 
 export function getNextKeyManaged(providerId: string): string | null {
@@ -65,9 +63,10 @@ export function getNextKeyManaged(providerId: string): string | null {
     logger.warn({ provider: providerId }, "all keys in cooldown");
     return null;
   }
-  const idx = rrIndex.get(providerId)! % available.length;
-  rrIndex.set(providerId, idx + 1);
-  const chosen = available[idx];
+  // Least-failed first (healthy keys preferred), LRU tie-break.
+  // markSuccess resets failCount, so recovered keys float back up.
+  const sorted = [...available].sort((a, b) => a.failCount - b.failCount || a.lastUsed - b.lastUsed);
+  const chosen = sorted[0];
   chosen.lastUsed = now;
   return chosen.key;
 }

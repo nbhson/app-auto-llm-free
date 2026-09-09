@@ -183,3 +183,4 @@ The gateway will:
 
 - Frontend: `qDebounced` 400ms `setTimeout` in `Models.tsx`/`Providers.tsx` — reduces request rate while typing
 - Backend: `middleware/rate-limit.ts` `isListEndpoint` (`/v1/models`, `/api/providers`, `/api/models/health`) → `effectiveLimit = max(vk.rpmLimit*4, 200)` — 4x increase for list/pagination/search
+- Engine (0.9.0): Redis Lua sliding-window-counter (`lib/sliding-window.ts`) — atomic check+commit, shared across gateway instances, no fixed-window boundary spike; falls back to in-memory fixed window when Redis is down. Same engine drives provider quotas via `checkQuotaAsync` (`lib/quota-tracker.ts`); `recordUsage` dual-writes so `getQuotaHeadroom`/cost-routing keeps working. 429 `provider_errors` entries now carry `retryAfterMs`.

@@ -46,7 +46,10 @@ describe("models route", () => {
     const data: any = await (await modelsRoute.request("/?q=llama-3.3&limit=50")).json();
     expect(data.filters.q).toBe("llama-3.3");
     expect(data.data.length).toBeGreaterThan(0);
-    // gateway auto alias + pollinations fallback are always appended (no q filter) — the rest must match
+    // hardcoded fallbacks (gateway alias, pollinations) respect q too
+    expect(data.data.some((m: any) => m.id === "free-llm-gateway/auto")).toBe(false);
+    expect(data.data.some((m: any) => m.id === "pollinations/openai")).toBe(false);
+    // the rest must match
     const rest = data.data.filter((m: any) => !["free-llm-gateway/auto", "pollinations/openai"].includes(m.id));
     expect(rest.length).toBeGreaterThan(0);
     for (const m of rest) {

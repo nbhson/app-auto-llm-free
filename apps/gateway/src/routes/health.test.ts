@@ -8,7 +8,7 @@ describe("health route", () => {
     expect(res.status).toBe(200);
     const data: any = await res.json();
     expect(data.status).toBe("ok");
-    expect(data.version).toBe("0.8.0");
+    expect(data.version).toBe("0.9.0");
     expect(data.providers).toBe(providerIds.length);
     expect(data.providers).toBeGreaterThan(30);
     expect(typeof data.uptime).toBe("number");

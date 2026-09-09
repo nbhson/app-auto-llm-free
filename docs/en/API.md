@@ -296,6 +296,8 @@ curl -X POST http://localhost:7373/v1/messages/count_tokens \
 
 Streaming (`stream: true`) emits Anthropic SSE events `event: message_start` / `content_block_delta` / `message_stop`.
 
+Upstream `tool_use` blocks are preserved as OpenAI `tool_calls` when the upstream returns Anthropic shape (agentic flows keep working through the gateway).
+
 ### GET /v1/health
 
 No auth required; returns gateway status and provider pool.
@@ -330,7 +332,7 @@ No auth required; returns gateway status and provider pool.
 | `POST` | `/api/verify` | Trigger verify `{dryRun:false}` — scheduler also calls syncLiveModels together |
 | `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
 | `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, duplicate Auto sync 5s removed |
-| `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Aggregated analytics (tokens, requests grouped by provider/key/model, interval `hour`/`day`) |
+| `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Aggregated analytics (tokens, requests grouped by provider/key/model, interval `hour`/`day`, plus `costBreakdown` and `savings`) |
 | `GET` | `/api/cache/stats` | Cache stats (hits, misses, size) |
 | `DELETE` | `/api/cache` | Clear gateway cache |
 | `POST` | `/api/compression/preview` | Preview compression for a prompt (estimate token savings) |
@@ -393,7 +395,8 @@ Alias map details: `apps/gateway/src/providers/registry.ts:42`.
 | 403 | `insufficient_scope` | Key lacks permission for the model/provider |
 | 429 | `rate_limit_exceeded` | RPM/TPM exceeded, includes `Retry-After` — **list endpoints now 4x (200) + 400ms debounce to reduce 429** |
 | 429 | `provider_rate_limit` | Provider quota exhausted, gateway has exhausted fallback pool |
-| 502 | `provider_error` | All providers failed, includes `provider_errors` array |
+| 502 | `provider_error` | All providers failed, includes `provider_errors` array (each entry may carry `status` and `retryAfterMs`, notably on 429) |
+| 404 | `model_not_found` | Unknown model for providers with a known catalog (e.g. Gemini fail-fast returns 404 locally instead of burning an upstream call) |
 | 504 | `provider_timeout` | Upstream timeout |
 
 ## Rate Limit Headers

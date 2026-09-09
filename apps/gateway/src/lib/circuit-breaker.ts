@@ -39,6 +39,17 @@ export function recordFailure(providerId: string) {
   }
 }
 
+/**
+ * Count a failure only when it indicates provider trouble: network exception
+ * (status undefined), 429, or 5xx. Plain 4xx means the request itself was bad
+ * (wrong model, bad params) — retrying another provider won't help, and the
+ * breaker must not trip on our own mistakes.
+ */
+export function recordFailureIfRetryable(providerId: string, status?: number): void {
+  if (status !== undefined && status !== 429 && status < 500) return;
+  recordFailure(providerId);
+}
+
 export function isOpen(providerId: string): boolean {
   const e = get(providerId);
   if (e.state === "closed") return false;

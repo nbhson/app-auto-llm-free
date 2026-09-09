@@ -21,10 +21,25 @@ function sanitizeGeminiModel(raw: string): string {
   return "gemini-3.6-flash";
 }
 
+/** Fail-fast guard: refuse unknown model ids locally instead of burning an upstream call. */
+const KNOWN_GEMINI_PATTERNS = ["gemini", "auto", "flash"];
+
+export function isKnownGeminiModel(raw: string): boolean {
+  const base = raw.includes("/") ? raw.split("/").pop()! : raw;
+  const cleaned = base.trim().toLowerCase();
+  return KNOWN_GEMINI_PATTERNS.some((p) => cleaned.includes(p));
+}
+
 export const geminiProvider: Provider = {
   id: "gemini",
   type: "gemini",
   async chat(req: ChatRequest, apiKey: string): Promise<Response> {
+    if (!isKnownGeminiModel(req.model)) {
+      return new Response(JSON.stringify({ error: { message: `unknown gemini model: ${req.model}`, type: "model_not_found" } }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const geminiModel = sanitizeGeminiModel(req.model);
     const isStream = req.stream ?? false;
     const endpoint = isStream ? "streamGenerateContent" : "generateContent";

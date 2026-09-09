@@ -2,13 +2,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
-import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
+import { getProvidersForRequest } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
 import { logger } from "../../middleware/logger.js";
-import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
 import { estimateChatTokens } from "../../lib/token-estimator.js";
-import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
-import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { recordUsage } from "../../lib/quota-tracker.js";
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { compressWithMetrics } from "../../lib/compression.js";
@@ -16,7 +14,8 @@ import { logGenAI } from "../../lib/otel.js";
 import { FREELLMS_COST, rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
 import { loadVerifiedMap, loadHealthMap } from "../../lib/model-store.js";
-import { getRequestVk, errMessage, type ProviderError, type UpstreamChatCompletion, type CompressibleMessage } from "../../lib/types.js";
+import { tryProviders } from "../../lib/provider-executor.js";
+import { getRequestVk, type UpstreamChatCompletion, type CompressibleMessage } from "../../lib/types.js";
 import type { ChatMessage } from "../../providers/base.js";
 
 const chatSchema = z.object({
@@ -99,7 +98,6 @@ chatRoute.post(
 
     const estimated = estimateChatTokens({ messages: body.messages, max_tokens: body.max_tokens });
     const startAll = Date.now();
-    const errors: ProviderError[] = [];
 
     // Vector 2: semantic cache check first (cheapest) - only for non-stream
     // harness 01 Retrieve: tenant-aware key (vkId + tools + temperature) prevents poisoning
@@ -138,50 +136,25 @@ chatRoute.post(
     }
     const estimatedForQuota = estimateChatTokens({ messages: messagesToSend, max_tokens: body.max_tokens });
 
-    for (const pid of providerOrder) {
-      const provider = providers[pid];
-      if (!provider) continue;
+    // Extract session IDs for providers that require them (opencode free tier, etc.)
+    const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
+    const parentSessionId = c.req.header("x-parent-session-id") || c.req.header("X-Parent-Session-ID") || undefined;
 
-      // Circuit breaker
-      if (isOpen(pid)) {
-        errors.push({ provider: pid, error: "circuit open (cooldown)" });
-        continue;
-      }
-
-      const key = getNextKeyManaged(pid);
-      if (key === null) {
-        errors.push({ provider: pid, error: "no key configured (set " + pid.toUpperCase().replace(/-/g, "_") + "_API_KEYS)" });
-        continue;
-      }
-      if (!key && !isPublicProvider(pid)) {
-        errors.push({ provider: pid, error: "missing key" });
-        continue;
-      }
-
-      // Quota pre-check (RPM/TPM/RPD/TPD)
-      const quota = checkQuota(pid, key, (typeof estimatedForQuota !== "undefined" ? estimatedForQuota.total : estimated.total));
-      if (!quota.allowed) {
-        errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
-        if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
-        continue;
-      }
-
+    const result = await tryProviders({
+      providerOrder,
+      quotaTokens: estimatedForQuota.total,
       // Skip deprecated model for this provider if verified AND provider is NOT the original requesting provider
       // If user explicitly requests kilo-code/..., allow kilo-code to serve it even if marked deprecated
-      const fullId = model.includes("/") ? model : `${pid}/${model}`;
-      const requestedPrefix = model.split("/")[0];
-      const isRequestingProvider = pid === requestedPrefix;
-      if (verifiedMap.get(fullId) === "deprecated" && !isRequestingProvider) {
-        errors.push({ provider: pid, error: "model deprecated per verified-models.json" });
-        continue;
-      }
-
-      // Extract session IDs for providers that require them (opencode free tier, etc.)
-      const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
-      const parentSessionId = c.req.header("x-parent-session-id") || c.req.header("X-Parent-Session-ID") || undefined;
-
-      try {
-        const res = await provider.chat(
+      shouldSkip: (pid) => {
+        const fullId = model.includes("/") ? model : `${pid}/${model}`;
+        const requestedPrefix = model.split("/")[0];
+        if (verifiedMap.get(fullId) === "deprecated" && pid !== requestedPrefix) {
+          return "model deprecated per verified-models.json";
+        }
+        return null;
+      },
+      call: ({ provider, key }) =>
+        provider.chat(
           {
             model,
             messages: messagesToSend as unknown as ChatMessage[],
@@ -201,24 +174,14 @@ chatRoute.post(
             parentSessionId,
           },
           key
-        );
+        ),
+    });
 
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-          recordFailure(pid);
-          // 429 -> mark rate limited with Retry-After
-          if (res.status === 429) {
-            const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-            markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-          }
-          continue;
-        }
-
+    if (result.ok) {
+      const { providerId: pid, key, res } = result;
+      {
+        const fullId = model.includes("/") ? model : `${pid}/${model}`;
         // Success: record + log
-        recordSuccess(pid);
-        markSuccess(pid, key);
-        recordUsage(pid, key, estimated.total);
         const latency = Date.now() - startAll;
         const vStatus = verifiedMap.get(fullId) || "unknown";
         logGenAI("chat", { provider: pid, model, promptTokens: estimated.prompt, latencyMs: latency, traceId: `req-${Date.now()}` });
@@ -315,13 +278,10 @@ chatRoute.post(
           choices: [{ index: 0, message: { role: "assistant", content: typeof data === "string" ? data : JSON.stringify(data) }, finish_reason: "stop" }],
           usage: { prompt_tokens: estimated.prompt, completion_tokens: 0, total_tokens: estimated.total },
         });
-      } catch (e) {
-        logger.warn({ provider: pid, err: errMessage(e) }, "provider failed, trying next");
-        errors.push({ provider: pid, error: errMessage(e) });
-        recordFailure(pid);
-        continue;
       }
     }
+
+    const errors = result.errors;
 
     // Log failure
     addLog({

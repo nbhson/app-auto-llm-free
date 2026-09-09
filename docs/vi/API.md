@@ -296,6 +296,8 @@ curl -X POST http://localhost:7373/v1/messages/count_tokens \
 
 Streaming (`stream: true`) emit SSE events Anthropic `event: message_start` / `content_block_delta` / `message_stop`.
 
+Upstream `tool_use` blocks được giữ nguyên thành OpenAI `tool_calls` khi upstream trả shape Anthropic (agentic flow không bị mất tool calls khi qua gateway).
+
 ### GET /v1/health
 
 Không cần auth, trả status gateway + provider pool.
@@ -330,7 +332,7 @@ Không cần auth, trả status gateway + provider pool.
 | `POST` | `/api/verify` | Trigger verify `{dryRun:false}` — scheduler cũng gọi syncLiveModels kèm |
 | `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
 | `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, đã bỏ Auto sync 5s duplicate |
-| `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Thống kê tổng hợp (tokens, requests theo provider/key/model, interval `hour`/`day`) |
+| `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Thống kê tổng hợp (tokens, requests theo provider/key/model, interval `hour`/`day`, kèm `costBreakdown` và `savings`) |
 | `GET` | `/api/cache/stats` | Thống kê cache (hits, misses, size) |
 | `DELETE` | `/api/cache` | Xóa cache gateway |
 | `POST` | `/api/compression/preview` | Preview nén prompt (ước tính tiết kiệm tokens) |
@@ -393,7 +395,8 @@ Chi tiết alias map: `apps/gateway/src/providers/registry.ts:42`.
 | 403 | `insufficient_scope` | Key không có quyền model/provider |
 | 429 | `rate_limit_exceeded` | Vượt RPM/TPM, kèm `Retry-After` — **list endpoints đã tăng 4x (200) + debounce 400ms để giảm 429** |
 | 429 | `provider_rate_limit` | Provider hết quota, gateway đã fallback hết pool |
-| 502 | `provider_error` | Tất cả provider fail, kèm `provider_errors` array |
+| 502 | `provider_error` | Tất cả provider fail, kèm `provider_errors` array (mỗi entry có thể kèm `status` và `retryAfterMs`, nhất là khi 429) |
+| 404 | `model_not_found` | Model lạ với provider có catalog cố định (ví dụ Gemini fail-fast trả 404 local thay vì đốt upstream call) |
 | 504 | `provider_timeout` | Upstream timeout |
 
 ## Rate Limit Headers

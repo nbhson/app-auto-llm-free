@@ -86,6 +86,17 @@
 - [x] Provider keys — `ANTHROPIC_API_KEYS` (comma-separated) for `/v1/messages` direct Anthropic upstream
 - [x] Tests + docs — Vector 1+2 e2e, `CONFIGURATION.md` Vector 2 flags, `ROADMAP.md` P6/M6, `README.md` features table
 
+## P7 — Resilience v2 (0.9.0) ✅ Done 2026-09-09
+
+- [x] `lib/provider-executor.ts` — shared `tryProviders()` fallback loop (breaker → key → quota → skip → call) for all 6 v1 routes, ~300 duplicated LOC removed; 429 errors carry `retryAfterMs`
+- [x] `lib/sliding-window.ts` — Redis Lua sliding-window-counter (atomic check+commit, fail-open to in-memory); `checkQuotaAsync` + dual-write `recordUsage`; same engine for virtual-key rate-limit (headers preserved)
+- [x] Query-aware compression — `relevanceKeep` engine (BM25-lite vs last user message, system + 3 recent + top-5 relevant) wired before `historySummarize`; `normalizeCodeBlock` for near-duplicate code dedup
+- [x] Cost routing by success-rate — `getProviderSuccessRate` (request-log last100) + `SUCCESS_WEIGHT=2` (env/compose/`GET /api/config`)
+- [x] `tool_use` → `tool_calls` preserved in Anthropic→OpenAI translation; parallel embedding fallbacks; least-failed-first key pool; Gemini fail-fast 404 for unknown models
+- [x] `request-log` batched persistence (2s + flush on exit + `flushRequestLogs`); quota enforced on embeddings/images/audio; breaker counts 5xx/429/exceptions only
+- [x] Bugfixes: `GET /api/analytics` missing `await` (was `{}`), `GET /v1/models?q=` hardcoded alias bypass, images dev mock now gated by `ALLOW_MOCK=1`
+- [x] Tests 207→232 + docs EN/VI (`ARCHITECTURE`, `CONFIGURATION`, `OPERATIONS`, `API`, `README`, `CHANGELOG` 0.9.0)
+
 ## Milestones
 
 | Milestone | Date | Deliverable |
@@ -96,5 +107,6 @@
 | M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE (Live ON) + Dashboard 5 routes (hasKey/hide404, hasRealKey highlight, sticky bottom LOV) |
 | M5 | 2026-09-06 | P5 done: wrangler + Dockerfile prod + OTel + benchmark + SECURITY rotate + PROVIDER_TEST_RESULTS + live sync 2185/882 |
 | M6 | 2026-09-08 | P6 Vector 1+2 done: `/v1/audio/*` + `/responses`/`/conversations` + `/v1/messages` (Anthropic) + semantic cache + compression + cost routing + analytics (`costByProvider`/`cacheHitRate`/`p95`) |
+| M7 | 2026-09-09 | P7 Resilience v2 (0.9.0): shared `tryProviders` executor + Redis sliding-window quota/rate-limit + query-aware compression + success-rate cost routing + `tool_use` preserved, 232 tests |
 
 Gantt chart reference in `docs/ARCHITECTURE.md:1`.

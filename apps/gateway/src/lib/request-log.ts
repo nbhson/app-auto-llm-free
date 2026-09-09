@@ -48,6 +48,44 @@ function persist() {
   } catch { /* ignore: persist failed */ }
 }
 
+// Batched persistence: hot-path addLog only marks dirty, fs write happens at
+// most every 2s (previously a blocking writeFileSync per request).
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let persistPending = false;
+
+function schedulePersist(): void {
+  if (persistTimer) {
+    persistPending = true;
+    return;
+  }
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persist();
+    if (persistPending) {
+      persistPending = false;
+      schedulePersist();
+    }
+  }, 2000);
+  persistTimer.unref?.();
+}
+
+/** Force an immediate flush (admin/tests/shutdown). */
+export function flushRequestLogs(): void {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+    persistPending = false;
+  }
+  persist();
+}
+
+// Best-effort flush on shutdown so the trailing window is not lost
+if (typeof process !== "undefined" && typeof process.on === "function") {
+  process.on("exit", () => {
+    try { persist(); } catch { /* ignore */ }
+  });
+}
+
 // Simple SSE listeners
 const listeners = new Set<(log: RequestLog) => void>();
 
@@ -55,7 +93,7 @@ export function addLog(entry: RequestLog) {
   ensure();
   logs.push(entry);
   if (logs.length > MAX_LOGS) logs = logs.slice(-MAX_LOGS);
-  persist();
+  schedulePersist();
   for (const fn of listeners) try { fn(entry); } catch { /* ignore: listener failed */ }
 }
 
@@ -68,6 +106,7 @@ export function getStats() {
   ensure();
   const last100 = logs.slice(-100);
   const byProvider = new Map<string, number>();
+  const errorsByProvider = new Map<string, number>();
   const tokensByProvider = new Map<string, number>();
   const costByProvider = new Map<string, number>();
   let totalTokens = 0;
@@ -78,6 +117,7 @@ export function getStats() {
   let compressedSaved = 0;
   for (const l of last100) {
     byProvider.set(l.provider, (byProvider.get(l.provider) || 0) + 1);
+    if (l.status >= 400) errorsByProvider.set(l.provider, (errorsByProvider.get(l.provider) || 0) + 1);
     const t = l.totalTokens || 0;
     const pt = l.promptTokens || 0;
     const ct = l.completionTokens || 0;
@@ -113,6 +153,7 @@ export function getStats() {
     total: logs.length,
     last100,
     byProvider: Object.fromEntries(byProvider),
+    errorsByProvider: Object.fromEntries(errorsByProvider),
     tokensByProvider: Object.fromEntries(tokensByProvider),
     costByProvider: Object.fromEntries(costByProvider),
     totalTokens,

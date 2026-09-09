@@ -3,12 +3,12 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
 import { providers } from "../../providers/registry.js";
-import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
-import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
-import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { getProvidersForRequest } from "../../lib/router.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { logger } from "../../middleware/logger.js";
-import { getRequestVk, errMessage, type ProviderError, type UpstreamImages } from "../../lib/types.js";
+import { tryProviders } from "../../lib/provider-executor.js";
+import { estimateTokens } from "../../lib/token-estimator.js";
+import { getRequestVk, type UpstreamImages } from "../../lib/types.js";
 
 const imagesSchema = z.object({
   model: z.string().optional(),
@@ -46,43 +46,25 @@ imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => 
     }
   }
 
-  const errors: ProviderError[] = [];
   const startAll = Date.now();
 
-  for (const pid of providerOrder) {
-    const provider = providers[pid];
-    if (!provider || !provider.images) continue;
-    if (isOpen(pid)) {
-      errors.push({ provider: pid, error: "circuit open" });
-      continue;
-    }
-    const key = getNextKeyManaged(pid);
-    if (key === null) {
-      errors.push({ provider: pid, error: "no key configured" });
-      continue;
-    }
-    if (!key && !isPublicProvider(pid)) {
-      errors.push({ provider: pid, error: "missing key" });
-      continue;
-    }
-
-    try {
-      const res = await provider.images(
+  const result = await tryProviders({
+    providerOrder: providerOrder.filter((pid) => providers[pid]?.images),
+    // Heuristic: prompt tokens + image output budget (image providers are RPM-bound in practice)
+    quotaTokens: estimateTokens(body.prompt) + 256,
+    call: ({ providerId: pid, key }) => {
+      const fn = providers[pid]?.images;
+      if (!fn) throw new Error("provider has no images method");
+      return fn(
         { model, prompt: body.prompt, n: body.n, size: body.size, response_format: body.response_format, user: body.user },
         key
       );
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-        recordFailure(pid);
-        if (res.status === 429) {
-          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-        }
-        continue;
-      }
-      recordSuccess(pid);
-      markSuccess(pid, key);
+    },
+  });
+
+  if (result.ok) {
+    const { providerId: pid, res } = result;
+    {
       const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamImages;
       if (data.data && Array.isArray(data.data)) {
         c.header("X-Provider", pid);
@@ -93,17 +75,14 @@ imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => 
         created: Math.floor(Date.now() / 1000),
         data: data.data || [{ url: data.url || "", b64_json: data.b64_json || "" }],
       });
-    } catch (e) {
-      logger.warn({ provider: pid, err: errMessage(e) }, "images provider failed");
-      errors.push({ provider: pid, error: errMessage(e) });
-      recordFailure(pid);
-      continue;
     }
   }
 
+  const errors = result.errors;
+
   logger.warn({ model, errors, latency: Date.now() - startAll }, "all images providers failed");
 
-  if (config.nodeEnv === "development" && errors.length > 0) {
+  if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development" && errors.length > 0) {
     return c.json(
       {
         created: Math.floor(Date.now() / 1000),

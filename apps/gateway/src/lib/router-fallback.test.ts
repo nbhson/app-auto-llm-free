@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getProvidersForRequest, getNextKey, _resetRouterState } from "./router.js";
-import { isOpen, recordFailure, recordSuccess, getState } from "./circuit-breaker.js";
+import { isOpen, recordFailure, recordSuccess, getState, recordFailureIfRetryable } from "./circuit-breaker.js";
 
 describe("router fallback ordering", () => {
   beforeEach(() => _resetRouterState());
@@ -56,5 +56,20 @@ describe("circuit-breaker half-open lifecycle", () => {
     recordFailure(pid);
     expect(getState(pid).state).toBe("open");
     expect(isOpen(pid)).toBe(true);
+  });
+});
+
+describe("circuit-breaker retryable failures", () => {
+  it("ignores 4xx (client errors), counts 429/5xx/exceptions", () => {
+    const pid = `rt-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    for (let i = 0; i < 10; i++) recordFailureIfRetryable(pid, 400);
+    expect(getState(pid).failures).toBe(0);
+    expect(getState(pid).state).toBe("closed");
+    recordFailureIfRetryable(pid, 404);
+    expect(getState(pid).failures).toBe(0);
+    recordFailureIfRetryable(pid, 429);
+    recordFailureIfRetryable(pid, 503);
+    recordFailureIfRetryable(pid); // exception/timeout
+    expect(getState(pid).failures).toBe(3);
   });
 });

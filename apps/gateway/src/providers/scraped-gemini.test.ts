@@ -66,6 +66,16 @@ describe("gemini provider", () => {
     expect(res.status).toBe(400);
   });
 
+  it("fail-fast 404 on unknown model without network call", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await geminiProvider.chat({ model: "llama-3.3-70b", messages: [] } as any, "k");
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const data: any = await res.json();
+    expect(data.error.type).toBe("model_not_found");
+  });
+
   it("models() without key returns default, health catches errors", async () => {
     expect(await geminiProvider.models()).toEqual([
       { id: "gemini/gemini-3.6-flash", provider: "gemini", contextLength: 1_000_000 },

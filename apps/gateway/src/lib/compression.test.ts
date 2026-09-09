@@ -3,6 +3,9 @@ import {
   toolsMinify,
   historySummarize,
   codeDedup,
+  normalizeCodeBlock,
+  relevanceScore,
+  relevanceKeep,
   compressMessages,
   compressWithMetrics,
 } from "./compression.js";
@@ -85,6 +88,61 @@ describe("compression codeDedup", () => {
     const msgs = [{ role: "user", content: "plain text" }];
     const out = codeDedup(msgs);
     expect(out[0]).toBe(msgs[0]);
+  });
+});
+
+describe("compression normalizeCodeBlock", () => {
+  it("treats re-indented copies as duplicates", () => {
+    const a = "```js\nconst x = 1;\n```";
+    const b = "```js\n    const  x   =  1;\n```";
+    expect(normalizeCodeBlock(a)).toBe(normalizeCodeBlock(b));
+    const out = codeDedup([
+      { role: "user", content: `${a} first` },
+      { role: "user", content: `again ${b} second` },
+    ]);
+    expect(out[1].content).not.toContain("const");
+    expect(out[1].content).toContain("second");
+  });
+});
+
+describe("compression relevanceKeep", () => {
+  const history = [
+    { role: "system", content: "sys" },
+    { role: "user", content: "my deploy token is ABC123, keep it secret" },
+    { role: "assistant", content: "noted" },
+    { role: "user", content: "what is the weather today" },
+    { role: "assistant", content: "sunny" },
+    { role: "user", content: "tell me a joke about cats" },
+    { role: "assistant", content: "haha" },
+    { role: "user", content: "what time is it" },
+    { role: "assistant", content: "noon" },
+    { role: "user", content: "remind me what my deploy token was" },
+  ];
+
+  it("scores query-relevant messages higher", () => {
+    const q = new Set(["remind", "deploy", "token"]);
+    const rel = relevanceScore("my deploy token is ABC123, keep it secret", q);
+    const irr = relevanceScore("tell me a joke about cats", q);
+    expect(rel).toBeGreaterThan(irr);
+    expect(relevanceScore("anything", new Set())).toBe(0);
+  });
+
+  it("keeps system + recent + relevant, drops irrelevant middle", () => {
+    const out = relevanceKeep(history);
+    expect(out[0]).toMatchObject({ role: "system" });
+    // deploy-token message survives (relevant to final query)
+    expect(out.some((m) => typeof m.content === "string" && m.content.includes("ABC123"))).toBe(true);
+    // final query always kept
+    expect(out[out.length - 1]).toMatchObject({ role: "user" });
+    expect(out.length).toBeLessThan(history.length);
+    // chronological order preserved
+    const texts = out.map((m) => String(m.content));
+    expect(texts.indexOf("sys")).toBe(0);
+  });
+
+  it("passes short history through untouched", () => {
+    const short = history.slice(0, 5);
+    expect(relevanceKeep(short)).toHaveLength(5);
   });
 });
 

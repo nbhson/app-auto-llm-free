@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { addLog, getLogs, getStats, onLog } from "./request-log.js";
+import { addLog, flushRequestLogs, getLogs, getStats, onLog } from "./request-log.js";
+import fs from "node:fs";
+import { resolveDataPath } from "./paths.js";
 
 const prov = () => `ut-provider-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -25,8 +27,7 @@ describe("request-log", () => {
     expect(logs[1].id).toBe("old-1");
   });
 
-  it("getStats aggregates tokens/cost/cache/p95 structurally", () => {
-    const p = prov();
+  it("getStats aggregates tokens/cost/cache/p95 structurally", () => {    const p = prov();
     addLog({ id: "s1", timestamp: new Date().toISOString(), provider: p, model: "m", promptTokens: 10, completionTokens: 5, totalTokens: 15, latencyMs: 100, status: 200, cost: 0.001, cacheHit: true, compressedTokens: 6 });
     addLog({ id: "s2", timestamp: new Date().toISOString(), provider: p, model: "m", promptTokens: 20, totalTokens: 25, latencyMs: 200, status: 500, error: "boom" });
     const s = getStats();
@@ -39,5 +40,14 @@ describe("request-log", () => {
     expect(s.p95LatencyMs).toBeGreaterThanOrEqual(100);
     expect(s.compressedSavedTokens).toBeGreaterThanOrEqual(4); // 10 - 6
     expect(s.avgLatencyMs).toBeGreaterThan(0);
+    expect(s.errorsByProvider[p]).toBeGreaterThanOrEqual(1);
+  });
+
+  it("flushRequestLogs persists buffered entries to disk", () => {
+    const id = `flush-${Date.now()}`;
+    addLog({ id, timestamp: new Date().toISOString(), provider: prov(), model: "m", latencyMs: 1, status: 200 });
+    flushRequestLogs();
+    const raw = fs.readFileSync(resolveDataPath("request-log.json"), "utf-8");
+    expect(raw).toContain(id);
   });
 });

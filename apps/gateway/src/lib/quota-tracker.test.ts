@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkQuota, recordUsage, getQuotaHeadroom } from "./quota-tracker.js";
+import { checkQuota, checkQuotaAsync, recordUsage, getQuotaHeadroom } from "./quota-tracker.js";
 
 // unique key prefix per test to isolate the in-memory windows
 // (windowKey = provider + first 8 chars of key)
@@ -74,5 +74,21 @@ describe("quota-tracker", () => {
     expect(checkQuota("kilo-code", keyA, 1).allowed).toBe(false);
     // different key untouched
     expect(checkQuota("kilo-code", keyB, 1).allowed).toBe(true);
+  });
+
+  it("checkQuotaAsync enforces limits (redis sliding or memory fallback)", async () => {
+    const key = uniqKey();
+    expect((await checkQuotaAsync("kilo-code", key, 10)).allowed).toBe(true);
+    for (let i = 0; i < 3; i++) recordUsage("kilo-code", key, 10);
+    // brief settle for best-effort async redis commit
+    await new Promise((r) => setTimeout(r, 100));
+    const blocked = await checkQuotaAsync("kilo-code", key, 10);
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.reason).toMatch(/RPM/);
+    expect(blocked.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it("checkQuotaAsync allows unlimited providers", async () => {
+    expect((await checkQuotaAsync("no-such-provider-xyz", uniqKey(), 100)).allowed).toBe(true);
   });
 });

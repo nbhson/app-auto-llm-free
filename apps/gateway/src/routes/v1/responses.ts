@@ -2,17 +2,16 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
-import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
+import { getProvidersForRequest } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
 import { logger } from "../../middleware/logger.js";
-import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
 import { estimateChatTokens } from "../../lib/token-estimator.js";
-import { checkQuota, recordUsage } from "../../lib/quota-tracker.js";
-import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { recordUsage } from "../../lib/quota-tracker.js";
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { translateResponsesToChat, translateChatToResponses, createResponsesStreamChunk } from "../../lib/responses-translator.js";
-import { getRequestVk, errMessage, type ProviderError, type UpstreamChatCompletion } from "../../lib/types.js";
+import { tryProviders } from "../../lib/provider-executor.js";
+import { getRequestVk, type UpstreamChatCompletion } from "../../lib/types.js";
 import type { ResponsesRequest } from "../../providers/base.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -96,64 +95,30 @@ async function handleResponses(c: ResponsesHandlerContext, body: ResponsesReques
     max_tokens: body.max_output_tokens ?? body.max_tokens,
   });
   const startAll = Date.now();
-  const errors: ProviderError[] = [];
 
   const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
   const parentSessionId = c.req.header("x-parent-session-id") || c.req.header("X-Parent-Session-ID") || undefined;
   if (sessionId) chatReq.sessionId = sessionId;
   if (parentSessionId) chatReq.parentSessionId = parentSessionId;
 
-  for (const pid of providerOrder) {
-    const provider = providers[pid];
-    if (!provider) continue;
-
-    if (isOpen(pid)) {
-      errors.push({ provider: pid, error: "circuit open (cooldown)" });
-      continue;
-    }
-
-    const key = getNextKeyManaged(pid);
-    if (key === null) {
-      errors.push({ provider: pid, error: "no key configured (set " + pid.toUpperCase().replace(/-/g, "_") + "_API_KEYS)" });
-      continue;
-    }
-    if (!key && !isPublicProvider(pid)) {
-      errors.push({ provider: pid, error: "missing key" });
-      continue;
-    }
-
-    const quota = checkQuota(pid, key, estimated.total);
-    if (!quota.allowed) {
-      errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
-      if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
-      continue;
-    }
-
-    const fullId = model.includes("/") ? model : `${pid}/${model}`;
-    if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
-      errors.push({ provider: pid, error: "model deprecated per verified-models.json" });
-      continue;
-    }
-
-    try {
-      const res = provider.responses
-        ? await provider.responses(body, key)
-        : await provider.chat(chatReq, key);
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-        recordFailure(pid);
-        if (res.status === 429) {
-          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-        }
-        continue;
+  const result = await tryProviders({
+    providerOrder,
+    quotaTokens: estimated.total,
+    shouldSkip: (pid) => {
+      const fullId = model.includes("/") ? model : `${pid}/${model}`;
+      if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {
+        return "model deprecated per verified-models.json";
       }
+      return null;
+    },
+    call: ({ provider, key }) =>
+      provider.responses ? provider.responses(body, key) : provider.chat(chatReq, key),
+  });
 
-      recordSuccess(pid);
-      markSuccess(pid, key);
-      recordUsage(pid, key, estimated.total);
+  if (result.ok) {
+    const { providerId: pid, key, res } = result;
+    {
+      const fullId = model.includes("/") ? model : `${pid}/${model}`;
       const latency = Date.now() - startAll;
       const vStatus = verifiedMap.get(fullId) || "unknown";
 
@@ -172,7 +137,7 @@ async function handleResponses(c: ResponsesHandlerContext, body: ResponsesReques
           verifiedStatus: vStatus,
         });
 
-        if (provider.responses) {
+        if (providers[pid]?.responses) {
           return new Response(res.body, {
             status: 200,
             headers: {
@@ -225,7 +190,7 @@ async function handleResponses(c: ResponsesHandlerContext, body: ResponsesReques
                 }
               }
             } catch (e) {
-              logger.warn({ provider: pid, err: errMessage(e) }, "responses stream error");
+              logger.warn({ provider: pid, err: e instanceof Error ? e.message : String(e) }, "responses stream error");
             } finally {
               controller.close();
             }
@@ -247,7 +212,7 @@ async function handleResponses(c: ResponsesHandlerContext, body: ResponsesReques
 
       const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamChatCompletion;
       let out: UpstreamChatCompletion;
-      if (provider.responses) {
+      if (providers[pid]?.responses) {
         out = data;
         if (!out.id) out.id = `resp_${Date.now()}`;
         if (!out.object) out.object = "response";
@@ -282,13 +247,10 @@ async function handleResponses(c: ResponsesHandlerContext, body: ResponsesReques
         verifiedStatus: vStatus,
       });
       return c.json(out);
-    } catch (e) {
-      logger.warn({ provider: pid, err: errMessage(e) }, "provider failed (responses)");
-      errors.push({ provider: pid, error: errMessage(e) });
-      recordFailure(pid);
-      continue;
+      }
     }
-  }
+
+    const errors = result.errors;
 
   addLog({
     id: `req-${Date.now()}`,

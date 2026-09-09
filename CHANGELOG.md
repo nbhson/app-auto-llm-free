@@ -2,6 +2,30 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0] - 2026-09-09
+
+### Added
+- **Fallback executor dùng chung**: new `lib/provider-executor.ts` `tryProviders()` (breaker → key → quota → skip → call → bookkeeping) thay 6 vòng lặp trùng nhau ở `chat/anthropic/responses/embeddings/images/audio` (~300 LOC trùng được xóa); 429 gắn `retryAfterMs` vào error entry
+- **Redis sliding-window-counter (Lua)**: new `lib/sliding-window.ts` (current + previous window weight tuyến tính, atomic check+commit, fail-open về in-memory khi mất Redis); `quota-tracker.ts` `checkQuotaAsync` + dual-write `recordUsage` (giữ `getQuotaHeadroom` hoạt động); `middleware/rate-limit.ts` dùng chung (giữ nguyên headers `x-ratelimit-*`, thêm `remaining` chính xác)
+- **Query-aware compression**: new engine `relevanceKeep` (BM25-lite overlap với user message cuối, giữ system + 3 recent + top-5 relevant, chronological) chạy trước `historySummarize` trong pipeline mặc định; `normalizeCodeBlock` cho `codeDedup` bắt bản paste gần giống (khác indent/space)
+- **Cost routing theo success-rate**: `getProviderSuccessRate` (request-log last100, default 1 khi thiếu data) + `SUCCESS_WEIGHT=2` (env, `docker-compose.yml`, `GET /api/config`); công thức `cost*5 + latency*0.0005 - headroom*0.3 - success*2`
+- **Anthropic `tool_use` passthrough**: `translateAnthropicToOpenAI` giữ `tool_use` → OpenAI `tool_calls` (trước đây drop lặng lẽ, agentic flow mất tool calls)
+- **Parallel embeddings**: `embedWithFallback` fire all candidates song song, lấy success đầu tiên theo priority (trước đây serial, worst-case 3×timeout)
+- **Weighted key pool**: `getNextKeyManaged` least-failed-first + LRU tie-break (thay round-robin đều); `markSuccess` reset failCount đưa key khỏe lên lại
+- **Gemini fail-fast**: `isKnownGeminiModel` trả 404 local cho model lạ (không đốt upstream call, fallback ngay)
+- **Batched request-log**: `addLog` chỉ mark-dirty, flush disk mỗi 2s + `flushRequestLogs()` + flush on exit (trước đây `writeFileSync` mỗi request trên hot path); `getStats` thêm `errorsByProvider`
+- **Quota cho embeddings/images/audio**: `quotaTokens` heuristic (embeddings theo input, images prompt+256, transcription 500, speech input+200) — trước đây 3 routes bypass quota
+
+### Fixed
+- **`GET /api/analytics` trả `{}` rỗng**: thiếu `await` ở `getAnalytics`/`calculateSavings` — giờ trả payload thật (test khóa `totalRequests`/`hitRate` là number)
+- **`GET /v1/models?q=` lọt 2 alias cứng**: `free-llm-gateway/auto` + `pollinations/openai` luôn append bất chấp `q` — giờ tôn trọng filter
+- **`POST /v1/images/generations` mock không gate**: dev mock giờ cần `ALLOW_MOCK=1` như chat/audio/embeddings (trước đây chỉ cần `NODE_ENV=development`)
+- **Breaker đếm nhầm 4xx**: new `recordFailureIfRetryable` — chỉ đếm exception/timeout/429/5xx, 4xx (model sai, params sai) không trip breaker
+
+### Changed
+- **Version bump**: `package.json` `apps/gateway` `apps/web` `0.8.0→0.9.0`, `main.tsx` badge `v0.9.0`, `app.ts` + `health.ts` `version 0.9.0`
+- **Tests**: 207→232 (new `provider-executor.test.ts` 7, `sliding-window.test.ts` 6, relevance/normalize/tool_use/gemini-404/demotion/flush/retryable/quota-async); `cost-router` ordering tests pin `successWeight: 0` để độc lập ambient log state
+
 ## [0.8.0] - 2026-09-09
 
 ### Security

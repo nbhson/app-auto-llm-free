@@ -99,15 +99,20 @@ sau đó bấm **Sync Live Now** `POST /api/models/live/sync` để nạp `data/
 | `SEMANTIC_THRESHOLD` | `0.92` | Ngưỡng cosine similarity để cache hit (0.0–1.0, càng cao càng chặt). Tối ưu cho `cohere/embed-english-v3.0` |
 | `CACHE_TTL_S` | `3600` | TTL (giây) cho cache completions (1 giờ). Xóa qua Redis TTL hoặc sweep in-memory |
 | `EMBEDDING_MODEL` | `cohere/embed-english-v3.0` | Model embedding cho semantic cache. Mặc định Cohere; có thể đổi endpoint tương thích |
-| `COMPRESSION_ENABLED` | `0` | Bật nén token (cắt history + minify tools, pattern 12-engine như OmniRoute) để giảm chi phí |
-| `COST_ROUTING_ENABLED` | `0` | Bật routing theo chi phí — ưu tiên provider free rẻ nhất trước (hòa thì xét latency/verified) |
+| `COMPRESSION_ENABLED` | `0` | Bật nén token: `relevanceKeep` query-aware (BM25-lite so với user message cuối, giữ system + 3 recent + top-5 relevant) + tools minify + dedup code chuẩn hóa |
+| `COST_ROUTING_ENABLED` | `0` | Bật routing theo chi phí — điểm `cost*COST_WEIGHT + latency*LATENCY_WEIGHT - headroom*HEADROOM_WEIGHT - successRate*SUCCESS_WEIGHT` (success từ request-log 100 gần nhất, mặc định 1 khi chưa có data) |
 | `ANALYTICS_RETENTION_DAYS` | `30` | Số ngày giữ rollup analytics admin (theo dõi chi phí, tiết kiệm, billing per-key, `costByProvider`, `cacheHitRate`, `p95`) |
+| `SUCCESS_WEIGHT` | `2` | Trọng số success-rate cho cost-router — hạ hạng provider hay lỗi trước cả khi breaker mở (`0` để tắt) |
 
 Các flag mặc định tắt (`0`) để tương thích ngược. Bật riêng lẻ qua `.env` và restart gateway (xem hướng dẫn kill/restart ở trên).
 
 ### Rate limit
 
-`middleware/rate-limit.ts` — list endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) được 4x (`Math.max(rpmLimit*4, 200)`), frontend debounce search `q` 400ms (Models/Providers) để giảm 429.
+`middleware/rate-limit.ts` — sliding-window-counter qua Redis Lua khi có Redis (atomic check+commit, dùng chung mọi instance, hết boundary spike), fallback in-memory fixed window khi mất Redis. List endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) được 4x (`Math.max(rpmLimit*4, 200)`), frontend debounce search `q` 400ms (Models/Providers) để giảm 429.
+
+### Quota
+
+`lib/quota-tracker.ts` — cùng engine sliding-window cho quota provider (RPM/TPM theo phút, RPD/TPD theo ngày). `checkQuotaAsync` probe Redis 1 lần/request rồi fallback toàn phần về in-memory khi Redis down; `recordUsage` ghi kép (mirror in-memory giữ `getQuotaHeadroom`/cost-router hoạt động). Lưu ý: provider có cả TPM và TPD sẽ chạm TPM trước theo thiết kế (phút bó chặt hơn ngày).
 
 ## models.yaml — 316 free models (freellms snapshot, lịch sử) + live-models.json (882 free)
 

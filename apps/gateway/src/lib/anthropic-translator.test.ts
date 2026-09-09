@@ -74,6 +74,27 @@ describe("anthropic-translator Anthropic -> OpenAI", () => {
     const out = translateAnthropicToOpenAI({ content: [{ type: "text", text: "x" }], stop_reason: "tool_use" }, "m");
     expect(out.choices[0].finish_reason).toBe("tool_calls");
   });
+
+  it("preserves tool_use blocks as OpenAI tool_calls", () => {
+    const out = translateAnthropicToOpenAI(
+      {
+        id: "msg_2",
+        content: [
+          { type: "text", text: "calling now" },
+          { type: "tool_use", id: "toolu_1", name: "get_weather", input: { city: "HN" } },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+        stop_reason: "tool_use",
+      },
+      "claude-3"
+    );
+    expect(out.choices[0].finish_reason).toBe("tool_calls");
+    const msg = out.choices[0].message as { tool_calls: Array<{ id: string; function: { name: string; arguments: string } }> };
+    expect(msg.tool_calls).toHaveLength(1);
+    expect(msg.tool_calls[0]).toMatchObject({ id: "toolu_1", type: "function" });
+    expect(msg.tool_calls[0].function.name).toBe("get_weather");
+    expect(JSON.parse(msg.tool_calls[0].function.arguments)).toEqual({ city: "HN" });
+  });
 });
 
 describe("anthropic-translator stream", () => {

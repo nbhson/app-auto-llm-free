@@ -32,10 +32,10 @@ import { z } from "zod";
 import { config } from "../../config.js";
 import { getProvidersForRequest } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
-import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
-import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { logger } from "../../middleware/logger.js";
+import { tryProviders } from "../../lib/provider-executor.js";
+import { estimateTokens } from "../../lib/token-estimator.js";
 import { getRequestVk, errMessage, type ProviderError } from "../../lib/types.js";
 import type { AudioTranscriptionRequest } from "../../providers/base.js";
 import type { Context } from "hono";
@@ -81,40 +81,37 @@ async function handleAudioForm(c: Context, isTranslation: boolean) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
   }
   const order = providerOrderFor(model);
-  const errors: ProviderError[] = [];
   const start = Date.now();
-  for (const pid of order) {
-    const p = providers[pid];
-    if (!p) continue;
-    const fn = isTranslation ? (p.translations ?? p.transcriptions) : p.transcriptions;
-    if (typeof fn !== "function") continue;
-    if (isOpen(pid)) { errors.push({ provider: pid, error: "circuit open (cooldown)" }); continue; }
-    const key = getNextKeyManaged(pid);
-    if (key === null) { errors.push({ provider: pid, error: `no key configured (set ${pid.toUpperCase().replace(/-/g, "_")}_API_KEYS)` }); continue; }
-    try {
+
+  const result = await tryProviders({
+    // translations falls back to transcriptions when the provider lacks it
+    providerOrder: order.filter((pid) => {
+      const p = providers[pid];
+      return !!p && (isTranslation ? !!(p.translations ?? p.transcriptions) : !!p.transcriptions);
+    }),
+    // Heuristic: audio providers are RPM-bound; fixed budget keeps quota dims consistent
+    quotaTokens: 500,
+    call: ({ providerId: pid, key }) => {
+      const p = providers[pid];
+      const fn = isTranslation ? (p?.translations ?? p?.transcriptions) : p?.transcriptions;
+      if (typeof fn !== "function" || !p) throw new Error("provider has no transcription method");
       const payload: AudioTranscriptionRequest = { file, filename, model, prompt, response_format, temperature };
       if (!isTranslation) payload.language = language;
-      const res: Response = await fn.call(p, payload, key);
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-        recordFailure(pid);
-        if (res.status === 429) {
-          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-        }
-        continue;
-      }
-      recordSuccess(pid); markSuccess(pid, key);
+      return fn.call(p, payload, key);
+    },
+  });
+
+  if (result.ok) {
+    const { res } = result;
+    {
       const data = (await res.json().catch(async () => ({ text: await res.text() }))) as { text?: unknown; data?: unknown };
       const out = data.text ?? data.data ?? JSON.stringify(data);
-      logger.info({ provider: pid, model, latency: Date.now() - start }, isTranslation ? "translation success" : "transcription success");
+      logger.info({ provider: result.providerId, model, latency: Date.now() - start }, isTranslation ? "translation success" : "transcription success");
       return c.json({ text: out });
-    } catch (e) {
-      logger.warn({ provider: pid, err: errMessage(e) }, "audio provider failed, trying next");
-      errors.push({ provider: pid, error: errMessage(e) }); recordFailure(pid); continue;
     }
   }
+
+  const errors: ProviderError[] = result.errors;
   logger.warn({ model, errors, latency: Date.now() - start }, isTranslation ? "all translations providers failed" : "all transcriptions providers failed");
   if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development") {
     const mockText = isTranslation ? "[mock translation]" : "[mock transcription]";
@@ -143,35 +140,28 @@ audioRoute.post("/speech", zValidator("json", speechSchema), async (c) => {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
   }
   const order = providerOrderFor(model);
-  const errors: ProviderError[] = [];
   const start = Date.now();
-  for (const pid of order) {
-    const p = providers[pid];
-    if (!p || typeof p.speech !== "function") continue;
-    if (isOpen(pid)) { errors.push({ provider: pid, error: "circuit open" }); continue; }
-    const key = getNextKeyManaged(pid);
-    if (key === null) { errors.push({ provider: pid, error: "no key configured" }); continue; }
-    try {
-      const res: Response = await p.speech({ model, input: body.input, voice: body.voice, response_format: body.response_format, speed: body.speed }, key);
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-        recordFailure(pid);
-        if (res.status === 429) {
-          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-        }
-        continue;
-      }
-      recordSuccess(pid); markSuccess(pid, key);
+
+  const result = await tryProviders({
+    providerOrder: order.filter((pid) => typeof providers[pid]?.speech === "function"),
+    quotaTokens: estimateTokens(body.input) + 200,
+    call: ({ providerId: pid, key }) => {
+      const fn = providers[pid]?.speech;
+      if (typeof fn !== "function") throw new Error("provider has no speech method");
+      return fn({ model, input: body.input, voice: body.voice, response_format: body.response_format, speed: body.speed }, key);
+    },
+  });
+
+  if (result.ok) {
+    const { providerId: pid, res } = result;
+    {
       const buf = await res.arrayBuffer();
       logger.info({ provider: pid, model, bytes: buf.byteLength, latency: Date.now() - start }, "tts success");
       return new Response(buf, { status: 200, headers: { "Content-Type": "audio/mpeg", "Content-Length": String(buf.byteLength), "X-Provider": pid, "X-Model": model } });
-    } catch (e) {
-      logger.warn({ provider: pid, err: errMessage(e) }, "speech provider failed");
-      errors.push({ provider: pid, error: errMessage(e) }); recordFailure(pid); continue;
     }
   }
+
+  const errors: ProviderError[] = result.errors;
   logger.warn({ model, errors, latency: Date.now() - start }, "all speech providers failed");
   if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development") {
     const placeholder = Buffer.from("ID3mock audio placeholder");

@@ -4,6 +4,71 @@ import type { CompressibleMessage, TokenCountMessage } from "./types.js";
 export interface CompressOpts {
   maxTokens?: number;
   engines?: string[];
+  relevance?: RelevanceOpts;
+}
+
+export interface RelevanceOpts {
+  /** trailing non-system messages always kept (default 3) */
+  keepRecent?: number;
+  /** top relevant older messages to keep (default 5) */
+  keepRelevant?: number;
+  /** skip relevance when history is at most this long (default 8) */
+  minLength?: number;
+}
+
+function messageText(m: CompressibleMessage): string {
+  return typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "");
+}
+
+function tokenize(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9_]+/).filter((t) => t.length > 2);
+}
+
+/**
+ * BM25-lite relevance: query token overlap, length-normalized.
+ * Sync + dependency-free (no embedding call on the hot path).
+ */
+export function relevanceScore(message: string, queryTokens: Set<string>): number {
+  if (queryTokens.size === 0) return 0;
+  const tokens = tokenize(message);
+  if (tokens.length === 0) return 0;
+  let hits = 0;
+  for (const t of new Set(tokens)) if (queryTokens.has(t)) hits++;
+  return hits / Math.sqrt(tokens.length);
+}
+
+/**
+ * Query-aware keep: always retain system + trailing recent messages, then fill
+ * the budget with the older messages most relevant to the last user message.
+ * Unlike pure recency truncation, topics referenced earlier (ids, constraints,
+ * decisions) survive when the conversation returns to them.
+ */
+export function relevanceKeep(messages: CompressibleMessage[], opts: RelevanceOpts = {}): CompressibleMessage[] {
+  const { keepRecent = 3, keepRelevant = 5, minLength = 8 } = opts;
+  if (messages.length <= minLength) return messages;
+  const system = messages.filter((m) => m.role === "system");
+  const rest = messages.filter((m) => m.role !== "system");
+  if (rest.length <= keepRecent + keepRelevant) return messages;
+  // query = last user message (what the model must answer next)
+  const lastUser = [...rest].reverse().find((m) => m.role === "user");
+  const queryTokens = new Set(tokenize(lastUser ? messageText(lastUser) : ""));
+  const recent = rest.slice(-keepRecent);
+  const candidates = rest.slice(0, -keepRecent);
+  const scored = candidates.map((m, i) => ({ m, i, s: relevanceScore(messageText(m), queryTokens) }));
+  scored.sort((a, b) => b.s - a.s || a.i - b.i);
+  const keptIdx = new Set(scored.slice(0, keepRelevant).map((x) => x.i));
+  const out = [...candidates.filter((_, i) => keptIdx.has(i)), ...recent];
+  // restore chronological order (same object refs, index via identity)
+  const order = new Map<CompressibleMessage, number>();
+  messages.forEach((m, i) => {
+    if (!order.has(m)) order.set(m, i);
+  });
+  out.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  if (system.length > 0) {
+    const lastSystem = system[system.length - 1];
+    if (!out.includes(lastSystem)) return [lastSystem, ...out];
+  }
+  return out;
 }
 
 export interface CompressResult {
@@ -102,8 +167,19 @@ export function historySummarize(messages: CompressibleMessage[]): CompressibleM
 
 /**
  * Remove duplicate code blocks (``` ... ```) keeping first occurrence.
- * Fixed: keep first global occurrence, remove subsequent duplicates only.
+ * Normalizes whitespace before comparing so near-duplicate pastes
+ * (re-indented or re-spaced copies) are also caught.
  */
+export function normalizeCodeBlock(block: string): string {
+  return block
+    .replace(/```\w*\n?/, "")
+    .replace(/```\s*$/, "")
+    .split("\n")
+    .map((line) => line.trim().replace(/\s+/g, " "))
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
 export function codeDedup(messages: CompressibleMessage[]): CompressibleMessage[] {
   const seen = new Set<string>();
   const codeBlockRe = /```[\s\S]*?```/g;
@@ -114,13 +190,14 @@ export function codeDedup(messages: CompressibleMessage[]): CompressibleMessage[
     let deduped = m.content;
     const localSeen = new Set<string>();
     for (const block of blocks) {
-      const norm = block.trim();
-      const isDuplicate = seen.has(norm) || localSeen.has(norm);
+      const norm = normalizeCodeBlock(block);
+      // empty blocks are never deduped (avoid collapsing intentional placeholders)
+      const isDuplicate = norm.length > 0 && (seen.has(norm) || localSeen.has(norm));
       if (isDuplicate) {
         // remove only the last occurrence of this block, keep first
         const idx = deduped.lastIndexOf(block);
         if (idx !== -1) deduped = deduped.slice(0, idx) + deduped.slice(idx + block.length);
-      } else {
+      } else if (norm.length > 0) {
         seen.add(norm);
         localSeen.add(norm);
       }
@@ -174,13 +251,15 @@ export function compressWithMetrics(messages: CompressibleMessage[], opts: Compr
  * Harness 02 Build Context: respects maxTokens budget (drop oldest non-system).
  */
 export function compressMessages(messages: CompressibleMessage[], opts: CompressOpts = {}): CompressResult {
-  const engines = opts.engines ?? ["toolsMinify", "historySummarize", "codeDedup"];
+  // relevance first (shrinks by importance), then recency cap, then dedup
+  const engines = opts.engines ?? ["toolsMinify", "relevanceKeep", "historySummarize", "codeDedup"];
   const originalLength = calcLength(messages);
   const originalTokens = estimateMessagesTokens(messages as TokenCountMessage[]);
 
   let out: CompressibleMessage[] = [...messages];
 
   if (engines.includes("toolsMinify")) out = toolsMinify(out);
+  if (engines.includes("relevanceKeep")) out = relevanceKeep(out, opts.relevance);
   if (engines.includes("historySummarize")) out = historySummarize(out);
   if (engines.includes("codeDedup")) out = codeDedup(out);
 

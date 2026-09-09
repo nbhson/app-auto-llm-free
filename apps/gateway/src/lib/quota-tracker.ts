@@ -1,4 +1,5 @@
 import { logger } from "../middleware/logger.js";
+import { slidingCheck } from "./sliding-window.js";
 
 // Freellms limits mapping (from docs/CONFIGURATION.md + freellms scan)
 export const FREELLMS_LIMITS: Record<string, { rpm?: number; rpd?: number; tpm?: number; tpd?: number; note?: string }> = {
@@ -106,18 +107,68 @@ export function recordUsage(provider: string, key: string, tokens: number) {
     w.count += tokens;
     tpdWindows.set(k, w);
   }
-  // Also try to increment Redis counters if available (best-effort, async)
-  try {
-    // dynamic import to avoid circular dep
-    import("./redis.js").then(({ getRedis }) => {
-      const r = getRedis?.();
-      if (!r) return;
-      const dayKey = `quota:${k}:${Math.floor(now / 86400000)}`;
-      r.incr(dayKey).catch(() => {});
-      r.expire(dayKey, 86400).catch(() => {});
-    }).catch(() => {});
-  } catch { /* ignore */ }
+  // Redis commit (best-effort): mirrors the increments above into sliding windows
+  void commitUsageAsync(provider, key, tokens).catch(() => {});
   logger.debug({ provider, tokens, k }, "quota usage recorded");
+}
+
+const MIN_MS = 60000;
+const DAY_MS = 86400000;
+
+interface QuotaDim {
+  kind: string;
+  ns: string;
+  limit: number;
+  windowMs: number;
+  tokens: number;
+  incr: number;
+}
+
+function quotaDims(provider: string, keyPrefix: string, estimatedTokens: number, commit: boolean): QuotaDim[] {
+  const limits = FREELLMS_LIMITS[provider];
+  if (!limits) return [];
+  const base = `quota:${provider}:${keyPrefix}`;
+  const dims: QuotaDim[] = [];
+  if (limits.rpm) dims.push({ kind: "RPM", ns: `${base}:rpm`, limit: limits.rpm, windowMs: MIN_MS, tokens: 1, incr: commit ? 1 : 0 });
+  if (limits.tpm) dims.push({ kind: "TPM", ns: `${base}:tpm`, limit: limits.tpm, windowMs: MIN_MS, tokens: estimatedTokens, incr: commit ? estimatedTokens : 0 });
+  if (limits.rpd) dims.push({ kind: "RPD", ns: `${base}:rpd`, limit: limits.rpd, windowMs: DAY_MS, tokens: 1, incr: commit ? 1 : 0 });
+  if (limits.tpd) dims.push({ kind: "TPD", ns: `${base}:tpd`, limit: limits.tpd, windowMs: DAY_MS, tokens: estimatedTokens, incr: commit ? estimatedTokens : 0 });
+  return dims;
+}
+
+async function commitUsageAsync(provider: string, key: string, tokens: number): Promise<void> {
+  const dims = quotaDims(provider, key.slice(0, 8), tokens, true);
+  for (const d of dims) {
+    await slidingCheck({ namespace: d.ns, limit: d.limit, tokens: d.tokens, incr: d.incr, windowMs: d.windowMs });
+  }
+}
+
+/**
+ * Async quota check: Redis sliding-window-counter when available (distributed,
+ * no boundary spike), otherwise the in-memory fixed window. TPM shadows TPD
+ * note: a provider with both trips TPM first by design (per-minute binds tighter).
+ */
+export async function checkQuotaAsync(
+  provider: string,
+  key: string,
+  estimatedTokens: number
+): Promise<{ allowed: boolean; reason?: string; retryAfterMs?: number }> {
+  const dims = quotaDims(provider, key.slice(0, 8), estimatedTokens, false);
+  if (dims.length === 0) return { allowed: true };
+  // Probe Redis once; wholesale fallback to in-memory when unavailable
+  const probe = await slidingCheck({ namespace: dims[0].ns, limit: dims[0].limit, tokens: dims[0].tokens, incr: 0, windowMs: dims[0].windowMs });
+  if (probe === null) return checkQuota(provider, key, estimatedTokens);
+  const results: Array<{ allowed: boolean; retryAfterMs: number } | null> = [probe];
+  for (let i = 1; i < dims.length; i++) {
+    results.push(await slidingCheck({ namespace: dims[i].ns, limit: dims[i].limit, tokens: dims[i].tokens, incr: 0, windowMs: dims[i].windowMs }));
+  }
+  for (let i = 0; i < dims.length; i++) {
+    const r = results[i];
+    if (r && !r.allowed) {
+      return { allowed: false, reason: `${dims[i].kind} limit ${dims[i].limit} exceeded`, retryAfterMs: r.retryAfterMs };
+    }
+  }
+  return { allowed: true };
 }
 
 export function getQuotaState(provider: string, key: string) {

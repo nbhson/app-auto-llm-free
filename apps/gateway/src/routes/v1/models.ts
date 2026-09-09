@@ -249,7 +249,7 @@ modelsRoute.get("/", async (c) => {
       const exists = all.some((m) => m.id === em.id);
       if (!exists) all.push({ ...em, health: h, persisted_404: false });
     }
-    if (!providerFilter || providerFilter === "gateway") {
+    if ((!providerFilter || providerFilter === "gateway") && !rawQ) {
         all.unshift(
           { id: "free-llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
         );
@@ -300,7 +300,7 @@ modelsRoute.get("/", async (c) => {
         limit: "no key",
         created: 1715433600,
       };
-      if (!providerFilter || providerFilter === "pollinations") {
+      if ((!providerFilter || providerFilter === "pollinations") && !rawQ) {
         if (!verifiedFilter || verifiedFilter === "free") all.push(pollinationsModel);
       }
       // Always include free auto aliases (kilo/openrouter) and newer agnes model not in freellms
@@ -342,7 +342,7 @@ modelsRoute.get("/", async (c) => {
         const exists = all.some((m) => m.id === em.id);
         if (!exists) all.push({ ...em, live_status, persisted_404: !!persisted404, health: h });
       }
-      if (!providerFilter || providerFilter === "gateway") {
+      if ((!providerFilter || providerFilter === "gateway") && !rawQ) {
         all.unshift(
           { id: "free-llm-gateway/auto", object: "model", owned_by: "gateway", provider: "gateway", context_length: 8192, created: 1715433600, capabilities: ["text"], live_status: "alias" },
         );

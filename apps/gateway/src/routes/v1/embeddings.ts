@@ -3,12 +3,12 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../../config.js";
 import { providers } from "../../providers/registry.js";
-import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
-import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
-import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
+import { getProvidersForRequest } from "../../lib/router.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { logger } from "../../middleware/logger.js";
-import { getRequestVk, errMessage, type ProviderError, type UpstreamEmbeddings } from "../../lib/types.js";
+import { tryProviders } from "../../lib/provider-executor.js";
+import { estimateTokens } from "../../lib/token-estimator.js";
+import { getRequestVk, type UpstreamEmbeddings } from "../../lib/types.js";
 
 const embeddingsSchema = z.object({
   model: z.string().min(1),
@@ -47,43 +47,26 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
     }
   }
 
-  const errors: ProviderError[] = [];
   const startAll = Date.now();
 
-  for (const pid of providerOrder) {
-    const provider = providers[pid];
-    if (!provider || !provider.embeddings) continue;
-    if (isOpen(pid)) {
-      errors.push({ provider: pid, error: "circuit open" });
-      continue;
-    }
-    const key = getNextKeyManaged(pid);
-    if (key === null) {
-      errors.push({ provider: pid, error: "no key configured" });
-      continue;
-    }
-    if (!key && !isPublicProvider(pid)) {
-      errors.push({ provider: pid, error: "missing key" });
-      continue;
-    }
-
-    try {
-      const res = await provider.embeddings(
+  const inputText = Array.isArray(body.input) ? body.input.join("\n") : body.input;
+  const result = await tryProviders({
+    // Only embedding-capable providers (silently skipped ones stay out of errors, as before)
+    providerOrder: providerOrder.filter((pid) => providers[pid]?.embeddings),
+    quotaTokens: estimateTokens(inputText),
+    call: ({ providerId: pid, key }) => {
+      const fn = providers[pid]?.embeddings;
+      if (!fn) throw new Error("provider has no embeddings method");
+      return fn(
         { model, input: body.input, encoding_format: body.encoding_format, dimensions: body.dimensions, user: body.user },
         key
       );
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        errors.push({ provider: pid, status: res.status, error: text.slice(0, 600) });
-        recordFailure(pid);
-        if (res.status === 429) {
-          const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
-          markRateLimited(pid, key, isNaN(retry) ? 60000 : retry);
-        }
-        continue;
-      }
-      recordSuccess(pid);
-      markSuccess(pid, key);
+    },
+  });
+
+  if (result.ok) {
+    const { providerId: pid, res } = result;
+    {
       const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamEmbeddings;
       // Ensure OpenAI shape
       if (data.data && Array.isArray(data.data)) {
@@ -97,13 +80,10 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
         model: `${pid}/${model}`,
         usage: data.usage || { prompt_tokens: 0, total_tokens: 0 },
       });
-    } catch (e) {
-      logger.warn({ provider: pid, err: errMessage(e) }, "embeddings provider failed");
-      errors.push({ provider: pid, error: errMessage(e) });
-      recordFailure(pid);
-      continue;
     }
   }
+
+  const errors = result.errors;
 
   logger.warn({ model, errors, latency: Date.now() - startAll }, "all embeddings providers failed");
 

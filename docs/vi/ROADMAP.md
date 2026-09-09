@@ -86,6 +86,17 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 - [x] Provider keys — `ANTHROPIC_API_KEYS` (phân tách dấu phẩy) cho upstream Anthropic trực tiếp của `/v1/messages`
 - [x] Tests + docs — e2e Vector 1+2, `CONFIGURATION.md` flags Vector 2, `ROADMAP.md` P6/M6, `README.vi.md` bảng tính năng
 
+## P7 — Resilience v2 (0.9.0) ✅ Done 2026-09-09
+
+- [x] `lib/provider-executor.ts` — fallback chung `tryProviders()` cho 6 routes v1 (breaker → key → quota → skip → call), ~300 LOC trùng bị xóa; error 429 mang `retryAfterMs`
+- [x] `lib/sliding-window.ts` — Redis Lua sliding-window-counter (atomic check+commit, fail-open về in-memory); `checkQuotaAsync` + `recordUsage` dual-write; cùng engine cho rate-limit virtual key (giữ nguyên headers)
+- [x] Compression query-aware — engine `relevanceKeep` (BM25-lite so với user message cuối, giữ system + 3 recent + top-5 relevant) chạy trước `historySummarize`; `normalizeCodeBlock` cho code dedup gần giống
+- [x] Cost routing theo success-rate — `getProviderSuccessRate` (request-log 100 gần nhất) + `SUCCESS_WEIGHT=2` (env/compose/`GET /api/config`)
+- [x] Giữ `tool_use` → `tool_calls` trong Anthropic↔OpenAI translation; embedding fallback song song; key pool least-failed-first; Gemini fail-fast 404 cho model lạ
+- [x] `request-log` batch write (2s + flush exit + `flushRequestLogs`); quota áp cho embeddings/images/audio; breaker chỉ đếm 5xx/429/exception
+- [x] Bugfix: `GET /api/analytics` thiếu `await` (trước đó trả `{}`), `q`-filter models bỏ sót 2 alias cứng, images mock dev chưa gate `ALLOW_MOCK`
+- [x] Tests 207→232 + docs EN/VI (`ARCHITECTURE`, `CONFIGURATION`, `OPERATIONS`, `API`, `README`, `CHANGELOG` 0.9.0)
+
 ## Milestones
 
 | Milestone | Date | Deliverable |
@@ -96,5 +107,6 @@ Lộ trình 5 phases, tổng ~11-16 ngày cho MVP.
 | M4 | 2026-09-06 | P4 done: virtual keys `fgk-...` CRUD + logs SSE (Live ON) + Dashboard 5 routes (hasKey/hide404, hasRealKey highlight, sticky bottom LOV) |
 | M5 | 2026-09-06 | P5 done: wrangler + Dockerfile prod + OTel + benchmark + SECURITY rotate + PROVIDER_TEST_RESULTS + live sync 2185/882 |
 | M6 | 2026-09-08 | P6 Vector 1+2 done: `/v1/audio/*` + `/responses`/`/conversations` + `/v1/messages` (Anthropic) + semantic cache + compression + cost routing + analytics (`costByProvider`/`cacheHitRate`/`p95`) |
+| M7 | 2026-09-09 | P7 Resilience v2 (0.9.0): executor `tryProviders` chung + sliding-window quota/rate-limit Redis + compression query-aware + cost routing theo success-rate + giữ `tool_use`, 232 tests |
 
 Gantt tham khảo trong `docs/ARCHITECTURE.md:1`.

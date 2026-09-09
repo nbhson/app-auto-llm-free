@@ -18,6 +18,9 @@ interface OpenAITool {
 interface AnthropicContentBlock {
   type?: string;
   text?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
   [key: string]: unknown;
 }
 
@@ -128,10 +131,18 @@ export function translateOpenAIToAnthropic(req: ChatRequest): AnthropicRequest {
  */
 export function translateAnthropicToOpenAI(data: AnthropicResponse, model: string) {
   const textParts: string[] = [];
+  const toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
   if (Array.isArray(data.content)) {
     for (const block of data.content) {
       if (block.type === "text" && typeof block.text === "string") {
         textParts.push(block.text);
+      } else if (block.type === "tool_use" && typeof block.name === "string") {
+        // Preserve agentic tool calls (previously dropped — Claude via gateway lost tool_calls silently)
+        toolCalls.push({
+          id: typeof block.id === "string" && block.id ? block.id : `toolu_${toolCalls.length}`,
+          type: "function",
+          function: { name: block.name, arguments: JSON.stringify(block.input ?? {}) },
+        });
       }
     }
   }
@@ -143,7 +154,7 @@ export function translateAnthropicToOpenAI(data: AnthropicResponse, model: strin
     stop_sequence: "stop",
     tool_use: "tool_calls",
   };
-  const finish_reason = finishMap[data.stop_reason ?? ""] || data.stop_reason || "stop";
+  const finish_reason = toolCalls.length > 0 ? "tool_calls" : finishMap[data.stop_reason ?? ""] || data.stop_reason || "stop";
 
   return {
     id: data.id || `chatcmpl-${Date.now()}`,
@@ -153,7 +164,7 @@ export function translateAnthropicToOpenAI(data: AnthropicResponse, model: strin
     choices: [
       {
         index: 0,
-        message: { role: "assistant", content },
+        message: toolCalls.length > 0 ? { role: "assistant", content, tool_calls: toolCalls } : { role: "assistant", content },
         finish_reason,
       },
     ],

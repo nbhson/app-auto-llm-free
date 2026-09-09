@@ -370,6 +370,7 @@ apiRoute.get("/config", (c) => {
     COST_WEIGHT: config.costWeight,
     LATENCY_WEIGHT: config.latencyWeight,
     HEADROOM_WEIGHT: config.headroomWeight,
+    SUCCESS_WEIGHT: config.successWeight,
     ANALYTICS_RETENTION_DAYS: config.analyticsRetentionDays,
     _source: ".env",
   });
@@ -401,9 +402,9 @@ apiRoute.get("/analytics", async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") || "20", 10), 100);
   try {
     const { getAnalytics, getCostBreakdown, calculateSavings } = await import("../lib/analytics.js");
-    const analytics: unknown = getAnalytics({ interval, groupBy, limit });
+    const analytics = await getAnalytics({ interval, groupBy, limit });
     const cost = getCostBreakdown();
-    const savings = calculateSavings();
+    const savings = await calculateSavings();
     return c.json({ interval, groupBy, analytics, cost, savings, generated_at: new Date().toISOString() });
   } catch (e) {
     return c.json({ interval, groupBy, error: errMessage(e) }, 500);

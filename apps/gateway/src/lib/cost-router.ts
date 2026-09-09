@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { resolveDataPath } from "./paths.js";
 import { getQuotaHeadroom as getQuotaHeadroomFromTracker } from "./quota-tracker.js";
+import { getStats } from "./request-log.js";
 import { logger } from "../middleware/logger.js";
 import { config } from "../config.js";
 
@@ -9,6 +10,7 @@ export interface ProviderScore {
   cost: number;
   latency: number;
   quotaHeadroom: number;
+  successRate: number;
   score: number;
 }
 
@@ -142,11 +144,29 @@ const SYNC_COOLDOWN_MS = 60 * 60 * 1000; // 1h
 const DEFAULT_COST_WEIGHT = 5; // cost dominates latency (free-first)
 const DEFAULT_LATENCY_WEIGHT = 0.0005; // half previous to ensure cheapest wins
 const HEADROOM_WEIGHT = 0.3; // quota pressure more visible
+const DEFAULT_SUCCESS_WEIGHT = 2; // failing providers demoted even before breaker opens
 
-function resolveWeights(opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number } = {}): {
+/**
+ * Rolling success rate from request-log (last 100). Defaults to 1 (no data =
+ * no penalty) so cold providers are not punished.
+ */
+export function getProviderSuccessRate(provider: string): number {
+  try {
+    const stats = getStats() as { byProvider?: Record<string, number>; errorsByProvider?: Record<string, number> };
+    const total = stats.byProvider?.[provider] ?? 0;
+    if (total === 0) return 1;
+    const errs = stats.errorsByProvider?.[provider] ?? 0;
+    return Math.max(0, Math.min(1, 1 - errs / total));
+  } catch {
+    return 1;
+  }
+}
+
+function resolveWeights(opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number } = {}): {
   costWeight: number;
   latencyWeight: number;
   headroomWeight: number;
+  successWeight: number;
 } {
   // harness 06 Decide Tools: env overrides allow A/B testing without code change
   // Direct import — config has no circular dependency on cost-router (verified)
@@ -154,20 +174,22 @@ function resolveWeights(opts: { costWeight?: number; latencyWeight?: number; hea
     costWeight: opts.costWeight ?? config.costWeight ?? DEFAULT_COST_WEIGHT,
     latencyWeight: opts.latencyWeight ?? config.latencyWeight ?? DEFAULT_LATENCY_WEIGHT,
     headroomWeight: opts.headroomWeight ?? config.headroomWeight ?? HEADROOM_WEIGHT,
+    successWeight: opts.successWeight ?? config.successWeight ?? DEFAULT_SUCCESS_WEIGHT,
   };
 }
 
 function buildScores(
   providerIds: string[],
-  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number } = {},
+  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number } = {},
 ): ProviderScore[] {
-  const { costWeight, latencyWeight, headroomWeight } = resolveWeights(opts);
+  const { costWeight, latencyWeight, headroomWeight, successWeight } = resolveWeights(opts);
   const scored: ProviderScore[] = providerIds.map((provider) => {
     const cost = FREELLMS_COST[provider] ?? 0.05;
     const latency = getLatency(provider);
     const quotaHeadroom = getQuotaHeadroom(provider);
-    const score = cost * costWeight + latency * latencyWeight - quotaHeadroom * headroomWeight;
-    return { provider, cost, latency, quotaHeadroom, score };
+    const successRate = getProviderSuccessRate(provider);
+    const score = cost * costWeight + latency * latencyWeight - quotaHeadroom * headroomWeight - successRate * successWeight;
+    return { provider, cost, latency, quotaHeadroom, successRate, score };
   });
   scored.sort((a, b) => a.score - b.score);
   return scored;
@@ -175,16 +197,17 @@ function buildScores(
 
 export async function buildScoresAsync(
   providerIds: string[],
-  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number } = {},
+  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number } = {},
 ): Promise<ProviderScore[]> {
-  const { costWeight, latencyWeight, headroomWeight } = resolveWeights(opts);
+  const { costWeight, latencyWeight, headroomWeight, successWeight } = resolveWeights(opts);
   const latencies = await Promise.all(providerIds.map((p) => getLatencyAsync(p)));
   const scored: ProviderScore[] = providerIds.map((provider, idx) => {
     const cost = FREELLMS_COST[provider] ?? 0.05;
     const latency = latencies[idx];
     const quotaHeadroom = getQuotaHeadroom(provider);
-    const score = cost * costWeight + latency * latencyWeight - quotaHeadroom * headroomWeight;
-    return { provider, cost, latency, quotaHeadroom, score };
+    const successRate = getProviderSuccessRate(provider);
+    const score = cost * costWeight + latency * latencyWeight - quotaHeadroom * headroomWeight - successRate * successWeight;
+    return { provider, cost, latency, quotaHeadroom, successRate, score };
   });
   scored.sort((a, b) => a.score - b.score);
   return scored;
@@ -197,28 +220,28 @@ export async function buildScoresAsync(
  */
 export function rankProvidersByCostAndLatency(
   providerIds: string[],
-  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number } = {},
+  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number } = {},
 ): string[] {
   return buildScores(providerIds, opts).map((s) => s.provider);
 }
 
 export async function rankProvidersByCostAndLatencyAsync(
   providerIds: string[],
-  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number } = {},
+  opts: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number } = {},
 ): Promise<string[]> {
   return (await buildScoresAsync(providerIds, opts)).map((s) => s.provider);
 }
 
 export function scoreProviders(
   providerIds: string[],
-  opts?: { costWeight?: number; latencyWeight?: number; headroomWeight?: number },
+  opts?: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number },
 ): ProviderScore[] {
   return buildScores(providerIds, opts);
 }
 
 export async function scoreProvidersAsync(
   providerIds: string[],
-  opts?: { costWeight?: number; latencyWeight?: number; headroomWeight?: number },
+  opts?: { costWeight?: number; latencyWeight?: number; headroomWeight?: number; successWeight?: number },
 ): Promise<ProviderScore[]> {
   return buildScoresAsync(providerIds, opts);
 }

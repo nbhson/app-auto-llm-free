@@ -3,13 +3,15 @@ import {
   rankProvidersByCostAndLatencyAsync,
   scoreProviders,
   scoreProvidersAsync,
+  getProviderSuccessRate,
   syncPricing,
   FREELLMS_COST,
 } from "./cost-router.js";
+import { addLog } from "./request-log.js";
 
 describe("cost-router async + scoring", () => {
   it("async rank keeps cheapest first", async () => {
-    const ranked = await rankProvidersByCostAndLatencyAsync(["groq", "openrouter", "pollinations"]);
+    const ranked = await rankProvidersByCostAndLatencyAsync(["groq", "openrouter", "pollinations"], { successWeight: 0 });
     expect(ranked[0]).toBe("pollinations");
   });
 
@@ -26,9 +28,30 @@ describe("cost-router async + scoring", () => {
 
   it("scoreProvidersAsync matches sync order", async () => {
     const ids = ["groq", "pollinations", "openrouter"];
-    const syncOrder = scoreProviders(ids).map((s) => s.provider);
-    const asyncOrder = (await scoreProvidersAsync(ids)).map((s) => s.provider);
+    const syncOrder = scoreProviders(ids, { successWeight: 0 }).map((s) => s.provider);
+    const asyncOrder = (await scoreProvidersAsync(ids, { successWeight: 0 })).map((s) => s.provider);
     expect(asyncOrder).toEqual(syncOrder);
+  });
+
+  it("getProviderSuccessRate defaults to 1 without data", () => {
+    expect(getProviderSuccessRate(`ut-no-traffic-${Date.now()}`)).toBe(1);
+  });
+
+  it("demotes providers with failing history (isolated fake ids)", async () => {
+    const flaky = `ut-flaky-${Date.now()}`;
+    const clean = `ut-clean-${Date.now()}`;
+    for (let i = 0; i < 5; i++) {
+      addLog({ id: `${flaky}-${i}`, timestamp: new Date().toISOString(), provider: flaky, model: "m", totalTokens: 10, latencyMs: 5, status: 500, error: "boom" });
+    }
+    addLog({ id: `${flaky}-ok`, timestamp: new Date().toISOString(), provider: flaky, model: "m", totalTokens: 10, latencyMs: 5, status: 200 });
+    expect(getProviderSuccessRate(flaky)).toBeCloseTo(1 / 6, 3);
+    expect(getProviderSuccessRate(clean)).toBe(1);
+    // same default cost (0.05) — success rate breaks the tie
+    const ranked = await rankProvidersByCostAndLatencyAsync([flaky, clean]);
+    expect(ranked[0]).toBe(clean);
+    const scores = scoreProviders([flaky, clean]);
+    expect(scores[0].provider).toBe(clean);
+    expect(scores.find((s) => s.provider === flaky)!.successRate).toBeLessThan(1);
   });
 });
 
