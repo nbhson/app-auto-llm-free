@@ -23,7 +23,6 @@ export default function Logs() {
   useEffect(() => {
     if (!live) return;
     const key = mk();
-    let timer: any;
     (async () => {
       try {
         const res = await fetch("/api/logs/stream", { headers: { Authorization: `Bearer ${key}` } });
@@ -32,11 +31,11 @@ export default function Logs() {
         while (true) {
           const { done, value } = await reader.read(); if (done) break;
           buf += decoder.decode(value, { stream: true }); const parts = buf.split("\n\n"); buf = parts.pop() || "";
-          for (const p of parts) { const line = p.split("\n").find((l) => l.startsWith("data: ")); if (line) { try { const obj = JSON.parse(line.slice(6)); if (obj.id) setLogs((prev) => [obj, ...prev].slice(0, 100)); } catch {} } }
+          for (const p of parts) { const line = p.split("\n").find((l) => l.startsWith("data: ")); if (line) { try { const obj = JSON.parse(line.slice(6)); if (obj.id) setLogs((prev) => [obj, ...prev].slice(0, 100)); } catch { /* ignore */ } } }
         }
-      } catch {}
+      } catch { /* ignore */ }
     })();
-    timer = setInterval(load, 2000);
+    const timer = setInterval(load, 2000);
     return () => clearInterval(timer);
   }, [live]);
 

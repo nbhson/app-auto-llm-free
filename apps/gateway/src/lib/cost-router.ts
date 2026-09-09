@@ -56,13 +56,13 @@ function ensureLatencyWatcher(): void {
     fs.watchFile(STATS_PATH, { interval: 5000 }, () => {
       latencyCache = null;
     });
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 export function stopLatencyWatcher(): void {
   try {
     fs.unwatchFile(STATS_PATH);
-  } catch {}
+  } catch { /* ignore */ }
   latencyWatchInitialized = false;
 }
 
@@ -106,7 +106,7 @@ function getLatency(provider: string): number {
     if (typeof v === "number") return v;
     if (v && typeof v.emaLatencyMs === "number") return v.emaLatencyMs;
     if (v && typeof v.latency === "number") return v.latency;
-  } catch {}
+  } catch { /* ignore */ }
   return 100; // fallback
 }
 

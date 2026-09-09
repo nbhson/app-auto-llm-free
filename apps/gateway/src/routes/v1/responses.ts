@@ -211,7 +211,7 @@ async function handleResponses(c: any) {
                     if (json.choices?.[0]?.finish_reason) {
                       controller.enqueue(encoder.encode(createResponsesStreamChunk(model, "", true)));
                     }
-                  } catch {}
+                  } catch { /* ignore */ }
                 }
               }
             } catch (e) {

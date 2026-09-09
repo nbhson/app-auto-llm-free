@@ -35,7 +35,7 @@ export function startScheduler() {
       try {
         const { syncPricing } = await import("../lib/cost-router.js");
         await syncPricing();
-      } catch {}
+      } catch { /* ignore */ }
     }, 6 * 60 * 60 * 1000);
   }
   // Run once at startup if stale
@@ -45,7 +45,7 @@ export function startScheduler() {
       try {
         const report = await verifyFreeModels({ dryRun: false });
         await saveVerifyReport(report);
-        try { await syncLiveModels(); } catch {}
+        try { await syncLiveModels(); } catch { /* ignore */ }
         logger.info("scheduler: initial verify done");
       } catch (e: any) {
         logger.error({ err: e.message }, "scheduler: initial verify failed");
@@ -61,7 +61,7 @@ export function startScheduler() {
     try {
       const report = await verifyFreeModels({ dryRun: false });
       await saveVerifyReport(report);
-      try { await syncLiveModels(); } catch {}
+      try { await syncLiveModels(); } catch { /* ignore */ }
       logger.info({ verified: report.total_verified_free, deprecated: report.total_deprecated }, "scheduler: periodic verify done");
     } catch (e: any) {
       logger.error({ err: e.message }, "scheduler: periodic verify failed");

@@ -6,7 +6,7 @@ import { sanitizeFreellmsName } from "../lib/sanitize.js";
 function generateSessionId(): string {
   return `ses_${crypto.randomBytes(12).toString("hex")}`;
 }
-function isOpencodeFreeModel(model: string): boolean {
+function isOpencodeFreeModel(_model: string): boolean {
   // opencode Zen: all 8 live models are free and session-gated; require X-Session-ID for every chat
   // previous regex missed deepseek/laguna/longcat/north and still returned 401
   return true;
@@ -246,7 +246,7 @@ export function createOpenAICompatibleProvider(opts: {
       try {
         const native = await fetch(url, { method: "POST", headers, body: JSON.stringify(req) });
         if (native.ok || native.status < 500) return native;
-      } catch {}
+      } catch { /* ignore: native responses failed, fallback to chat */ }
       // fallback to chat completions
       const chatUrl = `${base}/chat/completions`;
       let model = chat.model;

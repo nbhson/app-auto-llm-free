@@ -47,7 +47,7 @@ export function geminiToOpenAIStream(geminiStream: ReadableStream<Uint8Array>, m
             const obj = JSON.parse(buffer.trim().replace(/^\[?,\s*/, ""));
             const text = obj.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") || "";
             if (text) controller.enqueue(encoder.encode(createOpenAIChunk(model, text)));
-          } catch {}
+          } catch { /* ignore */ }
         }
         controller.enqueue(encoder.encode(createOpenAIChunk(model, "", "stop")));
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));

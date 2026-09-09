@@ -16,7 +16,7 @@ serve(
     logger.info(`   Health: http://localhost:${info.port}/v1/health`);
     logger.info(`   Models: http://localhost:${info.port}/v1/models`);
     logger.info(`   Chat:   POST http://localhost:${info.port}/v1/chat/completions`);
-    console.log(`\nDocs: http://localhost:${info.port}/docs`);
+    logger.info(`Docs: http://localhost:${info.port}/docs`);
     // Start 24h verify scheduler (checks freellms vs live /models)
     if (process.env.DISABLE_SCHEDULER !== "1") {
       startScheduler();

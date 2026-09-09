@@ -56,7 +56,7 @@ function loadFreellmsProviders(): any[] {
  */
 export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: number }): Promise<VerifyReport> {
   const freellmsFree = loadFreellmsFree();
-  const freellmsProviders = loadFreellmsProviders();
+  const _freellmsProviders = loadFreellmsProviders();
   const byProvider = new Map<string, any[]>();
   for (const m of freellmsFree) {
     const slug = m.slug;
@@ -252,7 +252,7 @@ export async function saveVerifyReport(report: VerifyReport) {
     }
     const liveOut = resolveDataPath("live-models.json");
     fs.writeFileSync(liveOut, JSON.stringify({ generated_at: report.generated_at, total: mergedMap.size, models: Array.from(mergedMap.values()) }, null, 2));
-  } catch {}
+  } catch { /* ignore */ }
   logger.info({ verified: report.total_verified_free, deprecated: report.total_deprecated, unverified: report.total_unverified_no_key }, "verify report saved");
 }
 
@@ -260,9 +260,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const dry = process.argv.includes("--dry-run");
   verifyFreeModels({ dryRun: dry }).then(async (r) => {
     await saveVerifyReport(r);
-    console.log(`✅ Verified ${r.total_verified_free}/${r.total_freellms_free} free (deprecated ${r.total_deprecated}, unverified_no_key ${r.total_unverified_no_key})`);
+    console.warn(`✅ Verified ${r.total_verified_free}/${r.total_freellms_free} free (deprecated ${r.total_deprecated}, unverified_no_key ${r.total_unverified_no_key})`);
     for (const p of r.providers) {
-      console.log(`${p.id.padEnd(28)} free:${p.freellms_free.toString().padStart(3)} live:${p.live_models.toString().padStart(3)} verified:${p.verified_free.toString().padStart(3)} deprecated:${p.deprecated.toString().padStart(3)} ${p.unverified_no_key ? "(no key)" : ""} ${p.error || ""}`);
+      console.warn(`${p.id.padEnd(28)} free:${p.freellms_free.toString().padStart(3)} live:${p.live_models.toString().padStart(3)} verified:${p.verified_free.toString().padStart(3)} deprecated:${p.deprecated.toString().padStart(3)} ${p.unverified_no_key ? "(no key)" : ""} ${p.error || ""}`);
     }
   });
 }

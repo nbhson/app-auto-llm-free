@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, X, Check, ChevronDown, Filter, Info, Zap, Copy } from "lucide-react";
+import { Search, RefreshCw, X, Check, ChevronDown, Filter, Zap, Copy } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
@@ -144,7 +144,7 @@ export default function Models() {
       if (/out of credits|no payment|payment method|insufficient|quota|billing|payment_required|unpaid|exceeded|balance|credit/i.test(err)) return true;
       if (status === 402) return true;
     }
-    if (/you\'re out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
+    if (/you're out of credits|out of credits|no payment method|payment required|insufficient.*credit|quota exceeded|billing|unpaid/i.test(err)) return true;
     return false;
   };
   const ALIAS_IDS = new Set(["free-llm-gateway/auto","auto","gpt-4","gpt-3.5","claude-3","gemini","gemini-flash","llama","qwen","glm","kimi","code","embedding","rerank","deepseek","mistral","kilo-auto"]);
@@ -174,7 +174,7 @@ export default function Models() {
     const h = liveH || (m as any).health;
     const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404;
     const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
-    const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you\'re out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
+    const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you're out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
     return is404 || isGone || isPayment || isInvalidId(m) || m.live_status === "deprecated";
   };
   const isCheckboxDisabled = (m: any) => isInvalidId(m);
@@ -198,12 +198,12 @@ export default function Models() {
         setLive((prev) => ({ ...prev, [id]: data }));
         if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) {
           await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], http_status: data.http_status, error: data.error }) }).catch(() => {});
-          try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); cur[id] = { http_status: data.http_status, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch {}
+          try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); cur[id] = { http_status: data.http_status, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch { /* ignore */ }
         } else if (data.status === "usable" || data.http_status === 200) {
           // persist usable to DB so reload keeps non-red (overwrites 404)
           await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], status: "usable", http_status: 200, latency_ms: (data as any).latency_ms || 0 }) }).catch(() => {});
-          try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch {}
-          try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); cur2[id] = { status: "usable", http_status: data.http_status || 200, latency_ms: data.latency_ms, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch {}
+          try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch { /* ignore */ }
+          try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); cur2[id] = { status: "usable", http_status: data.http_status || 200, latency_ms: data.latency_ms, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch { /* ignore */ }
           // Also clear persisted health in models state so isRowDisabled/isDisabledForHide no longer sees old 404
           setModels((prev) => prev.map((m) => m.id === id ? { ...m, health: { status: "usable", http_status: 200, latency_ms: (data as any).latency_ms || 0 }, persisted_404: false, live_status: "verified_free" } : m));
         }
@@ -227,13 +227,13 @@ export default function Models() {
       }
       if (toPersist.length > 0) {
         await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: toPersist, http_status: 404, error: "model_not_found", details: persistPayload }) }).catch(() => {});
-        try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); for (const id of toPersist) cur[id] = { http_status: 404, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch {}
+        try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); for (const id of toPersist) cur[id] = { http_status: 404, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch { /* ignore */ }
       }
       for (const id of toRemove) {
         const ld = live[id] || {};
         await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], status: "usable", http_status: 200, latency_ms: ld.latency_ms || 0 }) }).catch(() => {});
-        try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch {}
-        try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); const liveData = live[id] || {}; cur2[id] = { status: "usable", http_status: 200, latency_ms: liveData.latency_ms || 0, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch {}
+        try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch { /* ignore */ }
+        try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); const liveData = live[id] || {}; cur2[id] = { status: "usable", http_status: 200, latency_ms: liveData.latency_ms || 0, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch { /* ignore */ }
       }
       if (toRemove.length > 0) {
         setModels((prev) => prev.map((m) => toRemove.includes(m.id) ? { ...m, health: { status: "usable", http_status: 200, latency_ms: live[m.id]?.latency_ms || 0 }, persisted_404: false, live_status: "verified_free" } : m));
@@ -242,8 +242,8 @@ export default function Models() {
   };
   useEffect(() => {
     fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => { const map: Record<string, any> = {}; for (const row of d.data || []) map[row.id] = row; if (Object.keys(map).length > 0) setLive((prev) => ({ ...prev, ...map })); }).catch(() => {});
-    try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (Object.keys(cur).length > 0) setLive((prev) => ({ ...prev, ...cur })); } catch {}
-    try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); if (Object.keys(cur2).length > 0) setLive((prev) => ({ ...prev, ...cur2 })); } catch {}
+    try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (Object.keys(cur).length > 0) setLive((prev) => ({ ...prev, ...cur })); } catch { /* ignore */ }
+    try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); if (Object.keys(cur2).length > 0) setLive((prev) => ({ ...prev, ...cur2 })); } catch { /* ignore */ }
   }, []);
 
   return (
@@ -364,7 +364,7 @@ export default function Models() {
                 const disabled = isRowDisabled(m);
                 const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || (m as any).persisted_404;
                 const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
-                const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you\'re out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
+                const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you're out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
                 const isInvalid = isInvalidId(m);
                 return (
                   <tr key={`${m.id}::${idx}`} className={`${disabled ? `${isPayment ? "bg-amber-50/60 opacity-60 line-through decoration-amber-400" : isInvalid ? "bg-slate-100/60 opacity-60 line-through decoration-slate-400" : "bg-rose-50/60 opacity-60 line-through decoration-rose-400"}` : selected.has(m.id) ? "bg-blue-50/40" : "hover:bg-slate-50/80"} transition-colors`} title={isInvalid ? "Invalid model ID" : isPayment ? "Out of credits / payment required" : is404 || isGone ? "404/410" : ""}>

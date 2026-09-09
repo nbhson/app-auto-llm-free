@@ -30,7 +30,7 @@ function hashKey(key: string): string {
 function load(): VirtualKey[] {
   try {
     if (fs.existsSync(STORE_PATH)) return JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
-  } catch {}
+  } catch { /* ignore: store load failed */ }
   // Seed with master key as admin virtual key if no store
   const master: VirtualKey = {
     id: "vk-master",
@@ -56,7 +56,7 @@ async function saveAsync(keys: VirtualKey[]): Promise<void> {
   try {
     await fs.promises.mkdir(path.dirname(STORE_PATH), { recursive: true });
     await fs.promises.writeFile(STORE_PATH, JSON.stringify(keys, null, 2));
-  } catch {}
+  } catch { /* ignore: async save failed */ }
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -87,7 +87,7 @@ function getAll(): VirtualKey[] {
 }
 
 export function listVirtualKeys(): Omit<VirtualKey, "hash" | "encrypted" | "key">[] {
-  return getAll().map(({ hash, encrypted, key, ...rest }) => rest);
+  return getAll().map(({ hash: _hash, encrypted: _encrypted, key: _key, ...rest }) => rest);
 }
 
 export function createVirtualKey(opts: { name: string; scopes?: { models?: string[]; providers?: string[] }; rpmLimit?: number; tpdLimit?: number; role?: "user" | "admin" }): VirtualKey & { key: string } {

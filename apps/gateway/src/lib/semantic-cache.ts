@@ -197,7 +197,7 @@ export class SemanticCache {
               entry.embedding = res.embedding;
             }
           }
-        } catch {}
+        } catch { /* ignore */ }
       })();
       return;
     }

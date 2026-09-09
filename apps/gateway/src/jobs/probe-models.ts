@@ -1,6 +1,5 @@
 import { providers } from "../providers/registry.js";
 import { config } from "../config.js";
-import { logger } from "../middleware/logger.js";
 
 export type ModelHealth = {
   id: string; // e.g. nvidia-nim/z-ai/glm-5.2

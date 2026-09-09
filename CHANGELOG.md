@@ -2,6 +2,23 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0] - 2026-09-09
+
+### Security
+- **Bootstrap secure by default**: `app.ts` `isBootstrapExposed()` opt-in (`1/true/yes/on`), default `0` — `GET /api/bootstrap` + `/api/config/master` trả 403 + `Cache-Control: no-store` khi tắt; `.env.example` + `docker-compose.yml` default `0`; docs EN/VI đồng bộ; `config.ts` warn khi bật bootstrap/CORS `*`/`NODE_TLS_REJECT_UNAUTHORIZED=0` ở production
+- **Key handling**: `config.ts` không log full `MASTER_KEY` (chỉ prefix, cả dev), `key-manager.ts` throw khi `ENCRYPTION_KEY` <64hex ở production, `auth.ts` dùng `crypto.timingSafeEqual`, `api.ts` validate `POST /keys` (name/scopes/rpm/tpd bounds) + `POST /models/health/mark` (ids≤100, http_status clamp)
+- **TLS**: `.env.example` bỏ `NODE_TLS_REJECT_UNAUTHORIZED=0` mặc định (chỉ comment hướng dẫn + `NODE_EXTRA_CA_CERTS`), `SECURITY.md` checklist giữ nguyên
+- **Rate-limit**: `middleware/rate-limit.ts` cleanup 60s + cap 10k windows chống memory-leak/DoS
+
+### Fixed
+- **models.yaml**: fix `z-ai/glm-4.6v-flash` thiếu fields, `groq/allam-2-7b` duplicate keys, `nvidia-nim/nemotron-3-super` thiếu tier/caps, `kilo-auto/free` stray block, quote 2 ids (`siliconflow/abbreviation`, `modelscope/medaibase/antangelmed`), fill `capabilities:[text]`/`tier:permanent` cho 77 entries 8192-ctx; thêm `scripts/validate-models.py` + CI check + `models-yaml.test.ts`
+- **Deduplicate**: new `lib/provider-keys.ts` single source `PUBLIC_PROVIDERS/isRealKey/hasRealKey/STRICT_SINGLE_TIER_MAX`; `router.ts`/`key-manager.ts`/`api.ts`/`models.ts` dùng chung; `config.ts` `DEFAULT_FALLBACK_TIER` + validate `FALLBACK_TIERS` (cap 8 tiers x 60)
+- **Lint**: `eslint.config.js` nâng `no-empty/prefer-const/no-console/no-eval/no-unused-vars` lên `error` (+ override `scripts` cho phép console), fix 83 errors → `0 errors` (còn 326 `any` warnings); `token-estimator.ts` bỏ `eval(require)` → `createRequire`
+- **Tests**: 10→21 tests — new `provider-keys.test.ts` (4), `circuit-breaker.test.ts` (3), `virtual-keys-scope.test.ts` (3), `models-yaml.test.ts` (1)
+
+### Changed
+- **Version bump**: `package.json` `apps/gateway` `apps/web` `0.7.3→0.8.0`, `main.tsx` badge `v0.8.0`, `app.ts` + `health.ts` `version 0.8.0`
+
 ## [0.7.3] - 2026-09-09
 
 ### Added

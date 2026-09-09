@@ -5,8 +5,6 @@ import { config } from "../../config.js";
 import { getProvidersForRequest, isPublicProvider } from "../../lib/router.js";
 import { providers } from "../../providers/registry.js";
 import { anthropicProvider } from "../../providers/anthropic.js";
-import { translateOpenAIToAnthropic, translateAnthropicToOpenAI, anthropicStreamToOpenAIChunk } from "../../lib/anthropic-translator.js";
-import { createOpenAIChunk } from "../../lib/format-translator.js";
 import { logger } from "../../middleware/logger.js";
 import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-manager.js";
 import { estimateTokens, estimateMessagesTokens } from "../../lib/token-estimator.js";
@@ -49,7 +47,7 @@ function openAIStreamToAnthropicStream(openAIStream: ReadableStream<Uint8Array>,
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = "";
-  let messageId = `msg_${Date.now()}`;
+  const messageId = `msg_${Date.now()}`;
   let started = false;
 
   return new ReadableStream({
@@ -99,7 +97,7 @@ function openAIStreamToAnthropicStream(openAIStream: ReadableStream<Uint8Array>,
                 );
                 controller.enqueue(encoder.encode(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`));
               }
-            } catch {}
+            } catch { /* ignore: malformed SSE chunk */ }
           }
         }
         // Ensure stop if not already
@@ -201,7 +199,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     try {
       providerOrder = rankProvidersByCostAndLatency(providerOrder);
       logger.info({ providerOrder }, "cost routing re-ranked (anthropic)");
-    } catch {}
+    } catch { /* ignore: cost routing failed */ }
   }
 
   const estimated = estimateMessagesTokens(body.messages as any) + (body.max_tokens || 0);
@@ -227,7 +225,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: estimateTokens(hit) },
         });
       }
-    } catch {}
+    } catch { /* ignore: semantic cache failed */ }
   }
 
   // harness 02 Build Context: compression (parity with chat.ts)

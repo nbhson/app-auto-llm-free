@@ -18,7 +18,7 @@ export function resolveDataPath(filename: string): string {
     candidates.push(path.resolve(path.join(__dirname, "../../../../data", filename)));
     candidates.push(path.resolve(path.join(__dirname, "../../data", filename)));
     candidates.push(path.resolve(path.join(__dirname, "../../../..", "data", filename)));
-  } catch {}
+  } catch { /* ignore: file URL unavailable */ }
 
   // 2. cwd relative (when running from repo root)
   candidates.push(path.resolve("data", filename));
@@ -35,7 +35,7 @@ export function resolveDataPath(filename: string): string {
   for (const p of candidates) {
     try {
       if (fs.existsSync(p)) return p;
-    } catch {}
+    } catch { /* ignore: fs check failed */ }
   }
   // Fallback to file-relative first (not cwd) to ensure correct location when file doesn't exist yet
   try {
@@ -51,6 +51,6 @@ export function readDataJson<T>(filename: string, fallback: T): T {
   try {
     const p = resolveDataPath(filename);
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf-8")) as T;
-  } catch {}
+  } catch { /* ignore: read fallback */ }
   return fallback;
 }

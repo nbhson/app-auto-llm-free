@@ -78,6 +78,6 @@ export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ t
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   syncLiveModels().then((r) => {
-    console.log(`✅ Live sync: ${r.total} models from ${r.providers} providers`);
+    console.warn(`✅ Live sync: ${r.total} models from ${r.providers} providers`);
   });
 }

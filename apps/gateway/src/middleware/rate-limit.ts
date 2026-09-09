@@ -3,6 +3,19 @@ import { isValidVirtualKeyLive } from "../lib/virtual-keys.js";
 
 const windows = new Map<string, { count: number; resetAt: number }>();
 
+// Periodic cleanup to avoid unbounded memory growth (many virtual keys / list buckets).
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, w] of windows) {
+    if (w.resetAt <= now) windows.delete(k);
+  }
+  // Cap size as a backstop against key-spam DoS
+  if (windows.size > 10000) {
+    const oldest = [...windows.keys()].slice(0, windows.size - 10000);
+    for (const k of oldest) windows.delete(k);
+  }
+}, 60_000).unref?.();
+
 export const virtualKeyRateLimit: MiddlewareHandler = async (c, next) => {
   const path = c.req.path;
   // Skip strict limit for list endpoints (cheap, high frequency on typing/pagination)

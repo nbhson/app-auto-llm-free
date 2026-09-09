@@ -49,15 +49,15 @@ async function migrateSqlite(dbPath: string) {
   const resolved = dbPath.startsWith("file:") ? dbPath.slice(5) : dbPath;
   const dir = path.dirname(path.resolve(resolved));
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  console.log(`[migrate] SQLite DB: ${resolved}`);
+  console.warn(`[migrate] SQLite DB: ${resolved}`);
   const db = new (Database as any)(resolved);
   db.exec(createTablesSQL);
-  console.log("[migrate] SQLite tables ensured (users, virtual_keys, provider_keys, requests)");
+  console.warn("[migrate] SQLite tables ensured (users, virtual_keys, provider_keys, requests)");
   db.close();
 }
 
 async function migratePostgres(url: string) {
-  console.log(`[migrate] Postgres URL: ${url.replace(/:[^:@]+@/, ":***@")}`);
+  console.warn(`[migrate] Postgres URL: ${url.replace(/:[^:@]+@/, ":***@")}`);
   try {
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { Pool } = await import("pg");
@@ -65,7 +65,7 @@ async function migratePostgres(url: string) {
     const db: any = drizzle(pool);
     // Use raw SQL via pool for simplicity — ensures tables even without drizzle-kit generated files
     await pool.query(createTablesSQL.replace(/INTEGER/g, "BIGINT").replace(/TEXT PRIMARY KEY/g, "VARCHAR PRIMARY KEY").replace(/TEXT NOT NULL UNIQUE/g, "VARCHAR NOT NULL UNIQUE").replace(/TEXT NOT NULL/g, "VARCHAR NOT NULL").replace(/TEXT REFERENCES/g, "VARCHAR REFERENCES").replace(/TEXT,/g, "VARCHAR,"));
-    console.log("[migrate] Postgres tables ensured");
+    console.warn("[migrate] Postgres tables ensured");
     await pool.end();
     void db;
   } catch (e: any) {
@@ -79,11 +79,11 @@ async function migratePostgres(url: string) {
 }
 
 async function main() {
-  console.log("[migrate] DATABASE_URL:", config.databaseUrl);
+  console.warn("[migrate] DATABASE_URL:", config.databaseUrl);
   // Also try drizzle-kit migration files if present
   const drizzleDir = path.resolve("drizzle");
   if (fs.existsSync(drizzleDir)) {
-    console.log(`[migrate] Found drizzle dir: ${drizzleDir} — will apply after ensuring base tables`);
+    console.warn(`[migrate] Found drizzle dir: ${drizzleDir} — will apply after ensuring base tables`);
   }
 
   if (isPostgres) {
@@ -92,7 +92,7 @@ async function main() {
     const dbPath = config.databaseUrl || "file:./data.db";
     await migrateSqlite(dbPath);
   }
-  console.log("[migrate] Done");
+  console.warn("[migrate] Done");
 }
 
 main().catch((e) => {

@@ -6,6 +6,7 @@ import { getLogs, getStats, onLog } from "../lib/request-log.js";
 import { getAllStates } from "../lib/circuit-breaker.js";
 import { readDataJson, resolveDataPath } from "../lib/paths.js";
 import { semanticCache } from "../lib/semantic-cache.js";
+import { hasRealKey, isPublicProvider } from "../lib/provider-keys.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -23,9 +24,9 @@ apiRoute.get("/providers", (c) => {
   const q = (c.req.query("q") || "").toLowerCase();
   let detailed = providerIds.map((id) => {
     const meta = providerMeta[id] || { name: id, tier: "", tier_type: "", caps: [], noCard: true };
-    const fre = freellms.find((x: any) => x.slug === id);
+    const fre = freellms.find((x: { slug?: string; name?: string; tier?: string; tier_type?: string; caps?: string[]; noCard?: boolean; baseUrl?: string; free_models?: number; total_models?: number }) => x.slug === id);
     const keys = config.providerKeys[id] || [];
-    const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me"));
+    const hasReal = hasRealKey(id);
     return {
       id,
       name: meta.name || fre?.name || id,
@@ -33,23 +34,18 @@ apiRoute.get("/providers", (c) => {
       tier_type: meta.tier_type || fre?.tier_type || "",
       caps: meta.caps || fre?.caps || [],
       noCard: meta.noCard ?? fre?.noCard ?? true,
-      baseUrl: (fre as any)?.baseUrl || "",
+      baseUrl: (fre as { baseUrl?: string } | undefined)?.baseUrl || "",
       free_models: fre?.free_models ?? 0,
       total_models: fre?.total_models ?? 0,
       keys: keys.length > 0 ? `${keys.length} keys` : "none",
-      hasRealKey,
+      hasRealKey: hasReal,
       status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key",
     };
   });
   const hasKeyOnly = c.req.query("hasKey") === "1" || c.req.query("has_key") === "1";
   if (q) detailed = detailed.filter((p) => p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
   if (hasKeyOnly) {
-    detailed = detailed.filter((p) => {
-      const keys = config.providerKeys[p.id] || [];
-      const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me"));
-      const isPublic = ["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf"].includes(p.id);
-      return hasRealKey || isPublic;
-    });
+    detailed = detailed.filter((p) => hasRealKey(p.id) || isPublicProvider(p.id));
   }
   const total = detailed.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -221,11 +217,15 @@ apiRoute.get("/models/health/persisted", (c) => {
   return c.json({ object: "list", total: list.length, data: list });
 });
 apiRoute.post("/models/health/mark", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const ids: string[] = body.ids || (body.id ? [body.id] : []);
-  const status = body.status || "unusable";
-  const http_status = body.http_status || 404;
-  const error = body.error || "model_not_found";
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const rawIds: unknown = body.ids || (body.id ? [body.id] : []);
+  const ids: string[] = (Array.isArray(rawIds) ? rawIds : [])
+    .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+    .map((x) => x.trim().slice(0, 200))
+    .slice(0, 100);
+  const status = typeof body.status === "string" ? body.status.slice(0, 32) : "unusable";
+  const http_status = Math.min(Math.max(Number(body.http_status) || 404, 100), 599);
+  const error = typeof body.error === "string" ? body.error.slice(0, 500) : "model_not_found";
   if (ids.length === 0) return c.json({ error: "ids required" }, 400);
   const map = readModelHealth();
   const now = new Date().toISOString();
@@ -242,7 +242,7 @@ apiRoute.post("/models/health/mark", async (c) => {
 });
 apiRoute.delete("/models/health/persisted", (c) => {
   const p = resolveDataPath("model-health.json");
-  try { fs.unlinkSync(p); } catch {}
+  try { fs.unlinkSync(p); } catch { /* ignore */ }
   return c.json({ deleted: true });
 });
 apiRoute.delete("/models/health/persisted/:id", async (c) => {
@@ -270,14 +270,29 @@ apiRoute.get("/keys", (c) => {
 });
 
 apiRoute.post("/keys", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  if (!body.name) return c.json({ error: { message: "name required", type: "invalid_request" } }, 400);
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const name = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
+  if (!name) return c.json({ error: { message: "name required", type: "invalid_request" } }, 400);
+  const scopesRaw = (body.scopes ?? { models: ["*"], providers: ["*"] }) as {
+    models?: unknown;
+    providers?: unknown;
+  };
+  const cleanList = (v: unknown): string[] => {
+    if (!Array.isArray(v)) return ["*"];
+    return v
+      .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+      .map((x) => x.trim().slice(0, 120))
+      .slice(0, 50);
+  };
+  const rpmLimit = Math.min(Math.max(Number(body.rpmLimit ?? body.rpm_limit ?? 60) || 60, 1), 10000);
+  const tpdLimit = Math.min(Math.max(Number(body.tpdLimit ?? body.tpd_limit ?? 100000) || 100000, 100), 100_000_000);
+  const role = body.role === "admin" ? "admin" : "user";
   const vk = createVirtualKey({
-    name: body.name,
-    scopes: body.scopes || { models: ["*"], providers: ["*"] },
-    rpmLimit: body.rpmLimit || body.rpm_limit || 60,
-    tpdLimit: body.tpdLimit || body.tpd_limit || 100000,
-    role: body.role || "user",
+    name,
+    scopes: { models: cleanList(scopesRaw.models), providers: cleanList(scopesRaw.providers) },
+    rpmLimit,
+    tpdLimit,
+    role,
   });
   return c.json({ id: vk.id, key: vk.key, name: vk.name, scopes: vk.scopes, rpmLimit: vk.rpmLimit, createdAt: vk.createdAt }, 201);
 });
@@ -304,11 +319,11 @@ apiRoute.get("/logs/stream", (c) => {
       const off = onLog((log) => {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(log)}\n\n`));
-        } catch {}
+        } catch { /* ignore */ }
       });
       c.req.raw.signal.addEventListener("abort", () => {
         off();
-        try { controller.close(); } catch {}
+        try { controller.close(); } catch { /* ignore */ }
       });
     },
   });

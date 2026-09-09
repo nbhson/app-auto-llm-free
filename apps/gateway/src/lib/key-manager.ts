@@ -1,11 +1,15 @@
 import crypto from "node:crypto";
 import { config } from "../config.js";
 import { logger } from "../middleware/logger.js";
+import { isPublicProvider } from "./provider-keys.js";
 
 // AES-256-GCM encrypt/decrypt for at-rest storage (free-llm-gateway style)
 const ALGO = "aes-256-gcm";
 function getKey(): Buffer {
   const hex = config.encryptionKey.replace(/[^0-9a-f]/gi, "");
+  if (config.nodeEnv === "production" && hex.length < 64) {
+    throw new Error("ENCRYPTION_KEY must be 64 hex chars (32 bytes) in production");
+  }
   // pad or slice to 32 bytes (64 hex)
   const padded = (hex + "0".repeat(64)).slice(0, 64);
   return Buffer.from(padded, "hex");
@@ -51,7 +55,7 @@ export function getNextKeyManaged(providerId: string): string | null {
   const states = keyStates.get(providerId)!;
   if (states.length === 0) {
     // public providers allow empty
-    if (["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf"].includes(providerId)) return "";
+    if (isPublicProvider(providerId)) return "";
     return null;
   }
   // Filter out cooldown

@@ -1,15 +1,16 @@
 // Simple char-based token estimator (1 token ~4 chars, like tiktoken heuristic)
 // If js-tiktoken is installed, it will be used lazily via dynamic import (optional dep)
+import { createRequire } from "node:module";
+const _require = createRequire(import.meta.url);
 let tiktokenEnc: any = null;
 let tiktokenTried = false;
 function getTiktoken() {
   if (tiktokenTried) return tiktokenEnc;
   tiktokenTried = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod: any = eval("require")("js-tiktoken");
+    const mod: any = _require("js-tiktoken");
     if (mod?.getEncoding) tiktokenEnc = mod.getEncoding("cl100k_base");
-  } catch {}
+  } catch { /* ignore */ }
   return tiktokenEnc;
 }
 
@@ -17,7 +18,7 @@ export function estimateTokens(text: string): number {
   if (!text) return 0;
   const enc = getTiktoken();
   if (enc) {
-    try { return enc.encode(text).length; } catch {}
+    try { return enc.encode(text).length; } catch { /* ignore */ }
   }
   return Math.ceil(text.length / 4);
 }

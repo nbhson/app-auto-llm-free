@@ -31,7 +31,7 @@ let logs: RequestLog[] = [];
 function load() {
   try {
     if (fs.existsSync(LOG_PATH)) logs = JSON.parse(fs.readFileSync(LOG_PATH, "utf-8"));
-  } catch { logs = []; }
+  } catch { /* ignore: log load failed */ logs = []; }
 }
 
 let loaded = false;
@@ -45,7 +45,7 @@ function persist() {
     // keep last 1000
     const toSave = logs.slice(-MAX_LOGS);
     fs.writeFileSync(LOG_PATH, JSON.stringify(toSave, null, 2));
-  } catch {}
+  } catch { /* ignore: persist failed */ }
 }
 
 // Simple SSE listeners
@@ -56,7 +56,7 @@ export function addLog(entry: RequestLog) {
   logs.push(entry);
   if (logs.length > MAX_LOGS) logs = logs.slice(-MAX_LOGS);
   persist();
-  for (const fn of listeners) try { fn(entry); } catch {}
+  for (const fn of listeners) try { fn(entry); } catch { /* ignore: listener failed */ }
 }
 
 export function getLogs(limit = 100, offset = 0): RequestLog[] {

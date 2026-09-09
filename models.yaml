@@ -178,6 +178,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "openrouter/google/gemma-4-26b-a4b:free"
     display_name: "google/gemma-4-26b-a4b:free"
     provider: openrouter
@@ -236,6 +237,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/poolside/laguna-xs-2.1"
     display_name: "poolside/laguna-xs-2.1"
     provider: nvidia-nim
@@ -438,6 +440,12 @@ models:
     display_name: "glm-4.6v-flash"
     provider: z-ai-zhipu-ai
     context_length: 128000
+    score: 59
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "1 concurrent request"
   - id: "groq/llama-3.1-8b-instant"
     display_name: "llama-3.1-8b-instant"
     provider: groq
@@ -558,12 +566,6 @@ models:
     no_card: true
     capabilities: [text]
     limit: "30 RPM, 7K RPD, 6K TPM"
-    score: 59
-    tier: permanent
-    verified: true
-    no_card: true
-    capabilities: [text, image, video, reasoning]
-    limit: "1 concurrent request"
   - id: "aion-labs/aion-3.0"
     display_name: "aion-3.0"
     provider: aion-labs
@@ -598,6 +600,10 @@ models:
     provider: nvidia-nim
     context_length: 262144
     score: 57
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
   - id: "kilo-code/stepfun/step-3.7-flash:free"
     display_name: "stepfun/step-3.7-flash:free"
     provider: kilo-code
@@ -668,10 +674,6 @@ models:
     no_card: true
     capabilities: [text, reasoning]
     limit: "200 req/hour"
-    tier: permanent
-    verified: true
-    no_card: false
-    capabilities: [reasoning]
   - id: "aion-labs/aion-3.0-mini"
     display_name: "aion-3.0-mini"
     provider: aion-labs
@@ -720,6 +722,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3.5-122b-a10b"
     display_name: "qwen/qwen3.5-122b-a10b"
     provider: modelscope
@@ -728,6 +731,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "google-gemini/gemini-flash-latest"
     display_name: "gemini-flash-latest"
     provider: google-gemini
@@ -1253,6 +1257,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "openrouter/inclusionai/ling-3.0-tiny:free"
     display_name: "inclusionai/ling-3.0-tiny:free"
     provider: openrouter
@@ -1510,6 +1515,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/baai/bge-large-en-v1.5"
     display_name: "@cf/baai/bge-large-en-v1.5"
     provider: cloudflare-workers-ai
@@ -1518,6 +1524,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct"
     display_name: "@cf/meta/llama-4-scout-17b-16e-instruct"
     provider: cloudflare-workers-ai
@@ -1684,7 +1691,7 @@ models:
     no_card: true
     capabilities: [text]
     limit: "20 RPM"
-  - id: siliconflow/abbreviation
+  - id: "siliconflow/abbreviation"
     display_name: abbreviation
     provider: siliconflow
     context_length: 131072
@@ -1810,6 +1817,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/meta/llama-3.2-90b-vision-instruct"
     display_name: "meta/llama-3.2-90b-vision-instruct"
     provider: nvidia-nim
@@ -1818,6 +1826,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/mistralai/mistral-nemotron"
     display_name: "mistralai/mistral-nemotron"
     provider: nvidia-nim
@@ -1826,6 +1835,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/riva-translate-4b-instruct-v1.1"
     display_name: "nvidia/riva-translate-4b-instruct-v1.1"
     provider: nvidia-nim
@@ -1834,6 +1844,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/ising-calibration-1.5-31b"
     display_name: "nvidia/ising-calibration-1.5-31b"
     provider: nvidia-nim
@@ -1842,6 +1853,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/riva-translate-4b-instruct-v2"
     display_name: "nvidia/riva-translate-4b-instruct-v2"
     provider: nvidia-nim
@@ -1850,6 +1862,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cohere/aya-vision-32b"
     display_name: "aya-vision-32b"
     provider: cohere
@@ -1926,6 +1939,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/qwen/qwq-32b"
     display_name: "@cf/qwen/qwq-32b"
     provider: cloudflare-workers-ai
@@ -1934,6 +1948,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/opencompass/compassjudger-1-32b-instruct"
     display_name: "opencompass/compassjudger-1-32b-instruct"
     provider: modelscope
@@ -1942,6 +1957,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/xgenerationlab/xiyansql-qwencoder-32b-2412"
     display_name: "xgenerationlab/xiyansql-qwencoder-32b-2412"
     provider: modelscope
@@ -1950,6 +1966,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/xgenerationlab/xiyansql-qwencoder-32b-2504"
     display_name: "xgenerationlab/xiyansql-qwencoder-32b-2504"
     provider: modelscope
@@ -1958,6 +1975,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/stepfun-ai/step-3.5-flash"
     display_name: "stepfun-ai/step-3.5-flash"
     provider: modelscope
@@ -1966,6 +1984,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/stepfun-ai/step-3.7-flash"
     display_name: "stepfun-ai/step-3.7-flash"
     provider: modelscope
@@ -1974,6 +1993,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/llama-nemotron-embed-1b-v2"
     display_name: "nvidia/llama-nemotron-embed-1b-v2"
     provider: nvidia-nim
@@ -2215,6 +2235,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
     display_name: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
     provider: cloudflare-workers-ai
@@ -2272,6 +2293,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/google/gemma-2b-it-lora"
     display_name: "@cf/google/gemma-2b-it-lora"
     provider: cloudflare-workers-ai
@@ -2280,6 +2302,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6"
     display_name: "@cf/moonshotai/kimi-k2.6"
     provider: cloudflare-workers-ai
@@ -2288,6 +2311,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/ibm-granite/granite-4.0-h-micro"
     display_name: "@cf/ibm-granite/granite-4.0-h-micro"
     provider: cloudflare-workers-ai
@@ -2296,6 +2320,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/baai/bge-small-en-v1.5"
     display_name: "@cf/baai/bge-small-en-v1.5"
     provider: cloudflare-workers-ai
@@ -2304,6 +2329,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/zai-org/glm-5.2"
     display_name: "@cf/zai-org/glm-5.2"
     provider: cloudflare-workers-ai
@@ -2312,6 +2338,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/baai/bge-base-en-v1.5"
     display_name: "@cf/baai/bge-base-en-v1.5"
     provider: cloudflare-workers-ai
@@ -2320,6 +2347,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/aisingapore/gemma-sea-lion-v4-27b-it"
     display_name: "@cf/aisingapore/gemma-sea-lion-v4-27b-it"
     provider: cloudflare-workers-ai
@@ -2328,6 +2356,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/openai/gpt-oss-20b"
     display_name: "@cf/openai/gpt-oss-20b"
     provider: cloudflare-workers-ai
@@ -2336,6 +2365,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/moondream/moondream3.1-9b-a2b"
     display_name: "@cf/moondream/moondream3.1-9b-a2b"
     provider: cloudflare-workers-ai
@@ -2344,7 +2374,8 @@ models:
     tier: permanent
     verified: true
     no_card: false
-  - id: modelscope/medaibase/antangelmed
+    capabilities: [text]
+  - id: "modelscope/medaibase/antangelmed"
     display_name: medaibase/antangelmed
     provider: modelscope
     context_length: 8192
@@ -2352,6 +2383,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/minimax/minimax-m1-80k"
     display_name: "minimax/minimax-m1-80k"
     provider: modelscope
@@ -2360,6 +2392,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/musepublic/qwen-image-edit"
     display_name: "musepublic/qwen-image-edit"
     provider: modelscope
@@ -2368,6 +2401,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/opengvlab/internvl3_5-241b-a28b"
     display_name: "opengvlab/internvl3_5-241b-a28b"
     provider: modelscope
@@ -2376,6 +2410,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/paddlepaddle/ernie-4.5-21b-a3b-pt"
     display_name: "paddlepaddle/ernie-4.5-21b-a3b-pt"
     provider: modelscope
@@ -2384,6 +2419,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/paddlepaddle/ernie-4.5-300b-a47b-pt"
     display_name: "paddlepaddle/ernie-4.5-300b-a47b-pt"
     provider: modelscope
@@ -2392,6 +2428,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/paddlepaddle/ernie-4.5-vl-28b-a3b-pt"
     display_name: "paddlepaddle/ernie-4.5-vl-28b-a3b-pt"
     provider: modelscope
@@ -2400,6 +2437,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen-image-edit"
     display_name: "qwen/qwen-image-edit"
     provider: modelscope
@@ -2408,6 +2446,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-4b"
     display_name: "qwen/qwen3-4b"
     provider: modelscope
@@ -2416,6 +2455,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/shanghai_ai_laboratory/intern-s1"
     display_name: "shanghai_ai_laboratory/intern-s1"
     provider: modelscope
@@ -2424,6 +2464,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/shanghai_ai_laboratory/intern-s2-preview"
     display_name: "shanghai_ai_laboratory/intern-s2-preview"
     provider: modelscope
@@ -2432,6 +2473,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/tencent-hunyuan/hy3"
     display_name: "tencent-hunyuan/hy3"
     provider: modelscope
@@ -2440,6 +2482,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3.5-27b"
     display_name: "qwen/qwen3.5-27b"
     provider: modelscope
@@ -2448,6 +2491,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3.5-35b-a3b"
     display_name: "qwen/qwen3.5-35b-a3b"
     provider: modelscope
@@ -2456,6 +2500,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "llm7-io/mistral-nemo-instruct-2407"
     display_name: "mistral-nemo-instruct-2407"
     provider: llm7-io
@@ -2464,6 +2509,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-vl-235b-a22b-instruct"
     display_name: "qwen/qwen3-vl-235b-a22b-instruct"
     provider: modelscope
@@ -2472,6 +2518,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "chutes-ai/llama-3.1-70b"
     display_name: "llama-3.1-70b"
     provider: chutes-ai
@@ -2520,6 +2567,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/meta-llama/llama-2-7b-chat-hf-lora"
     display_name: "@cf/meta-llama/llama-2-7b-chat-hf-lora"
     provider: cloudflare-workers-ai
@@ -2528,6 +2576,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/google/gemma-7b-it-lora"
     display_name: "@cf/google/gemma-7b-it-lora"
     provider: cloudflare-workers-ai
@@ -2536,6 +2585,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-coder-30b-a3b-instruct"
     display_name: "qwen/qwen3-coder-30b-a3b-instruct"
     provider: modelscope
@@ -2544,6 +2594,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "github-models/mistral-large-24.11"
     display_name: "mistral-large-24.11"
     provider: github-models
@@ -2562,6 +2613,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/meituan-longcat/longcat-flash-lite"
     display_name: "meituan-longcat/longcat-flash-lite"
     provider: modelscope
@@ -2570,6 +2622,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/shanghai_ai_laboratory/intern-s1-mini"
     display_name: "shanghai_ai_laboratory/intern-s1-mini"
     provider: modelscope
@@ -2578,6 +2631,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "opencode/big-pickle"
     display_name: "big-pickle"
     provider: opencode
@@ -2586,6 +2640,7 @@ models:
     tier: permanent
     verified: true
     no_card: true
+    capabilities: [text]
   - id: "opencode/laguna-s-2.1-free"
     display_name: "laguna-s-2.1-free"
     provider: opencode
@@ -2612,6 +2667,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-235b-a22b"
     display_name: "qwen/qwen3-235b-a22b"
     provider: modelscope
@@ -2620,6 +2676,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/meta/llama-guard-4-12b"
     display_name: "meta/llama-guard-4-12b"
     provider: nvidia-nim
@@ -2638,6 +2695,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
     display_name: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
     provider: nvidia-nim
@@ -2646,6 +2704,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/nvidia-nemotron-nano-9b-v2"
     display_name: "nvidia/nvidia-nemotron-nano-9b-v2"
     provider: nvidia-nim
@@ -2654,6 +2713,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/llama-3.1-nemotron-nano-8b-v1"
     display_name: "nvidia/llama-3.1-nemotron-nano-8b-v1"
     provider: nvidia-nim
@@ -2662,6 +2722,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/nv-embed-v1"
     display_name: "nvidia/nv-embed-v1"
     provider: nvidia-nim
@@ -2699,6 +2760,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-235b-a22b-thinking-2507"
     display_name: "qwen/qwen3-235b-a22b-thinking-2507"
     provider: modelscope
@@ -2743,6 +2805,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-30b-a3b"
     display_name: "qwen/qwen3-30b-a3b"
     provider: modelscope
@@ -2751,6 +2814,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/mistralai/mistral-large-instruct-2407"
     display_name: "mistralai/mistral-large-instruct-2407"
     provider: modelscope
@@ -2759,6 +2823,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/llama-3.1-nemotron-safety-guard-8b-v3"
     display_name: "llama-3.1-nemotron-safety-guard-8b-v3"
     provider: nvidia-nim
@@ -2776,6 +2841,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "meta/llama-3.1-8b-instruct"
     display_name: "meta/llama-3.1-8b-instruct"
     provider: nvidia-nim
@@ -2784,6 +2850,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "grok-xai/grok-2"
     display_name: "grok-2"
     provider: grok-xai
@@ -2802,6 +2869,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "nvidia-nim/nvidia/llama-3.1-nemoguard-8b-topic-control"
     display_name: "nvidia/llama-3.1-nemoguard-8b-topic-control"
     provider: nvidia-nim
@@ -2810,6 +2878,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-14b"
     display_name: "qwen/qwen3-14b"
     provider: modelscope
@@ -2818,6 +2887,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "modelscope/qwen/qwen3-8b"
     display_name: "qwen/qwen3-8b"
     provider: modelscope
@@ -2826,6 +2896,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/meta/llama-3.2-3b-instruct"
     display_name: "@cf/meta/llama-3.2-3b-instruct"
     provider: cloudflare-workers-ai
@@ -2834,6 +2905,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/meta/llama-3.1-8b-instruct-fp8"
     display_name: "@cf/meta/llama-3.1-8b-instruct-fp8"
     provider: cloudflare-workers-ai
@@ -2842,6 +2914,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/meta/llama-guard-3-8b"
     display_name: "@cf/meta/llama-guard-3-8b"
     provider: cloudflare-workers-ai
@@ -2850,6 +2923,7 @@ models:
     tier: permanent
     verified: true
     no_card: false
+    capabilities: [text]
   - id: "cloudflare-workers-ai/@cf/qwen/qwen3-embedding-0.6b"
     display_name: "@cf/qwen/qwen3-embedding-0.6b"
     provider: cloudflare-workers-ai
@@ -2886,6 +2960,7 @@ models:
     verified: true
     no_card: false
 
+    capabilities: [text]
   - id: "experientiallabs/qwen3.8-27b"
     display_name: "qwen3.8-27b"
     provider: experientiallabs

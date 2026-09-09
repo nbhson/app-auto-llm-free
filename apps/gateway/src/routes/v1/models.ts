@@ -71,7 +71,7 @@ function loadFreellmsModels(): any[] {
     // Final fallback regex for id only
     const ids = [...raw.matchAll(/-\s+id:\s*"([^"]+)"/g)].map((m) => m[1]);
     return ids.map((id) => ({ id, raw_id: id, object: "model", owned_by: id.split("/")[0], provider: id.split("/")[0], display_name: id, context_length: 8192, score: 50, tier: "permanent", freellms_verified: false, no_card: true, capabilities: ["text"], limit: "", created: 1715433600 }));
-  } catch {}
+  } catch { /* ignore */ }
   return [];
 }
 
@@ -169,12 +169,12 @@ const opencodeSupplement: any[] = [
 modelsRoute.get("/", async (c) => {
   const providerFilter = c.req.query("provider");
   const verifiedFilter = c.req.query("verified"); // verified=free | verified=deprecated | verified=unverified
-  const freeOnly = c.req.query("free") !== "0";
+  const _freeOnly = c.req.query("free") !== "0";
   const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
   const rawLimit = parseInt(c.req.query("limit") || c.req.query("per_page") || "25", 10);
   const limit = [25, 50, 100, 200, 500, 1000].includes(rawLimit) ? rawLimit : 25;
   const rawQ = (c.req.query("q") || "").trim().toLowerCase();
-  const qTokens = rawQ ? rawQ.split(/[\s\-_\/:]+/).filter(Boolean) : [];
+  const qTokens = rawQ ? rawQ.split(/[\s\-_/:]+/).filter(Boolean) : [];
   const matchesQ = (id: string) => {
     if (!rawQ) return true;
     const hay = id.toLowerCase();

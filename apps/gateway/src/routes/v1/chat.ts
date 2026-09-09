@@ -92,7 +92,7 @@ chatRoute.post(
       try {
         providerOrder = rankProvidersByCostAndLatency(providerOrder);
         logger.info({ providerOrder }, "cost routing re-ranked");
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     const estimated = estimateChatTokens({ messages: body.messages as any, max_tokens: body.max_tokens });
@@ -116,7 +116,7 @@ chatRoute.post(
           addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimated.prompt, completionTokens: estimateChatTokens({ messages: [{ role: "assistant", content: cacheHitContent }] as any }).prompt, totalTokens: estimated.prompt + 20, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
           return c.json({ id: `chatcmpl-cache-${Date.now()}`, object: "chat.completion", created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, message: { role: "assistant", content: cacheHitContent }, finish_reason: "stop" }], usage: { prompt_tokens: estimated.prompt, completion_tokens: 20, total_tokens: estimated.prompt + 20 } });
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     // Vector 2: optional compression (only on cache miss) - harness 02 Build Context pipeline

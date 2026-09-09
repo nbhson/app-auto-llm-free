@@ -116,7 +116,7 @@ export function recordUsage(provider: string, key: string, tokens: number) {
       r.incr(dayKey).catch(() => {});
       r.expire(dayKey, 86400).catch(() => {});
     }).catch(() => {});
-  } catch {}
+  } catch { /* ignore */ }
   logger.debug({ provider, tokens, k }, "quota usage recorded");
 }
 

@@ -23,7 +23,7 @@ export function createApp() {
   const app = new Hono();
 
   // Init Redis lazily for Vector 2 features
-  try { initRedis(); } catch {}
+  try { initRedis(); } catch { /* ignore: redis optional */ }
 
   app.use("*", secureHeaders());
   app.use("*", cors({ origin: config.corsOrigin, allowHeaders: ["Authorization", "Content-Type", "x-router", "x-router-tier", "x-request-id", "X-Session-ID", "X-Parent-Session-ID", "x-session-id", "x-parent-session-id", "anthropic-version", "x-api-key"], maxAge: 86400 }));
@@ -37,27 +37,38 @@ export function createApp() {
   app.use("*", virtualKeyRateLimit);
 
   // Public bootstrap — expose auto-generated MASTER_KEY for first-time UI binding (local self-hosted)
-  // Enabled by default (EXPOSE_BOOTSTRAP=1): only disabled when EXPOSE_BOOTSTRAP=0/false/no (e.g. public deployment)
+  // Secure by default (EXPOSE_BOOTSTRAP=0): only enabled when explicitly
+  // EXPOSE_BOOTSTRAP=1/true/yes/on (e.g. local `docker compose` first boot).
+  // Public deployments MUST keep it disabled (default) — otherwise anyone can
+  // fetch MASTER_KEY without auth.
   function isBootstrapExposed(): boolean {
-    const v = (process.env.EXPOSE_BOOTSTRAP ?? "1").toLowerCase().trim();
-    return !(v === "0" || v === "false" || v === "no" || v === "off" || v === "");
+    const v = (process.env.EXPOSE_BOOTSTRAP ?? "0").toLowerCase().trim();
+    return v === "1" || v === "true" || v === "yes" || v === "on";
   }
-  app.get("/api/bootstrap", (c) => {
+  const bootstrapHandler = (c: { json: (o: unknown, s?: number) => unknown }) => {
     if (!isBootstrapExposed()) {
-      return c.json({ error: { message: "Bootstrap disabled", type: "forbidden" } }, 403);
+      return (c as unknown as { json: (o: unknown, s?: number) => unknown }).json(
+        { error: { message: "Bootstrap disabled", type: "forbidden" } },
+        403,
+      );
     }
-    return c.json({ masterKey: config.masterKey });
+    return (c as unknown as { json: (o: unknown) => unknown }).json({ masterKey: config.masterKey });
+  };
+  app.get("/api/bootstrap", (c) => {
+    const res = bootstrapHandler(c) as Response | Promise<Response>;
+    // Never cache the master key
+    c.header("Cache-Control", "no-store");
+    return res;
   });
   // Alias for convenience
   app.get("/api/config/master", (c) => {
-    if (!isBootstrapExposed()) {
-      return c.json({ error: { message: "Bootstrap disabled", type: "forbidden" } }, 403);
-    }
-    return c.json({ masterKey: config.masterKey });
+    const res = bootstrapHandler(c) as Response | Promise<Response>;
+    c.header("Cache-Control", "no-store");
+    return res;
   });
 
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.7.3", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.8.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
   app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nPOST /v1/audio/transcriptions\nPOST /v1/audio/speech\nPOST /v1/responses\nPOST /v1/messages (Anthropic)\nGET /v1/health</pre></body></html>`));
 
