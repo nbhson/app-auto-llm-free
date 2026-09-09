@@ -124,6 +124,7 @@ function parseTiers(): string[][] {
     if (!raw)
       return [
         [
+          "kiraai",
           "pollinations",
           "llm7-io",
           "kilo-code",
@@ -149,7 +150,6 @@ function parseTiers(): string[][] {
           "aion-labs",
           "z-ai-zhipu-ai",
           "experientiallabs",
-          "kiraai",
           "opencode",
           "freeai",
           "cline",
@@ -169,6 +169,7 @@ function parseTiers(): string[][] {
   } catch {
     return [
       [
+          "kiraai",
           "pollinations",
           "llm7-io",
           "kilo-code",
@@ -194,7 +195,6 @@ function parseTiers(): string[][] {
           "aion-labs",
           "z-ai-zhipu-ai",
           "experientiallabs",
-          "kiraai",
           "opencode",
           "freeai",
           "cline",

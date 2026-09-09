@@ -114,6 +114,7 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
 // Opencode custom models from user's opencode.json (2026-09-06) — many are :free variants not in freellms
 export const modelAliases: Record<string, string[]> = {
   "free-llm-gateway/auto": [
+    "kiraai",
     "pollinations",
     "llm7-io",
     "kilo-code",
@@ -129,7 +130,6 @@ export const modelAliases: Record<string, string[]> = {
     "cohere",
     "sambanova",
     "siliconflow",
-    "kiraai",
     "ovhcloud-ai-endpoints",
     "modelscope",
     "freeai",
