@@ -40,7 +40,10 @@ export const geminiProvider: Provider = {
         body: JSON.stringify(geminiBody),
       });
       if (!res.ok) return res;
-      const data: any = await res.json();
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> }; finishReason?: string }>;
+        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+      };
       const openAI = translateGeminiToOpenAI(data, geminiModel, req.model);
       return new Response(JSON.stringify(openAI), {
         status: 200,
@@ -72,8 +75,8 @@ export const geminiProvider: Provider = {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
       if (!res.ok) return [{ id: "gemini/gemini-3.6-flash", provider: "gemini" }];
-      const data: any = await res.json();
-      return (data.models || []).map((m: any) => ({
+      const data = (await res.json()) as { models?: Array<{ name: string; displayName?: string }> };
+      return (data.models || []).map((m) => ({
         id: `gemini/${m.name.replace("models/", "")}`,
         provider: "gemini",
         displayName: m.displayName,

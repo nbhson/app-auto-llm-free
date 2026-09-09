@@ -110,9 +110,8 @@ export function createVirtualKey(opts: { name: string; scopes?: { models?: strin
     requestCount: 0,
   };
   const all = getAll();
-  // Store hash only, not raw
+  // Store hash only, not raw (key already overridden to undefined above)
   const stored: VirtualKey = { ...vk, key: undefined, encrypted: undefined };
-  delete (stored as any).key;
   all.push(stored);
   save(all);
   cache = all;

@@ -1,32 +1,51 @@
 import type { ChatRequest, ChatMessage, ResponsesRequest } from "../providers/base.js";
 
+type InputItem = string | { role?: unknown; content?: unknown; tool_call_id?: string; name?: string; [key: string]: unknown };
+
+function toText(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) return raw.map((p) => textOfPart(p)).join("");
+  return String(raw ?? "");
+}
+
+function textOfPart(p: unknown): string {
+  if (typeof p === "string") return p;
+  if (p && typeof p === "object") {
+    const part = p as { text?: unknown; content?: unknown };
+    if (typeof part.text === "string") return part.text;
+    if (typeof part.content === "string") return part.content;
+  }
+  return "";
+}
+
 export function translateResponsesToChat(req: ResponsesRequest): ChatRequest {
   const messages: ChatMessage[] = [];
   if (req.instructions) {
     messages.push({ role: "system", content: req.instructions });
   }
-  const input: any = (req as any).input;
+  const input = (req as { input?: unknown }).input;
   if (typeof input === "string") {
     messages.push({ role: "user", content: input });
   } else if (Array.isArray(input)) {
-    for (const item of input) {
+    for (const item of input as InputItem[]) {
       if (typeof item === "string") {
         messages.push({ role: "user", content: item });
       } else if (item && typeof item === "object") {
         if (typeof item.role === "string" && item.content !== undefined) {
-          const role = item.role as ChatMessage["role"];
           const raw = item.content;
           const content = typeof raw === "string" ? raw : String(raw ?? "");
-          const safeRole = (["system", "user", "assistant", "tool"] as string[]).includes(role) ? role : "user";
+          const safeRole = (["system", "user", "assistant", "tool"] as string[]).includes(item.role)
+            ? (item.role as ChatMessage["role"])
+            : "user";
           messages.push({
-            role: safeRole as ChatMessage["role"],
+            role: safeRole,
             content,
             tool_call_id: item.tool_call_id,
             name: item.name,
           } as ChatMessage);
         } else if (Array.isArray(item.content)) {
-          const text = item.content.map((p: any) => p.text || p.content || "").join("\n");
-          messages.push({ role: (item.role as any) || "user", content: text });
+          const text = item.content.map((p: unknown) => textOfPart(p)).join("\n");
+          messages.push({ role: (item.role as ChatMessage["role"]) || "user", content: text });
         }
       }
     }
@@ -34,41 +53,53 @@ export function translateResponsesToChat(req: ResponsesRequest): ChatRequest {
       messages.push({ role: "user", content: "" });
     }
   } else if (input && typeof input === "object") {
-    const role = (input.role as ChatMessage["role"]) || "user";
-    messages.push({ role: role as ChatMessage["role"], content: String((input as any).content ?? "") });
+    const obj = input as { role?: unknown; content?: unknown };
+    const role = (obj.role as ChatMessage["role"]) || "user";
+    messages.push({ role, content: String(obj.content ?? "") });
   }
+  const ext = req as { max_output_tokens?: number; max_tokens?: number; user?: string };
   return {
     model: req.model,
     messages,
     temperature: req.temperature,
-    max_tokens: (req as any).max_output_tokens ?? (req as any).max_tokens,
+    max_tokens: ext.max_output_tokens ?? ext.max_tokens,
     stream: req.stream,
-    tools: req.tools as any,
-    tool_choice: req.tool_choice as any,
-    user: (req as any).user,
+    tools: req.tools as ChatRequest["tools"],
+    tool_choice: req.tool_choice,
+    user: ext.user,
   };
 }
 
-export function translateChatToResponses(chatData: any, model: string): any {
-  const choice = chatData?.choices?.[0];
-  const raw = choice?.message?.content ?? choice?.text ?? chatData?.content ?? "";
-  const text =
-    typeof raw === "string"
-      ? raw
-      : Array.isArray(raw)
-        ? raw.map((p: any) => p.text || p.content || "").join("")
-        : String(raw ?? "");
-  const id = chatData?.id
-    ? String(chatData.id).replace(/^chatcmpl-/, "resp_")
-    : `resp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const created_at = chatData?.created ?? Math.floor(Date.now() / 1000);
-  const usage = chatData?.usage
+interface ChatLikeResponse {
+  id?: unknown;
+  model?: unknown;
+  created?: unknown;
+  choices?: Array<{ message?: { content?: unknown }; text?: unknown }>;
+  content?: unknown;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
+export function translateChatToResponses(chatData: unknown, model: string) {
+  const data = (chatData ?? {}) as ChatLikeResponse;
+  const choice = data.choices?.[0];
+  const raw = choice?.message?.content ?? choice?.text ?? data.content ?? "";
+  const text = toText(raw);
+  const id =
+    typeof data.id === "string" && data.id
+      ? data.id.replace(/^chatcmpl-/, "resp_")
+      : `resp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const created_at = typeof data.created === "number" ? data.created : Math.floor(Date.now() / 1000);
+  const usage = data.usage
     ? {
-        input_tokens: chatData.usage.prompt_tokens ?? 0,
-        output_tokens: chatData.usage.completion_tokens ?? 0,
-        total_tokens: chatData.usage.total_tokens ?? 0,
-        prompt_tokens: chatData.usage.prompt_tokens,
-        completion_tokens: chatData.usage.completion_tokens,
+        input_tokens: data.usage.prompt_tokens ?? 0,
+        output_tokens: data.usage.completion_tokens ?? 0,
+        total_tokens: data.usage.total_tokens ?? 0,
+        prompt_tokens: data.usage.prompt_tokens,
+        completion_tokens: data.usage.completion_tokens,
       }
     : undefined;
   return {
@@ -76,7 +107,7 @@ export function translateChatToResponses(chatData: any, model: string): any {
     object: "response",
     created_at,
     created: created_at,
-    model: chatData?.model || model,
+    model: (typeof data.model === "string" && data.model) || model,
     status: "completed",
     output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text }] }],
     usage,

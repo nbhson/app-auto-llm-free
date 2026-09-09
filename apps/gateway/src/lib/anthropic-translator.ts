@@ -1,6 +1,33 @@
 import type { ChatRequest, AnthropicRequest } from "../providers/base.js";
 import { createOpenAIChunk } from "./format-translator.js";
 
+interface ContentPart {
+  type?: string;
+  text?: string;
+  image_url?: { url?: string };
+  [key: string]: unknown;
+}
+
+interface OpenAITool {
+  function?: { name?: string; description?: string; parameters?: unknown; input_schema?: unknown };
+  name?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface AnthropicContentBlock {
+  type?: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+interface AnthropicResponse {
+  id?: string;
+  content?: AnthropicContentBlock[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+  stop_reason?: string;
+}
+
 /**
  * Translate OpenAI ChatRequest -> Anthropic messages request.
  * - system messages concatenated into `system` string
@@ -37,7 +64,7 @@ export function translateOpenAIToAnthropic(req: ChatRequest): AnthropicRequest {
       if (typeof m.content === "string") {
         content = m.content;
       } else if (Array.isArray(m.content)) {
-        content = (m.content as any[]).map((part: any) => {
+        content = (m.content as ContentPart[]).map((part) => {
           if (part.type === "text" && part.text) return { type: "text", text: part.text };
           if (part.type === "image_url" && part.image_url?.url) {
             return { type: "image", source: { type: "url", url: part.image_url.url } };
@@ -53,7 +80,7 @@ export function translateOpenAIToAnthropic(req: ChatRequest): AnthropicRequest {
   // Tools: OpenAI {type:"function", function:{name,description,parameters}} -> Anthropic {name, description, input_schema}
   let tools: unknown[] | undefined;
   if (req.tools && Array.isArray(req.tools) && req.tools.length > 0) {
-    tools = (req.tools as any[]).map((t: any) => {
+    tools = (req.tools as OpenAITool[]).map((t) => {
       const fn = t.function || t;
       return {
         name: fn.name,
@@ -66,7 +93,7 @@ export function translateOpenAIToAnthropic(req: ChatRequest): AnthropicRequest {
   // tool_choice mapping
   let tool_choice: unknown = undefined;
   if (req.tool_choice !== undefined && req.tool_choice !== null) {
-    const tc: any = req.tool_choice;
+    const tc = req.tool_choice as { type?: string; function?: { name?: string } } | string;
     if (typeof tc === "string") {
       if (tc === "auto") tool_choice = { type: "auto" };
       else if (tc === "none") tool_choice = { type: "none" };
@@ -99,7 +126,7 @@ export function translateOpenAIToAnthropic(req: ChatRequest): AnthropicRequest {
  * Anthropic: {id, content:[{type:text,text}], usage:{input_tokens, output_tokens}, stop_reason}
  * OpenAI: {id, object:"chat.completion", created, model, choices:[{message:{role:"assistant", content:text}, finish_reason}], usage}
  */
-export function translateAnthropicToOpenAI(data: any, model: string): any {
+export function translateAnthropicToOpenAI(data: AnthropicResponse, model: string) {
   const textParts: string[] = [];
   if (Array.isArray(data.content)) {
     for (const block of data.content) {
@@ -116,7 +143,7 @@ export function translateAnthropicToOpenAI(data: any, model: string): any {
     stop_sequence: "stop",
     tool_use: "tool_calls",
   };
-  const finish_reason = finishMap[data.stop_reason] || data.stop_reason || "stop";
+  const finish_reason = finishMap[data.stop_reason ?? ""] || data.stop_reason || "stop";
 
   return {
     id: data.id || `chatcmpl-${Date.now()}`,
@@ -142,11 +169,12 @@ export function translateAnthropicToOpenAI(data: any, model: string): any {
  * Convert Anthropic streaming events to OpenAI SSE chunks.
  * Handles: message_start, content_block_delta (text), message_delta, message_stop
  */
-export function anthropicStreamToOpenAIChunk(chunk: any, model: string): string[] {
+export function anthropicStreamToOpenAIChunk(chunk: unknown, model: string): string[] {
   const out: string[] = [];
   if (!chunk || typeof chunk !== "object") return out;
 
-  const type = chunk.type;
+  const event = chunk as { type?: string; delta?: { text?: string; stop_reason?: string } };
+  const type = event.type;
 
   if (type === "message_start") {
     // No content yet, optionally send role chunk
@@ -159,7 +187,7 @@ export function anthropicStreamToOpenAIChunk(chunk: any, model: string): string[
   }
 
   if (type === "content_block_delta") {
-    const text = chunk.delta?.text || "";
+    const text = event.delta?.text || "";
     if (text) {
       out.push(createOpenAIChunk(model, text));
     }
@@ -168,7 +196,7 @@ export function anthropicStreamToOpenAIChunk(chunk: any, model: string): string[
 
   if (type === "message_delta") {
     // Contains stop_reason and usage delta
-    const reason = chunk.delta?.stop_reason;
+    const reason = event.delta?.stop_reason;
     if (reason) {
       const finishMap: Record<string, string> = {
         end_turn: "stop",
@@ -189,8 +217,8 @@ export function anthropicStreamToOpenAIChunk(chunk: any, model: string): string[
   }
 
   // Fallback: if chunk already contains Anthropic content block with text
-  if (chunk.delta?.text) {
-    out.push(createOpenAIChunk(model, chunk.delta.text));
+  if (event.delta?.text) {
+    out.push(createOpenAIChunk(model, event.delta.text));
   }
 
   return out;

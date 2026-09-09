@@ -36,6 +36,9 @@ import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-m
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { logger } from "../../middleware/logger.js";
+import { getRequestVk, errMessage, type ProviderError } from "../../lib/types.js";
+import type { AudioTranscriptionRequest } from "../../providers/base.js";
+import type { Context } from "hono";
 
 export const audioRoute = new Hono();
 const PRIORITY = ["groq", "openrouter", "modelscope"];
@@ -45,8 +48,11 @@ function providerOrderFor(model: string): string[] {
   return [...PRIORITY.filter((p) => base.includes(p)), ...base.filter((p) => !PRIORITY.includes(p))];
 }
 function filenameOf(file: unknown, fb?: string): string {
-  if (file instanceof File && (file as File).name) return (file as File).name;
-  if (file && typeof file === "object" && "name" in (file as any)) return (file as any).name;
+  if (file instanceof File && file.name) return file.name;
+  if (file && typeof file === "object" && "name" in file) {
+    const name = (file as { name?: unknown }).name;
+    if (typeof name === "string" && name) return name;
+  }
   return fb || "audio.wav";
 }
 function toTemp(v: unknown): number | undefined {
@@ -54,31 +60,31 @@ function toTemp(v: unknown): number | undefined {
   const n = typeof v === "string" ? parseFloat(v) : Number(v);
   return isNaN(n) ? undefined : n;
 }
-async function handleAudioForm(c: any, isTranslation: boolean) {
-  const vk = (c as any).get("vk") as any;
-  let body: any;
-  try { body = await c.req.parseBody(); } catch (e: any) {
-    return c.json({ error: { message: "Invalid multipart body", type: "invalid_request_error", detail: e.message } }, 400);
+async function handleAudioForm(c: Context, isTranslation: boolean) {
+  const vk = getRequestVk(c);
+  let body: Record<string, string | File | Blob | Uint8Array | undefined>;
+  try { body = (await c.req.parseBody()) as Record<string, string | File | Blob | Uint8Array | undefined>; } catch (e) {
+    return c.json({ error: { message: "Invalid multipart body", type: "invalid_request_error", detail: errMessage(e) } }, 400);
   }
   const rawFile = body.file;
   if (!rawFile) return c.json({ error: { message: "file is required", type: "invalid_request_error" } }, 400);
   if (typeof rawFile === "string") return c.json({ error: { message: "file must be a binary file upload", type: "invalid_request_error" } }, 400);
-  let file: any = rawFile as File | Blob;
+  let file: File | Blob | Buffer = rawFile as File | Blob;
   if (rawFile instanceof Uint8Array) file = Buffer.from(rawFile);
-  const filename = filenameOf(rawFile, body.filename);
-  const model = (body.model as string) || "whisper-large-v3";
-  const language = body.language as string | undefined;
-  const prompt = body.prompt as string | undefined;
-  const response_format = (body.response_format as string) || "json";
+  const filename = filenameOf(rawFile, typeof body.filename === "string" ? body.filename : undefined);
+  const model = (typeof body.model === "string" && body.model) || "whisper-large-v3";
+  const language = typeof body.language === "string" ? body.language : undefined;
+  const prompt = typeof body.prompt === "string" ? body.prompt : undefined;
+  const response_format = (typeof body.response_format === "string" && body.response_format) || "json";
   const temperature = toTemp(body.temperature);
   if (vk && !hasScope(vk, model, undefined)) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
   }
   const order = providerOrderFor(model);
-  const errors: any[] = [];
+  const errors: ProviderError[] = [];
   const start = Date.now();
   for (const pid of order) {
-    const p: any = (providers as any)[pid];
+    const p = providers[pid];
     if (!p) continue;
     const fn = isTranslation ? (p.translations ?? p.transcriptions) : p.transcriptions;
     if (typeof fn !== "function") continue;
@@ -86,7 +92,7 @@ async function handleAudioForm(c: any, isTranslation: boolean) {
     const key = getNextKeyManaged(pid);
     if (key === null) { errors.push({ provider: pid, error: `no key configured (set ${pid.toUpperCase().replace(/-/g, "_")}_API_KEYS)` }); continue; }
     try {
-      const payload: any = { file, filename, model, prompt, response_format, temperature };
+      const payload: AudioTranscriptionRequest = { file, filename, model, prompt, response_format, temperature };
       if (!isTranslation) payload.language = language;
       const res: Response = await fn.call(p, payload, key);
       if (!res.ok) {
@@ -100,13 +106,13 @@ async function handleAudioForm(c: any, isTranslation: boolean) {
         continue;
       }
       recordSuccess(pid); markSuccess(pid, key);
-      const data: any = await res.json().catch(async () => ({ text: await res.text() }));
-      const out = data.text ?? data.data ?? (typeof data === "string" ? data : JSON.stringify(data));
+      const data = (await res.json().catch(async () => ({ text: await res.text() }))) as { text?: unknown; data?: unknown };
+      const out = data.text ?? data.data ?? JSON.stringify(data);
       logger.info({ provider: pid, model, latency: Date.now() - start }, isTranslation ? "translation success" : "transcription success");
       return c.json({ text: out });
-    } catch (e: any) {
-      logger.warn({ provider: pid, err: e.message }, "audio provider failed, trying next");
-      errors.push({ provider: pid, error: e.message }); recordFailure(pid); continue;
+    } catch (e) {
+      logger.warn({ provider: pid, err: errMessage(e) }, "audio provider failed, trying next");
+      errors.push({ provider: pid, error: errMessage(e) }); recordFailure(pid); continue;
     }
   }
   logger.warn({ model, errors, latency: Date.now() - start }, isTranslation ? "all translations providers failed" : "all transcriptions providers failed");
@@ -132,15 +138,15 @@ const speechSchema = z.object({
 audioRoute.post("/speech", zValidator("json", speechSchema), async (c) => {
   const body = c.req.valid("json");
   const model = body.model || "tts-1";
-  const vk = (c as any).get("vk") as any;
+  const vk = getRequestVk(c);
   if (vk && !hasScope(vk, model, undefined)) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
   }
   const order = providerOrderFor(model);
-  const errors: any[] = [];
+  const errors: ProviderError[] = [];
   const start = Date.now();
   for (const pid of order) {
-    const p: any = (providers as any)[pid];
+    const p = providers[pid];
     if (!p || typeof p.speech !== "function") continue;
     if (isOpen(pid)) { errors.push({ provider: pid, error: "circuit open" }); continue; }
     const key = getNextKeyManaged(pid);
@@ -161,9 +167,9 @@ audioRoute.post("/speech", zValidator("json", speechSchema), async (c) => {
       const buf = await res.arrayBuffer();
       logger.info({ provider: pid, model, bytes: buf.byteLength, latency: Date.now() - start }, "tts success");
       return new Response(buf, { status: 200, headers: { "Content-Type": "audio/mpeg", "Content-Length": String(buf.byteLength), "X-Provider": pid, "X-Model": model } });
-    } catch (e: any) {
-      logger.warn({ provider: pid, err: e.message }, "speech provider failed");
-      errors.push({ provider: pid, error: e.message }); recordFailure(pid); continue;
+    } catch (e) {
+      logger.warn({ provider: pid, err: errMessage(e) }, "speech provider failed");
+      errors.push({ provider: pid, error: errMessage(e) }); recordFailure(pid); continue;
     }
   }
   logger.warn({ model, errors, latency: Date.now() - start }, "all speech providers failed");

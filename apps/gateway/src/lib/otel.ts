@@ -7,7 +7,7 @@ export function otelEnabled(): boolean {
   return !!process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 }
 
-export function logGenAI(event: string, attrs: Record<string, any>) {
+export function logGenAI(event: string, attrs: Record<string, unknown>) {
   if (!otelEnabled() && process.env.LOG_LEVEL !== "debug") return;
   // GenAI semantic conventions: https://opentelemetry.io/docs/specs/semconv/gen-ai/
   logger.info(
@@ -26,7 +26,7 @@ export function logGenAI(event: string, attrs: Record<string, any>) {
   );
 }
 
-export function withTrace<T>(fn: () => Promise<T>, attrs: Record<string, any> = {}): Promise<T> {
+export function withTrace<T>(fn: () => Promise<T>, attrs: Record<string, unknown> = {}): Promise<T> {
   const traceId = `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
   const start = Date.now();
   return fn()

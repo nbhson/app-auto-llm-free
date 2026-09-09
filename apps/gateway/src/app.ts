@@ -15,6 +15,7 @@ import { responsesRoute } from "./routes/v1/responses.js";
 import { anthropicRoute } from "./routes/v1/anthropic.js";
 import { apiRoute } from "./routes/api.js";
 import { extractBearer } from "./lib/auth.js";
+import { setRequestVk } from "./lib/types.js";
 import { isValidVirtualKeyLive } from "./lib/virtual-keys.js";
 import { initRedis } from "./lib/redis.js";
 import { logger } from "./middleware/logger.js";
@@ -76,7 +77,7 @@ export function createApp() {
   app.use("/v1/*", async (c, next) => {
     if (c.req.path === "/v1/health" || c.req.path === "/v1/health/ready") return next();
     // Support both Authorization: Bearer fgk-... and x-api-key: fgk-... (Anthropic style for Claude Code)
-    let key = extractBearer(c as any);
+    let key = extractBearer(c);
     if (!key) {
       const xKey = c.req.header("x-api-key") || c.req.header("X-API-Key");
       if (xKey) key = xKey.trim();
@@ -97,7 +98,7 @@ export function createApp() {
     if (vk && pinned && !vk.scopes.providers.includes("*") && !vk.scopes.providers.includes(pinned)) {
       return c.json({ error: { message: `Key not allowed for provider ${pinned}`, type: "insufficient_scope" } }, 403);
     }
-    (c as any).set("vk", vk);
+    setRequestVk(c, vk);
     return next();
   });
 
@@ -120,14 +121,14 @@ export function createApp() {
   // Admin /api/* — require master or admin virtual key
   app.use("/api/*", async (c, next) => {
     if (c.req.path === "/api/bootstrap" || c.req.path === "/api/config/master") return next();
-    const key = extractBearer(c as any);
+    const key = extractBearer(c);
     const vk = key ? isValidVirtualKeyLive(key) : null;
     if (!vk) return c.json({ error: { message: "Unauthorized", type: "invalid_api_key" } }, 401);
     // For /api/keys POST/DELETE require admin
     if ((c.req.path.startsWith("/api/keys") && c.req.method !== "GET") && vk.role !== "admin") {
       return c.json({ error: { message: "Admin required", type: "forbidden" } }, 403);
     }
-    (c as any).set("vk", vk);
+    setRequestVk(c, vk);
     return next();
   });
   app.route("/api", apiRoute);

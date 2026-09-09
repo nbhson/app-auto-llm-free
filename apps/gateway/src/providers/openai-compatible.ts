@@ -100,8 +100,8 @@ export function createOpenAICompatibleProvider(opts: {
       // Priority: req.sessionId > env > auto-generated for free models
       {
         const needsSession = opts.id === "opencode" && isOpencodeFreeModel(model);
-        const incomingSid = (req as any).sessionId;
-        const incomingParentSid = (req as any).parentSessionId;
+        const incomingSid = req.sessionId;
+        const incomingParentSid = req.parentSessionId;
         if (needsSession || incomingSid) {
           const sid = incomingSid || process.env.OPENCODE_SESSION_ID || generateSessionId();
           if (sid) {
@@ -116,7 +116,7 @@ export function createOpenAICompatibleProvider(opts: {
         }
       }
       // Build body filtering undefined/null to avoid provider strict validation (kilo 400, agnes 500)
-      const body: any = {
+      const body: Record<string, unknown> = {
         model,
         messages: req.messages,
         stream: req.stream ?? false,
@@ -124,7 +124,7 @@ export function createOpenAICompatibleProvider(opts: {
       if (req.temperature !== undefined && req.temperature !== null) body.temperature = req.temperature;
       if (req.max_tokens !== undefined && req.max_tokens !== null) body.max_tokens = req.max_tokens;
       if (req.top_p !== undefined && req.top_p !== null) body.top_p = req.top_p;
-      if ((req as any).top_k !== undefined && (req as any).top_k !== null) body.top_k = (req as any).top_k;
+      if (req.top_k !== undefined && req.top_k !== null) body.top_k = req.top_k;
       if (req.n !== undefined && req.n !== null) body.n = req.n;
       if (req.stop !== undefined && req.stop !== null) body.stop = req.stop;
       if (req.presence_penalty !== undefined && req.presence_penalty !== null) body.presence_penalty = req.presence_penalty;
@@ -202,9 +202,10 @@ export function createOpenAICompatibleProvider(opts: {
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       const res = await fetch(url, { headers });
       if (!res.ok) return [];
-      const data: any = await res.json().catch(() => ({}));
-      const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
-      return list.map((m: any) => ({
+      const data = (await res.json().catch(() => ({}))) as { data?: unknown };
+      const rawList: unknown = Array.isArray(data.data) ? data.data : [];
+      const list = (Array.isArray(rawList) ? rawList : []) as Array<{ id?: string; name?: string }>;
+      return list.map((m) => ({
         id: `${opts.id}/${m.id || m.name}`,
         provider: opts.id,
         displayName: m.id || m.name,
@@ -217,14 +218,14 @@ export function createOpenAICompatibleProvider(opts: {
       const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       const form = new FormData();
-      const blob = req.file instanceof Blob ? req.file : new Blob([req.file as any]);
+      const blob = req.file instanceof Blob ? req.file : new Blob([Uint8Array.from(req.file)]);
       form.append("file", blob, req.filename || "audio.wav");
       form.append("model", req.model);
       if (req.language) form.append("language", req.language);
       if (req.prompt) form.append("prompt", req.prompt);
       if (req.response_format) form.append("response_format", req.response_format);
       if (req.temperature !== undefined) form.append("temperature", String(req.temperature));
-      return fetch(url, { method: "POST", headers, body: form as any });
+      return fetch(url, { method: "POST", headers, body: form });
     },
     async speech(req: AudioSpeechRequest, apiKey: string): Promise<Response> {
       const base = resolveBase();

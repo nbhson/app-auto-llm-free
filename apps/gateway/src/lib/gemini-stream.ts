@@ -26,8 +26,8 @@ export function geminiToOpenAIStream(geminiStream: ReadableStream<Uint8Array>, m
             const jsonStr = trimmed.replace(/^\[?,\s*/, "").replace(/,$/, "");
             if (!jsonStr || jsonStr === "[" || jsonStr === "]") continue;
             try {
-              const obj = JSON.parse(jsonStr);
-              const text = obj.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") || "";
+              const obj = JSON.parse(jsonStr) as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> }; finishReason?: string }> };
+              const text = obj.candidates?.[0]?.content?.parts?.map((p) => String(p.text ?? "")).join("") || "";
               if (text) {
                 controller.enqueue(encoder.encode(createOpenAIChunk(model, text)));
               }
@@ -44,8 +44,8 @@ export function geminiToOpenAIStream(geminiStream: ReadableStream<Uint8Array>, m
         // Flush buffer
         if (buffer.trim()) {
           try {
-            const obj = JSON.parse(buffer.trim().replace(/^\[?,\s*/, ""));
-            const text = obj.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") || "";
+            const obj = JSON.parse(buffer.trim().replace(/^\[?,\s*/, "")) as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> };
+            const text = obj.candidates?.[0]?.content?.parts?.map((p) => String(p.text ?? "")).join("") || "";
             if (text) controller.enqueue(encoder.encode(createOpenAIChunk(model, text)));
           } catch { /* ignore */ }
         }

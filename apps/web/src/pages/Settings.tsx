@@ -126,7 +126,7 @@ ANALYTICS_RETENTION_DAYS=${form.ANALYTICS_RETENTION_DAYS}`;
     if (!m) { setStatus("error"); return; }
     setStatus("checking");
     const key = localStorage.getItem("masterKey") || "fgk-master-dev-key";
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     try {
       const ctrl = new AbortController();
       timer = setTimeout(() => ctrl.abort(), 8000);
@@ -145,17 +145,17 @@ ANALYTICS_RETENTION_DAYS=${form.ANALYTICS_RETENTION_DAYS}`;
     }
   };
 
-  const checkPrimary = () => checkOneEmbedding(form.EMBEDDING_MODEL, (s) => setEmbStatus(s as any));
+  const checkPrimary = () => checkOneEmbedding(form.EMBEDDING_MODEL, (s) => setEmbStatus(s));
   const checkFallbacks = async () => {
     const list = form.EMBEDDING_FALLBACKS.split(",").map((s) => s.trim()).filter(Boolean);
     if (list.length === 0) return;
     const next: Record<string, "checking" | "ok" | "error"> = {};
     list.forEach((m) => (next[m] = "checking"));
-    setFallbackStatuses({ ...next } as any);
+    setFallbackStatuses({ ...next });
     const key = localStorage.getItem("masterKey") || "fgk-master-dev-key";
     await Promise.all(
       list.map(async (m) => {
-        let timer: any = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
         try {
           const ctrl = new AbortController();
           timer = setTimeout(() => ctrl.abort(), 8000);

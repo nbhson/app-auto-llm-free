@@ -45,7 +45,11 @@ export const FREELLMS_COST: Record<string, number> = {
 };
 
 const STATS_PATH = resolveDataPath("provider-stats.json");
-let latencyCache: { data: Record<string, any>; loadedAt: number } | null = null;
+
+/** Latency entry in provider-stats.json: raw ms or EMA object. */
+export type LatencyEntry = number | { emaLatencyMs?: number; latency?: number };
+
+let latencyCache: { data: Record<string, LatencyEntry>; loadedAt: number } | null = null;
 const LATENCY_CACHE_TTL_MS = 5000;
 let latencyWatchInitialized = false;
 
@@ -66,7 +70,7 @@ export function stopLatencyWatcher(): void {
   latencyWatchInitialized = false;
 }
 
-async function loadLatencyData(): Promise<Record<string, any> | null> {
+async function loadLatencyData(): Promise<Record<string, LatencyEntry> | null> {
   try {
     const now = Date.now();
     if (latencyCache && now - latencyCache.loadedAt < LATENCY_CACHE_TTL_MS) {
@@ -75,7 +79,7 @@ async function loadLatencyData(): Promise<Record<string, any> | null> {
     ensureLatencyWatcher();
     if (!fs.existsSync(STATS_PATH)) return null;
     const raw = await fs.promises.readFile(STATS_PATH, "utf-8");
-    const j = JSON.parse(raw);
+    const j = JSON.parse(raw) as Record<string, LatencyEntry>;
     latencyCache = { data: j, loadedAt: now };
     return j;
   } catch {
@@ -83,10 +87,18 @@ async function loadLatencyData(): Promise<Record<string, any> | null> {
   }
 }
 
+function readLatencyValue(j: Record<string, LatencyEntry>, provider: string): number | null {
+  const v: LatencyEntry | undefined = j[provider];
+  if (typeof v === "number") return v;
+  if (v && typeof v.emaLatencyMs === "number") return v.emaLatencyMs;
+  if (v && typeof v.latency === "number") return v.latency;
+  return null;
+}
+
 function getLatency(provider: string): number {
   try {
     const now = Date.now();
-    let j: Record<string, any> | null = null;
+    let j: Record<string, LatencyEntry> | null = null;
     if (latencyCache && now - latencyCache.loadedAt < LATENCY_CACHE_TTL_MS) {
       j = latencyCache.data;
     } else {
@@ -102,10 +114,7 @@ function getLatency(provider: string): number {
       }
     }
     if (!j) return 100;
-    const v = (j as any)[provider];
-    if (typeof v === "number") return v;
-    if (v && typeof v.emaLatencyMs === "number") return v.emaLatencyMs;
-    if (v && typeof v.latency === "number") return v.latency;
+    return readLatencyValue(j, provider) ?? 100;
   } catch { /* ignore */ }
   return 100; // fallback
 }
@@ -113,11 +122,7 @@ function getLatency(provider: string): number {
 export async function getLatencyAsync(provider: string): Promise<number> {
   const j = await loadLatencyData();
   if (!j) return 100;
-  const v = (j as any)[provider];
-  if (typeof v === "number") return v;
-  if (v && typeof v.emaLatencyMs === "number") return v.emaLatencyMs;
-  if (v && typeof v.latency === "number") return v.latency;
-  return 100;
+  return readLatencyValue(j, provider) ?? 100;
 }
 
 function getQuotaHeadroom(provider: string): number {
@@ -145,11 +150,10 @@ function resolveWeights(opts: { costWeight?: number; latencyWeight?: number; hea
 } {
   // harness 06 Decide Tools: env overrides allow A/B testing without code change
   // Direct import — config has no circular dependency on cost-router (verified)
-  const cfg: any = config as any;
   return {
-    costWeight: opts.costWeight ?? cfg?.costWeight ?? DEFAULT_COST_WEIGHT,
-    latencyWeight: opts.latencyWeight ?? cfg?.latencyWeight ?? DEFAULT_LATENCY_WEIGHT,
-    headroomWeight: opts.headroomWeight ?? cfg?.headroomWeight ?? HEADROOM_WEIGHT,
+    costWeight: opts.costWeight ?? config.costWeight ?? DEFAULT_COST_WEIGHT,
+    latencyWeight: opts.latencyWeight ?? config.latencyWeight ?? DEFAULT_LATENCY_WEIGHT,
+    headroomWeight: opts.headroomWeight ?? config.headroomWeight ?? HEADROOM_WEIGHT,
   };
 }
 
@@ -237,14 +241,14 @@ export async function syncPricing(): Promise<Record<string, number>> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data: any = await res.json();
+    const data = (await res.json()) as Record<string, { input_cost_per_token?: unknown; input_cost_per_1k_tokens?: unknown }>;
     let updated = 0;
     for (const [key, val] of Object.entries(data)) {
-      const v: any = val;
       let perToken: number | null = null;
-      if (typeof v.input_cost_per_token === "number" && v.input_cost_per_token > 0) perToken = v.input_cost_per_token;
-      else if (typeof v.input_cost_per_token === "string" && parseFloat(v.input_cost_per_token) > 0) perToken = parseFloat(v.input_cost_per_token);
-      else if (typeof v.input_cost_per_1k_tokens === "number" && v.input_cost_per_1k_tokens > 0) perToken = v.input_cost_per_1k_tokens / 1000;
+      const perTok = val.input_cost_per_token;
+      if (typeof perTok === "number" && perTok > 0) perToken = perTok;
+      else if (typeof perTok === "string" && parseFloat(perTok) > 0) perToken = parseFloat(perTok);
+      else if (typeof val.input_cost_per_1k_tokens === "number" && val.input_cost_per_1k_tokens > 0) perToken = val.input_cost_per_1k_tokens / 1000;
       if (perToken !== null && perToken > 0) {
         const slug = key.split("/")[0].toLowerCase();
         if (FREELLMS_COST[slug] !== undefined) {

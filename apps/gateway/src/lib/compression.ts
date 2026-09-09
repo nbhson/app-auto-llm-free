@@ -1,4 +1,5 @@
 import { estimateMessagesTokens } from "./token-estimator.js";
+import type { CompressibleMessage, TokenCountMessage } from "./types.js";
 
 export interface CompressOpts {
   maxTokens?: number;
@@ -6,17 +7,17 @@ export interface CompressOpts {
 }
 
 export interface CompressResult {
-  messages: any[];
+  messages: CompressibleMessage[];
   ratio: number;
   savedTokens: number;
 }
 
-function truncateSchemaStrings(obj: any, maxStrLen = 200): any {
+function truncateSchemaStrings(obj: unknown, maxStrLen = 200): unknown {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === "string") return obj.length > maxStrLen ? obj.slice(0, maxStrLen) + "…" : obj;
   if (Array.isArray(obj)) return obj.map((v) => truncateSchemaStrings(v, maxStrLen));
   if (typeof obj === "object") {
-    const out: any = {};
+    const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
       // keep structural keys intact, truncate long string values (esp. description)
       if (k === "description" && typeof v === "string" && v.length > 100) out[k] = v.slice(0, 100) + "…";
@@ -31,12 +32,12 @@ function truncateSchemaStrings(obj: any, maxStrLen = 200): any {
  * Minify tool definitions: strip descriptions >100 chars and safely truncate large schemas
  * without dropping required/enum fields (fixes previous wipe to empty properties).
  */
-export function toolsMinify(messages: any[]): any[] {
+export function toolsMinify(messages: CompressibleMessage[]): CompressibleMessage[] {
   return messages.map((m) => {
     if (!m.tools && !m.tool_choice && !m.functions) return m;
-    const clone = { ...m };
+    const clone: CompressibleMessage = { ...m };
     if (Array.isArray(clone.tools)) {
-      clone.tools = clone.tools.map((t: any) => {
+      clone.tools = clone.tools.map((t) => {
         if (!t.function) return t;
         const fn = { ...t.function };
         if (typeof fn.description === "string" && fn.description.length > 100) {
@@ -60,7 +61,11 @@ export function toolsMinify(messages: any[]): any[] {
               fn.parameters = truncateSchemaStrings(fn.parameters, 20);
               if (JSON.stringify(fn.parameters).length > 2000) {
                 // last resort: keep minimal schema shape
-                fn.parameters = { type: fn.parameters.type || "object", properties: {} };
+                const prev = fn.parameters as { type?: unknown } | null;
+                fn.parameters = {
+                  type: (prev && typeof prev === "object" ? prev.type : undefined) || "object",
+                  properties: {},
+                };
               }
             } catch {
               fn.parameters = { type: "object", properties: {} };
@@ -82,10 +87,10 @@ export function toolsMinify(messages: any[]): any[] {
  * Fixed: use value comparison instead of reference equality (kept.includes was always false
  * because system/rest are disjoint filtered arrays).
  */
-export function historySummarize(messages: any[]): any[] {
+export function historySummarize(messages: CompressibleMessage[]): CompressibleMessage[] {
   if (messages.length <= 6) return messages;
-  const system = messages.filter((m: any) => m.role === "system");
-  const rest = messages.filter((m: any) => m.role !== "system");
+  const system = messages.filter((m) => m.role === "system");
+  const rest = messages.filter((m) => m.role !== "system");
   const kept = rest.slice(-6);
   if (system.length > 0) {
     const lastSystem = system[system.length - 1];
@@ -99,10 +104,10 @@ export function historySummarize(messages: any[]): any[] {
  * Remove duplicate code blocks (``` ... ```) keeping first occurrence.
  * Fixed: keep first global occurrence, remove subsequent duplicates only.
  */
-export function codeDedup(messages: any[]): any[] {
+export function codeDedup(messages: CompressibleMessage[]): CompressibleMessage[] {
   const seen = new Set<string>();
   const codeBlockRe = /```[\s\S]*?```/g;
-  return messages.map((m: any) => {
+  return messages.map((m) => {
     if (typeof m.content !== "string") return m;
     const blocks = m.content.match(codeBlockRe);
     if (!blocks) return m;
@@ -125,7 +130,7 @@ export function codeDedup(messages: any[]): any[] {
   });
 }
 
-function calcLength(messages: any[]): number {
+function calcLength(messages: CompressibleMessage[]): number {
   try {
     return JSON.stringify(messages).length;
   } catch {
@@ -145,7 +150,7 @@ export interface CompressionStageMetrics {
   applied: boolean;
 }
 
-export function compressWithMetrics(messages: any[], opts: CompressOpts = {}): CompressResult & { metrics: CompressionStageMetrics } {
+export function compressWithMetrics(messages: CompressibleMessage[], opts: CompressOpts = {}): CompressResult & { metrics: CompressionStageMetrics } {
   const start = Date.now();
   const result = compressMessages(messages, opts);
   const durationMs = Date.now() - start;
@@ -154,8 +159,8 @@ export function compressWithMetrics(messages: any[], opts: CompressOpts = {}): C
     metrics: {
       stage: "compression",
       durationMs,
-      originalTokens: result.savedTokens + estimateMessagesTokens(result.messages as any),
-      compressedTokens: estimateMessagesTokens(result.messages as any),
+      originalTokens: result.savedTokens + estimateMessagesTokens(result.messages),
+      compressedTokens: estimateMessagesTokens(result.messages),
       ratio: result.ratio,
       applied: result.ratio < 0.95 && result.savedTokens > 0,
     },
@@ -168,12 +173,12 @@ export function compressWithMetrics(messages: any[], opts: CompressOpts = {}): C
  * with token-estimator; falls back to length ratio if originalTokens==0.
  * Harness 02 Build Context: respects maxTokens budget (drop oldest non-system).
  */
-export function compressMessages(messages: any[], opts: CompressOpts = {}): CompressResult {
+export function compressMessages(messages: CompressibleMessage[], opts: CompressOpts = {}): CompressResult {
   const engines = opts.engines ?? ["toolsMinify", "historySummarize", "codeDedup"];
   const originalLength = calcLength(messages);
-  const originalTokens = estimateMessagesTokens(messages as any);
+  const originalTokens = estimateMessagesTokens(messages as TokenCountMessage[]);
 
-  let out: any[] = [...messages];
+  let out: CompressibleMessage[] = [...messages];
 
   if (engines.includes("toolsMinify")) out = toolsMinify(out);
   if (engines.includes("historySummarize")) out = historySummarize(out);
@@ -181,18 +186,18 @@ export function compressMessages(messages: any[], opts: CompressOpts = {}): Comp
 
   // Optional token budget truncation: drop oldest non-system until under maxTokens
   if (opts.maxTokens && opts.maxTokens > 0) {
-    let tokens = estimateMessagesTokens(out as any);
+    let tokens = estimateMessagesTokens(out as TokenCountMessage[]);
     while (tokens > opts.maxTokens && out.length > 1) {
       // remove second element (keep system at 0)
       const hasSystem = out[0]?.role === "system";
       const idx = hasSystem ? 1 : 0;
       out.splice(idx, 1);
-      tokens = estimateMessagesTokens(out as any);
+      tokens = estimateMessagesTokens(out as TokenCountMessage[]);
     }
   }
 
   const compressedLength = calcLength(out);
-  const compressedTokens = estimateMessagesTokens(out as any);
+  const compressedTokens = estimateMessagesTokens(out as TokenCountMessage[]);
   const tokenRatio = originalTokens === 0 ? 1 : compressedTokens / originalTokens;
   const lengthRatio = originalLength === 0 ? 1 : compressedLength / originalLength;
   // prefer token ratio (more meaningful for cost), keep 3-decimal

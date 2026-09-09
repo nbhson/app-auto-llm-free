@@ -8,6 +8,7 @@ import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-m
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { logger } from "../../middleware/logger.js";
+import { getRequestVk, errMessage, type ProviderError, type UpstreamEmbeddings } from "../../lib/types.js";
 
 const embeddingsSchema = z.object({
   model: z.string().min(1),
@@ -22,7 +23,7 @@ export const embeddingsRoute = new Hono();
 embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
   const body = c.req.valid("json");
   const model = body.model || "auto";
-  const vk = (c as any).get("vk") as any;
+  const vk = getRequestVk(c);
 
   if (vk && !hasScope(vk, model, undefined)) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
@@ -46,7 +47,7 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
     }
   }
 
-  const errors: any[] = [];
+  const errors: ProviderError[] = [];
   const startAll = Date.now();
 
   for (const pid of providerOrder) {
@@ -83,7 +84,7 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
       }
       recordSuccess(pid);
       markSuccess(pid, key);
-      const data: any = await res.json().catch(async () => ({ text: await res.text() }));
+      const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamEmbeddings;
       // Ensure OpenAI shape
       if (data.data && Array.isArray(data.data)) {
         c.header("X-Provider", pid);
@@ -96,9 +97,9 @@ embeddingsRoute.post("/", zValidator("json", embeddingsSchema), async (c) => {
         model: `${pid}/${model}`,
         usage: data.usage || { prompt_tokens: 0, total_tokens: 0 },
       });
-    } catch (e: any) {
-      logger.warn({ provider: pid, err: e.message }, "embeddings provider failed");
-      errors.push({ provider: pid, error: e.message });
+    } catch (e) {
+      logger.warn({ provider: pid, err: errMessage(e) }, "embeddings provider failed");
+      errors.push({ provider: pid, error: errMessage(e) });
       recordFailure(pid);
       continue;
     }

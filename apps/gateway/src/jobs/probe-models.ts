@@ -1,5 +1,6 @@
 import { providers } from "../providers/registry.js";
 import { config } from "../config.js";
+import { errMessage } from "../lib/types.js";
 
 export type ModelHealth = {
   id: string; // e.g. nvidia-nim/z-ai/glm-5.2
@@ -16,7 +17,7 @@ export type ModelHealth = {
  * Uses provider.chat with tiny prompt, max_tokens 5, no stream.
  */
 export async function probeModel(providerId: string, fullModelId: string, timeoutMs = 8000): Promise<ModelHealth> {
-  const provider = (providers as any)[providerId];
+  const provider = providers[providerId];
   if (!provider) return { id: fullModelId, provider: providerId, model: fullModelId, status: "error", error: "unknown provider" };
 
   const keys = config.providerKeys[providerId] || [];
@@ -34,11 +35,11 @@ export async function probeModel(providerId: string, fullModelId: string, timeou
       provider.chat(
         {
           model: fullModelId,
-          messages: [{ role: "user", content: "Hi" }],
+          messages: [{ role: "user" as const, content: "Hi" }],
           max_tokens: 5,
           temperature: 0,
           stream: false,
-        } as any,
+        },
         key
       ),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
@@ -60,9 +61,10 @@ export async function probeModel(providerId: string, fullModelId: string, timeou
     }
     // Try to parse as OpenAI shape
     const text = await res.text();
-    let data: any;
+    let data: unknown;
     try { data = JSON.parse(text); } catch { data = { text }; }
-    const ok = data.choices || data.candidates || data.text || data.content;
+    const rec = data as { choices?: unknown; candidates?: unknown; text?: unknown; content?: unknown };
+    const ok = rec.choices || rec.candidates || rec.text || rec.content;
     return {
       id: fullModelId,
       provider: providerId,
@@ -71,14 +73,15 @@ export async function probeModel(providerId: string, fullModelId: string, timeou
       latency_ms: latency,
       http_status: res.status,
     };
-  } catch (e: any) {
+  } catch (e) {
+    const msg = errMessage(e);
     return {
       id: fullModelId,
       provider: providerId,
       model: fullModelId,
-      status: e.message === "timeout" ? "timeout" : "error",
+      status: msg === "timeout" ? "timeout" : "error",
       latency_ms: Date.now() - start,
-      error: e.message,
+      error: msg,
     };
   }
 }

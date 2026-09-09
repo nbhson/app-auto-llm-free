@@ -4,6 +4,16 @@ import { providers, providerMeta } from "../providers/registry.js";
 import { config } from "../config.js";
 import { logger } from "../middleware/logger.js";
 import { readDataJson, resolveDataPath } from "../lib/paths.js";
+import { errMessage, type FreellmsModelEntry } from "../lib/types.js";
+import type { ModelInfo } from "../providers/base.js";
+
+interface LiveSyncModel {
+  id: string;
+  provider: string;
+  display_name: string;
+  context_length: number;
+  owned_by: string;
+}
 
 function hasRealKey(providerId: string): boolean {
   const keys = config.providerKeys[providerId] || [];
@@ -14,13 +24,13 @@ function isPublic(providerId: string): boolean {
   return ["pollinations", "llm7-io", "ollama-cloud", "glhf-chat", "glhf", "modelscope", "ovhcloud-ai-endpoints", "sambanova", "chutes", "aion-labs", "freeai"].includes(providerId);
 }
 
-export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ total: number; providers: number; liveModels: any[]; totalFetched?: number; filtered?: number }> {
+export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ total: number; providers: number; liveModels: LiveSyncModel[]; totalFetched?: number; filtered?: number }> {
   const freeOnly = opts?.freeOnly ?? true; // default only free
   // Load freellms free set for filtering (if available)
-  const freellmsFree = readDataJson<any[]>("freellms-models-free.json", []);
-  const freellmsSet = new Set(freellmsFree.map((m: any) => `${m.slug}/${m.name}`.toLowerCase()));
-  const freellmsShort = new Set(freellmsFree.map((m: any) => (m.name || "").toLowerCase()));
-  const liveModels: any[] = [];
+  const freellmsFree = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
+  const freellmsSet = new Set(freellmsFree.map((m) => `${m.slug}/${m.name}`.toLowerCase()));
+  const freellmsShort = new Set(freellmsFree.map((m) => (m.name || "").toLowerCase()));
+  const liveModels: LiveSyncModel[] = [];
   let providersSynced = 0;
   let totalFetched = 0;
   for (const [providerId, provider] of Object.entries(providers)) {
@@ -30,11 +40,11 @@ export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ t
     try {
       const models = await provider.models(key);
       totalFetched += models.length;
-      let filtered = models;
+      let filtered: ModelInfo[] = models;
       if (freeOnly) {
-        const meta = (providerMeta as any)[providerId];
+        const meta = providerMeta[providerId];
         const isPermanent = meta?.tier_type === "permanent";
-        filtered = models.filter((m: any) => {
+        filtered = models.filter((m) => {
           const idLower = m.id.toLowerCase();
           const short = (m.id.split("/").pop() || "").toLowerCase();
           // :free suffix is explicit free
@@ -45,13 +55,13 @@ export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ t
           if (freellmsSet.has(idLower) || freellmsShort.has(short)) return true;
           // Also check freellms full id without sanitization (original name may have spaces)
           // Fallback: if model id contains freellms short substring
-          return freellmsFree.some((f: any) => idLower.includes((f.name || "").toLowerCase().split(" ")[0]) && f.slug === providerId);
+          return freellmsFree.some((f) => idLower.includes(String(f.name || "").toLowerCase().split(" ")[0]) && f.slug === providerId);
         });
         // If filtering removed all but provider is quota with known free count, keep at least freellms count
         if (filtered.length === 0 && models.length > 0) {
           // For quota providers where live filter too strict, fallback to show freellms free if any
-          const freCount = freellmsFree.filter((f: any) => f.slug === providerId).length;
-          if (freCount > 0) filtered = models.filter((m: any) => freCount > 0 && (m.id.toLowerCase().includes(":free") || freellmsSet.has(m.id.toLowerCase())));
+          const freCount = freellmsFree.filter((f) => f.slug === providerId).length;
+          if (freCount > 0) filtered = models.filter((m) => freCount > 0 && (m.id.toLowerCase().includes(":free") || freellmsSet.has(m.id.toLowerCase())));
           if (filtered.length === 0) filtered = []; // keep empty if still none
         }
       }
@@ -59,15 +69,15 @@ export async function syncLiveModels(opts?: { freeOnly?: boolean }): Promise<{ t
         liveModels.push({
           id: m.id,
           provider: providerId,
-          display_name: m.displayName || m.id.split("/").pop(),
+          display_name: m.displayName || m.id.split("/").pop() || m.id,
           context_length: m.contextLength || 8192,
           owned_by: providerId,
         });
       }
       providersSynced++;
       logger.info({ provider: providerId, count: models.length, filtered: filtered.length, freeOnly }, "live sync ok");
-    } catch (e: any) {
-      logger.warn({ provider: providerId, err: e.message }, "live sync failed");
+    } catch (e) {
+      logger.warn({ provider: providerId, err: errMessage(e) }, "live sync failed");
     }
   }
   const out = resolveDataPath("live-models.json");

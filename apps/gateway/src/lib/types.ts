@@ -1,0 +1,142 @@
+import type { Context } from "hono";
+import type { VirtualKey } from "./virtual-keys.js";
+
+/**
+ * Shared gateway types — single source to avoid `any` across routes/lib/providers.
+ */
+
+/** Error entry accumulated while trying providers in order. */
+export interface ProviderError {
+  provider: string;
+  error?: string;
+  status?: number;
+  retryAfterMs?: number;
+}
+
+/** Loose JSON value for dynamic upstream payloads. */
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+/** Message shape accepted by token-estimator / compression. */
+export interface TokenCountMessage {
+  role: string;
+  content: unknown;
+}
+
+/** Compressible chat message (tools/history/code engines). */
+export interface CompressibleMessage {
+  role: string;
+  content: unknown;
+  tools?: Array<{
+    function?: {
+      name?: string;
+      description?: string;
+      parameters?: unknown;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  }>;
+  tool_choice?: unknown;
+  functions?: unknown;
+  [key: string]: unknown;
+}
+
+/** Upstream chat completion (OpenAI shape, fields optional since providers vary). */
+export interface UpstreamChatCompletion {
+  id?: string;
+  object?: string;
+  model?: string;
+  created?: number;
+  choices?: Array<{
+    index?: number;
+    message?: { role?: string; content?: unknown; tool_calls?: unknown };
+    delta?: { content?: unknown };
+    finish_reason?: string | null;
+    text?: string;
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    total_tokens_compat?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+  output?: unknown;
+  content?: unknown;
+  text?: string;
+  data?: unknown;
+  error?: unknown;
+}
+
+/** Upstream Anthropic message (fields optional). */
+export interface UpstreamAnthropicMessage {
+  id?: string;
+  type?: string;
+  role?: string;
+  model?: string;
+  content?: Array<{ type?: string; text?: string }>;
+  stop_reason?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+/** Upstream embeddings response (OpenAI shape). */
+export interface UpstreamEmbeddings {
+  object?: string;
+  data?: Array<{ object?: string; index?: number; embedding?: number[] }>;
+  embedding?: number[];
+  model?: string;
+  usage?: { prompt_tokens?: number; total_tokens?: number };
+}
+
+/** Upstream images response. */
+export interface UpstreamImages {
+  created?: number;
+  data?: Array<{ url?: string; b64_json?: string; revised_prompt?: string }>;
+  url?: string;
+  b64_json?: string;
+}
+
+/** Freellms catalog entry (loose source JSON). */
+export interface FreellmsModelEntry {
+  slug?: string;
+  name?: string;
+  provider?: string;
+  score?: string | number;
+  context?: string | number;
+  [key: string]: unknown;
+}
+
+/** Freellms provider entry (loose source JSON). */
+export interface FreellmsProviderEntry {
+  slug?: string;
+  name?: string;
+  tier?: string;
+  tier_type?: string;
+  caps?: string[];
+  noCard?: boolean;
+  baseUrl?: string;
+  free_models?: number;
+  total_models?: number;
+  [key: string]: unknown;
+}
+
+/** Extract message from unknown throwables (replaces `catch (e: any) => e.message`). */
+export function errMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
+
+/**
+ * Typed accessor for the virtual key set by auth middleware.
+ * Replaces `(c as any).get("vk")` — single sanctioned cast site.
+ */
+export function getRequestVk(c: unknown): VirtualKey | undefined {
+  const getter = (c as { get: (key: string) => unknown }).get.bind(c);
+  const vk = getter("vk") as VirtualKey | undefined;
+  return vk && typeof vk === "object" && "id" in vk ? vk : undefined;
+}
+
+/** Typed setter for the virtual key (auth middleware). */
+export function setRequestVk(c: Context, vk: VirtualKey): void {
+  (c as unknown as { set: (key: string, value: unknown) => void }).set("vk", vk);
+}

@@ -3,22 +3,23 @@ import { providers } from "../providers/registry.js";
 import { getNextKeyManaged } from "./key-manager.js";
 import { isOpen, recordSuccess, recordFailure } from "./circuit-breaker.js";
 import { logger } from "../middleware/logger.js";
+import { errMessage } from "./types.js";
 
 // Default fallback chain if EMBEDDING_FALLBACKS not set or primary fails.
 // Order: Cohere primary (env), then nvidia-nim, cloudflare, then hash fallback (no embedding)
 const DEFAULT_FALLBACKS = ["nvidia-nim/nvidia/nv-embed-v1", "cloudflare-workers-ai/@cf/baai/bge-large-en-v1.5"];
 
 function getEmbeddingModels(): string[] {
-  const primary = (config as any).embeddingModels as string[] | undefined;
-  const fallbacks = (config as any).embeddingFallbacks as string[] | undefined;
-  const list = [...(primary || [config.embeddingModel]), ...(fallbacks || DEFAULT_FALLBACKS)];
+  const primary = config.embeddingModels.length > 0 ? config.embeddingModels : [config.embeddingModel];
+  const fallbacks = config.embeddingFallbacks.length > 0 ? config.embeddingFallbacks : DEFAULT_FALLBACKS;
+  const list = [...primary, ...fallbacks];
   // dedup preserve order
   return [...new Set(list)];
 }
 
 async function tryEmbedWithModel(text: string, model: string, timeoutMs = 4000): Promise<number[] | null> {
   const providerId = model.includes("/") ? model.split("/")[0] : "cohere";
-  const provider: any = (providers as any)[providerId];
+  const provider = providers[providerId];
   if (!provider?.embeddings) {
     logger.warn({ provider: providerId, model }, "[embeddings] provider has no embeddings support, skipping");
     return null;
@@ -46,18 +47,26 @@ async function tryEmbedWithModel(text: string, model: string, timeoutMs = 4000):
       return null;
     }
     recordSuccess(providerId);
-    const data: any = await res.json().catch(async () => ({ text: await (res as any).text() }));
+    const data = (await res.json().catch(async () => ({ text: await res.text() }))) as {
+      data?: unknown;
+      embedding?: unknown;
+    };
     // OpenAI shape: { data: [{ embedding: [...] }], model }
-    const emb = data?.data?.[0]?.embedding || data?.embedding || data?.data?.[0] || null;
-    if (Array.isArray(emb) && emb.length > 0) return emb as number[];
-    if (Array.isArray(data?.data) && Array.isArray(data.data[0])) return data.data[0] as number[];
+    const first = Array.isArray(data.data) ? data.data[0] : undefined;
+    const firstEmbedding = first && typeof first === "object" ? (first as { embedding?: unknown }).embedding : undefined;
+    const emb = asNumberArray(firstEmbedding) ?? asNumberArray(data.embedding) ?? asNumberArray(first);
+    if (emb) return emb;
     logger.warn({ provider: providerId, model, data: JSON.stringify(data).slice(0, 300) }, "[embeddings] unexpected shape");
     return null;
-  } catch (e: any) {
-    logger.warn({ provider: providerId, model, err: e.message }, "[embeddings] failed, will try fallback");
+  } catch (e) {
+    logger.warn({ provider: providerId, model, err: errMessage(e) }, "[embeddings] failed, will try fallback");
     recordFailure(providerId);
     return null;
   }
+}
+
+function asNumberArray(v: unknown): number[] | null {
+  return Array.isArray(v) && v.length > 0 && v.every((n) => typeof n === "number") ? (v as number[]) : null;
 }
 
 /**

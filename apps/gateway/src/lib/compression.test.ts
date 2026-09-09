@@ -1,0 +1,126 @@
+import { describe, it, expect } from "vitest";
+import {
+  toolsMinify,
+  historySummarize,
+  codeDedup,
+  compressMessages,
+  compressWithMetrics,
+} from "./compression.js";
+
+describe("compression toolsMinify", () => {
+  it("truncates long tool descriptions, keeps required/enum", () => {
+    const msgs = [
+      {
+        role: "user",
+        content: "hi",
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "get_weather",
+              description: "x".repeat(200),
+              parameters: { type: "object", properties: { city: { type: "string", enum: ["HN", "HCM"] } }, required: ["city"] },
+            },
+          },
+        ],
+      },
+    ];
+    const out = toolsMinify(msgs);
+    const fn = (out[0] as any).tools[0].function;
+    expect(fn.description.length).toBeLessThanOrEqual(101);
+    expect(fn.parameters.required).toEqual(["city"]);
+    expect(fn.parameters.properties.city.enum).toEqual(["HN", "HCM"]);
+  });
+
+  it("leaves messages without tools untouched (same ref content)", () => {
+    const msgs = [{ role: "user", content: "hello" }];
+    const out = toolsMinify(msgs);
+    expect(out[0]).toBe(msgs[0]);
+  });
+});
+
+describe("compression historySummarize", () => {
+  it("keeps short history as-is", () => {
+    const msgs = Array.from({ length: 6 }, (_, i) => ({ role: "user", content: `m${i}` }));
+    expect(historySummarize(msgs)).toHaveLength(6);
+  });
+
+  it("keeps last 6 + system prompt, no duplicate system", () => {
+    const msgs = [
+      { role: "system", content: "sys" },
+      ...Array.from({ length: 10 }, (_, i) => ({ role: "user", content: `m${i}` })),
+    ];
+    const out = historySummarize(msgs);
+    expect(out).toHaveLength(7);
+    expect(out[0]).toMatchObject({ role: "system" });
+    expect(out.slice(1)).toHaveLength(6);
+  });
+
+  it("does not duplicate system when already in last 6", () => {
+    const msgs = [
+      ...Array.from({ length: 5 }, (_, i) => ({ role: "user", content: `m${i}` })),
+      { role: "system", content: "sys" },
+      { role: "user", content: "last" },
+    ];
+    const out = historySummarize(msgs);
+    const sysCount = out.filter((m: any) => m.role === "system").length;
+    expect(sysCount).toBe(1);
+  });
+});
+
+describe("compression codeDedup", () => {
+  it("removes duplicate code blocks, keeps first occurrence", () => {
+    const block = "```js\nconst a = 1;\n```";
+    const msgs = [
+      { role: "user", content: `${block} hello` },
+      { role: "user", content: `again ${block} world` },
+    ];
+    const out = codeDedup(msgs);
+    expect(out[0].content).toContain("const a = 1");
+    expect(out[1].content).not.toContain("const a = 1");
+    expect(out[1].content).toContain("world");
+  });
+
+  it("leaves messages without code blocks untouched", () => {
+    const msgs = [{ role: "user", content: "plain text" }];
+    const out = codeDedup(msgs);
+    expect(out[0]).toBe(msgs[0]);
+  });
+});
+
+describe("compression compressMessages / compressWithMetrics", () => {
+  it("compresses long history (ratio < 1, savedTokens > 0)", () => {
+    const msgs = [
+      { role: "system", content: "sys" },
+      ...Array.from({ length: 20 }, (_, i) => ({ role: "user", content: `message ${i} `.repeat(20) })),
+    ];
+    const res = compressMessages(msgs);
+    expect(res.ratio).toBeLessThan(1);
+    expect(res.savedTokens).toBeGreaterThan(0);
+    expect(res.messages.length).toBeLessThan(msgs.length);
+  });
+
+  it("respects maxTokens budget", () => {
+    const msgs = Array.from({ length: 20 }, (_, i) => ({ role: "user", content: `x`.repeat(500) + i }));
+    const res = compressMessages(msgs, { maxTokens: 100 });
+    expect(res.messages.length).toBeLessThan(msgs.length);
+  });
+
+  it("compressWithMetrics reports applied + durationMs", () => {
+    const msgs = [
+      { role: "system", content: "sys" },
+      ...Array.from({ length: 20 }, (_, i) => ({ role: "user", content: `message ${i} `.repeat(20) })),
+    ];
+    const res = compressWithMetrics(msgs);
+    expect(res.metrics.stage).toBe("compression");
+    expect(res.metrics.applied).toBe(true);
+    expect(res.metrics.durationMs).toBeGreaterThanOrEqual(0);
+    expect(res.metrics.originalTokens).toBeGreaterThan(res.metrics.compressedTokens);
+  });
+
+  it("short input is not marked applied", () => {
+    const msgs = [{ role: "user", content: "hi" }];
+    const res = compressWithMetrics(msgs);
+    expect(res.metrics.applied).toBe(false);
+  });
+});

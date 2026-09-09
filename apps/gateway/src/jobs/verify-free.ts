@@ -4,6 +4,8 @@ import { providers } from "../providers/registry.js";
 import { config } from "../config.js";
 import { logger } from "../middleware/logger.js";
 import { readDataJson, resolveDataPath } from "../lib/paths.js";
+import { errMessage, type FreellmsModelEntry } from "../lib/types.js";
+import type { ModelInfo } from "../providers/base.js";
 
 export type VerifyStatus = "verified_free" | "verified_paid" | "deprecated" | "unverified_no_key" | "error" | "unverified_no_data";
 
@@ -41,12 +43,12 @@ export interface VerifyReport {
   models: VerifiedModel[];
 }
 
-function loadFreellmsFree(): any[] {
-  return readDataJson<any[]>("freellms-models-free.json", []);
+function loadFreellmsFree(): FreellmsModelEntry[] {
+  return readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
 }
 
-function loadFreellmsProviders(): any[] {
-  return readDataJson<any[]>("freellms-providers.json", []);
+function loadFreellmsProviders(): FreellmsModelEntry[] {
+  return readDataJson<FreellmsModelEntry[]>("freellms-providers.json", []);
 }
 
 /**
@@ -57,9 +59,9 @@ function loadFreellmsProviders(): any[] {
 export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: number }): Promise<VerifyReport> {
   const freellmsFree = loadFreellmsFree();
   const _freellmsProviders = loadFreellmsProviders();
-  const byProvider = new Map<string, any[]>();
+  const byProvider = new Map<string, FreellmsModelEntry[]>();
   for (const m of freellmsFree) {
-    const slug = m.slug;
+    const slug = m.slug ?? "";
     if (!byProvider.has(slug)) byProvider.set(slug, []);
     byProvider.get(slug)!.push(m);
   }
@@ -79,7 +81,7 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
 
   for (const [providerId, provider] of Object.entries(providers)) {
     const freellmsCount = byProvider.get(providerId)?.length || 0;
-    const freellmsCountAlias = freellmsFree.filter((m: any) => m.provider === providerId || m.slug === providerId).length;
+    const freellmsCountAlias = freellmsFree.filter((m) => m.provider === providerId || m.slug === providerId).length;
     // Use actual freellms count for this provider (could be 0 for legacy like "nvidia")
     const effectiveFreellmsCount = freellmsCount || freellmsCountAlias;
 
@@ -97,17 +99,17 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
     if (!dryRun && !hasKey && !allowNoKey) {
       // Mark all freellms models for this provider as unverified_no_key (live needs key)
       // In dryRun mode we simulate verification even without key for CI
-      const list = byProvider.get(providerId) || freellmsFree.filter((m: any) => m.slug === providerId);
+      const list = byProvider.get(providerId) || freellmsFree.filter((m) => m.slug === providerId);
       for (const m of list) {
         const id = `${m.slug}/${m.name}`;
         report.models.push({
           id,
           provider: providerId,
           freellms_free: true,
-          freellms_score: parseInt(m.score) || 0,
+          freellms_score: parseInt(String(m.score ?? "")) || 0,
           status: "unverified_no_key",
           last_verified: report.generated_at,
-          context_length: parseInt(m.context) || 8192,
+          context_length: parseInt(String(m.context ?? "")) || 8192,
           error: "no API key configured — set " + providerId.toUpperCase().replace(/-/g, "_") + "_API_KEYS in .env to verify",
         });
       }
@@ -125,18 +127,18 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
 
     const key = keys[0] || "";
     const start = Date.now();
-    let liveModels: any[] = [];
+    let liveModels: ModelInfo[] = [];
     let error: string | undefined;
     try {
       if (dryRun) {
         // Dry run: simulate without hitting upstream (use freellms count as live)
         // For CI, we just mark as verified_free if freellms says free
-        liveModels = (byProvider.get(providerId) || []).map((m: any) => ({ id: `${providerId}/${m.name}`, provider: providerId }));
+        liveModels = (byProvider.get(providerId) || []).map((m) => ({ id: `${providerId}/${m.name}`, provider: providerId }));
       } else {
         liveModels = await provider.models(key);
       }
-    } catch (e: any) {
-      error = e.message || String(e);
+    } catch (e) {
+      error = errMessage(e);
       logger.warn({ provider: providerId, err: error }, "verify: models() failed");
     }
     const latency = Date.now() - start;
@@ -150,7 +152,7 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
           id: `${m.slug}/${m.name}`,
           provider: providerId,
           freellms_free: true,
-          freellms_score: parseInt(m.score) || 0,
+          freellms_score: parseInt(String(m.score ?? "")) || 0,
           status: "error",
           last_verified: report.generated_at,
           error,
@@ -172,7 +174,7 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
     }
 
     // Compare
-    const list = byProvider.get(providerId) || freellmsFree.filter((m: any) => m.slug === providerId);
+    const list = byProvider.get(providerId) || freellmsFree.filter((m) => m.slug === providerId);
     let verified = 0;
     let deprecated = 0;
     for (const m of list) {
@@ -186,13 +188,13 @@ export async function verifyFreeModels(opts?: { dryRun?: boolean; concurrency?: 
         id: `${m.slug}/${m.name}`,
         provider: providerId,
         freellms_free: true,
-        freellms_score: parseInt(m.score) || 0,
+        freellms_score: parseInt(String(m.score ?? "")) || 0,
         live_free: found ? true : false,
         live_found: found,
         status,
         last_verified: report.generated_at,
         latency_ms: latency,
-        context_length: parseInt(m.context) || 8192,
+        context_length: parseInt(String(m.context ?? "")) || 8192,
         error: found ? undefined : `not found in live /models (provider returned ${liveModels.length} models) — may be deprecated or renamed`,
       });
     }
@@ -233,15 +235,15 @@ export async function saveVerifyReport(report: VerifyReport) {
   fs.writeFileSync(resolveDataPath("verified-summary.json"), JSON.stringify(summary, null, 2));
   // Also update live-models.json from live provider data (source of truth, not freellms)
   try {
-    const liveModels: any[] = [];
+    const liveModels: Array<{ id: string; provider: string; display_name: string; context_length: number }> = [];
     for (const m of report.models) {
       if (m.status === "verified_free" && m.live_found) {
         liveModels.push({ id: m.id, provider: m.provider, display_name: m.id.split("/").slice(1).join("/"), context_length: m.context_length || 8192 });
       }
     }
     // Merge with existing live-models.json to keep models not in freellms but live (e.g., newly discovered)
-    const existing = readDataJson<any>("live-models.json", null as any);
-    const mergedMap = new Map<string, any>();
+    const existing = readDataJson<{ models?: Array<{ id: string; provider?: string }> } | null>("live-models.json", null);
+    const mergedMap = new Map<string, { id: string; provider: string; display_name: string; context_length: number }>();
     for (const m of liveModels) mergedMap.set(m.id, m);
     if (existing?.models) {
       for (const m of existing.models) {

@@ -22,10 +22,9 @@ export class SemanticCache {
   private scanCap: number;
 
   constructor(defaultTtlSec?: number) {
-    const cfgTtl = (config as any)?.semanticCacheTtlSec;
-    this.defaultTtl = defaultTtlSec ?? (typeof cfgTtl === "number" && cfgTtl > 0 ? cfgTtl : 3600);
-    this.maxMemEntries = (config as any)?.semanticCacheMaxMemEntries ?? 1000;
-    this.scanCap = (config as any)?.semanticCacheScanCap ?? 200;
+    this.defaultTtl = defaultTtlSec ?? (typeof config.semanticCacheTtlSec === "number" && config.semanticCacheTtlSec > 0 ? config.semanticCacheTtlSec : 3600);
+    this.maxMemEntries = config.semanticCacheMaxMemEntries ?? 1000;
+    this.scanCap = config.semanticCacheScanCap ?? 200;
   }
 
   private hash(query: string): string {

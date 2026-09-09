@@ -75,6 +75,7 @@ export interface ResponsesRequest {
   stream?: boolean;
   temperature?: number;
   max_output_tokens?: number;
+  max_tokens?: number;
   tools?: unknown[];
   tool_choice?: unknown;
   user?: string;
@@ -101,6 +102,7 @@ export interface Provider {
   embeddings?(req: EmbeddingsRequest, apiKey: string): Promise<Response>;
   images?(req: ImagesRequest, apiKey: string): Promise<Response>;
   transcriptions?(req: AudioTranscriptionRequest, apiKey: string): Promise<Response>;
+  translations?(req: AudioTranscriptionRequest, apiKey: string): Promise<Response>;
   speech?(req: AudioSpeechRequest, apiKey: string): Promise<Response>;
   responses?(req: ResponsesRequest, apiKey: string): Promise<Response>;
   anthropic?(req: AnthropicRequest, apiKey: string): Promise<Response>;

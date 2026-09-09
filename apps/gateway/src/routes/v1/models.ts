@@ -7,23 +7,44 @@ import { config } from "../../config.js";
 import { isPublicProvider } from "../../lib/router.js";
 import { sanitizeFreellmsName } from "../../lib/sanitize.js";
 import { loadHealthMap as loadHealthMapCached, loadLiveModels as loadLiveModelsCached } from "../../lib/model-store.js";
+import type { FreellmsModelEntry } from "../../lib/types.js";
 
 export const modelsRoute = new Hono();
+
+/** Catalog entry served by GET /v1/models (freellms + supplements + live). */
+export interface ModelListEntry {
+  id: string;
+  raw_id?: string;
+  object?: string;
+  owned_by: string;
+  provider?: string;
+  display_name?: string;
+  context_length?: number;
+  score?: number;
+  tier?: unknown;
+  live_status?: string;
+  capabilities?: unknown;
+  limit?: unknown;
+  created?: number;
+  health?: unknown;
+  persisted_404?: boolean;
+  [key: string]: unknown;
+}
  // Load freellms free models if available (316 models) — fallback to models.yaml for fresh clone (b930e6d deletes data/*.json)
-function loadFreellmsModels(): any[] {
-  const arr = readDataJson<any[]>("freellms-models-free.json", []);
+function loadFreellmsModels(): ModelListEntry[] {
+  const arr = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
   if (arr.length > 0) {
-    return arr.map((m: any) => {
-      const sanitized = sanitizeFreellmsName(m.name);
+    return arr.map((m) => {
+      const sanitized = sanitizeFreellmsName(String(m.name ?? ""));
       return {
         id: `${m.slug}/${sanitized}`,
         raw_id: `${m.slug}/${m.name}`,
         object: "model",
-        owned_by: m.slug,
+        owned_by: m.slug || "unknown",
         provider: m.slug,
         display_name: m.name,
-        context_length: parseInt(m.context) || 8192,
-        score: parseInt(m.score) || 0,
+        context_length: parseInt(String(m.context ?? "")) || 8192,
+        score: parseInt(String(m.score ?? "")) || 0,
         tier: m.tier_type,
         freellms_verified: m.verified,
         no_card: m.nocard,
@@ -49,7 +70,7 @@ function loadFreellmsModels(): any[] {
     // Parse models.yaml: each entry has id, provider, display_name, context_length, score, tier, verified, capabilities, limit
     // Use block regex to extract each model entry
     const blocks = raw.split(/\n\s*-\s+id:\s*/);
-    const out: any[] = [];
+    const out: ModelListEntry[] = [];
     for (let i = 1; i < blocks.length; i++) {
       const blk = blocks[i];
       const idMatch = blk.match(/^"([^"]+)"/);
@@ -79,7 +100,7 @@ function loadFreellmsModels(): any[] {
 function loadVerifiedMapFull(): Map<string, Record<string, unknown>> {
   const data = readDataJson<{ models?: Array<{ id: string; [k: string]: unknown }> }>("verified-models.json", { models: [] });
   const map = new Map<string, Record<string, unknown>>();
-  for (const m of data.models || []) map.set(m.id, m as Record<string, unknown>);
+  for (const m of data.models || []) map.set(m.id, m);
   return map;
 }
 
@@ -87,7 +108,7 @@ const freellmsModels = loadFreellmsModels();
 
 // Supplement from user's opencode.json (https://freellms.org/?free=1 + custom gateways)
 // Ensures models like deepseek/deepseek-v4-flash-free and qwen/qwen3.8-27b-free are displayed even if live sync missed them
-const opencodeSupplement: any[] = [
+const opencodeSupplement: ModelListEntry[] = [
   // agnes-custom -> agnes-ai
   { id: "agnes-ai/agnes-2.5-flash", owned_by: "agnes-ai", provider: "agnes-ai", display_name: "agnes-2.5-flash", context_length: 256000, score: 82, tier: "permanent", live_status: "alias", capabilities: ["text","vision"], limit: "30 RPM" },
   // openrouter-custom -> openrouter
@@ -189,7 +210,7 @@ modelsRoute.get("/", async (c) => {
   const healthMap = loadHealthMapCached();
   const liveModelsCache = loadLiveModelsCached();
 
-  const all: any[] = [];
+  const all: ModelListEntry[] = [];
 
   // If hasKeyOnly and we have live cache, use live provider list as source of truth (not freellms)
   if (hasKeyOnly && liveModelsCache.length > 0) {
@@ -215,7 +236,7 @@ modelsRoute.get("/", async (c) => {
       const hasRealKey = keys.some((k) => k.length > 20 && !k.includes("xxx") && !k.includes("change-me")) || isPublicProvider(em.owned_by);
       if (!hasRealKey) continue;
       const exists = all.some((m) => m.id === em.id);
-      if (!exists) all.push(em as any);
+      if (!exists) all.push(em);
     }
     for (const em of opencodeSupplement) {
       if (providerFilter && em.owned_by !== providerFilter) continue;
@@ -242,10 +263,10 @@ modelsRoute.get("/", async (c) => {
         if (!hasRealKey) continue;
       }
       if (!matchesQ(m.id)) continue;
-      const v = (verifiedMap.get(m.id) || verifiedMap.get((m as any).raw_id)) as Record<string, unknown> | undefined;
-      const h = healthMap.get(m.id) || healthMap.get((m as any).raw_id);
+      const v = verifiedMap.get(m.id) ?? (m.raw_id ? verifiedMap.get(m.raw_id) : undefined);
+      const h = healthMap.get(m.id) ?? (m.raw_id ? healthMap.get(m.raw_id) : undefined);
       let live_status: string = v ? String(v["status"] ?? "unverified_no_data") : "unverified_no_data";
-      let persisted404: any = null;
+      let persisted404: unknown = null;
       if (h && (h.http_status === 404 || h.http_status === 410)) {
         live_status = "deprecated";
         persisted404 = h;
@@ -255,7 +276,7 @@ modelsRoute.get("/", async (c) => {
         persisted404 = null;
       }
       const annotated = v || h
-        ? { ...m, live_status, live_free: (v as Record<string, unknown>)?.["live_free"] ?? false, live_found: (v as Record<string, unknown>)?.["live_found"] ?? false, last_verified: (h as Record<string, unknown>)?.["updated_at"] || (v as Record<string, unknown>)?.["last_verified"] || null, verified_error: (h as Record<string, unknown>)?.["error"] || (v as Record<string, unknown>)?.["error"], persisted_404: !!persisted404, health: h }
+        ? { ...m, live_status, live_free: v?.["live_free"] ?? false, live_found: v?.["live_found"] ?? false, last_verified: h?.["updated_at"] || v?.["last_verified"] || null, verified_error: h?.["error"] || v?.["error"], persisted_404: !!persisted404, health: h }
         : { ...m, live_status: "unverified_no_data" as const, last_verified: null };
       if (verifiedFilter) {
         if (verifiedFilter === "free" && annotated.live_status !== "verified_free") continue;
@@ -298,7 +319,7 @@ modelsRoute.get("/", async (c) => {
         }
         if (verifiedFilter && verifiedFilter !== "free" && em.live_status !== verifiedFilter) continue;
         const exists = all.some((m) => m.id === em.id);
-        if (!exists) all.push(em as any);
+        if (!exists) all.push(em);
       }
       for (const em of opencodeSupplement) {
         if (providerFilter && em.owned_by !== providerFilter) continue;
@@ -309,8 +330,8 @@ modelsRoute.get("/", async (c) => {
           if (!hasRealKey) continue;
         }
         const h = healthMap.get(em.id);
-        let live_status: string = (em as any).live_status;
-        let persisted404: any = null;
+        let live_status: string = em.live_status || "alias";
+        let persisted404: unknown = null;
         if (h && (h.http_status === 404 || h.http_status === 410)) { live_status = "deprecated"; persisted404 = h; }
         else if (h && (h.http_status === 200 || h.status === "usable")) { live_status = "verified_free"; persisted404 = null; }
         if (verifiedFilter) {
@@ -340,7 +361,7 @@ modelsRoute.get("/", async (c) => {
     }
   }
 
-  const verifiedSummary = readDataJson<any>("verified-summary.json", null);
+  const verifiedSummary = readDataJson<Record<string, unknown> | null>("verified-summary.json", null);
 
   // Pagination: limit 25/50 LOV, page 1-indexed
   // Deduplicate by id (fix duplicate keys like openrouter/Qwen/Qwen2.5-VL-72B-Instruct)
@@ -371,7 +392,7 @@ modelsRoute.get("/:id", (c) => {
   const verifiedMap = loadVerifiedMapFull();
   const found = freellmsModels.find((m) => m.id === id);
   if (found) {
-    const v = verifiedMap.get(id) as Record<string, unknown> | undefined;
+    const v = verifiedMap.get(id);
     return c.json(v ? { ...found, live_status: v["status"], last_verified: v["last_verified"], error: v["error"] } : found);
   }
   return c.json({ id, object: "model", owned_by: id.split("/")[0] || "gateway", created: 1715433600 });

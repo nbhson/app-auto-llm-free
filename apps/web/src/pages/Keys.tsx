@@ -1,23 +1,24 @@
 import { useEffect, useState } from "react";
 import { Copy, Check, Key, Trash2, ShieldCheck, Dices, Terminal, ShieldAlert, ChevronDown } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
+import type { VirtualKeyView } from "../lib/api-types.ts";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 function randHex(bytes: number) { const a = new Uint8Array(bytes); crypto.getRandomValues(a); return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join(""); }
 
 export default function Keys() {
   const { t } = useLang();
-  const [keys, setKeys] = useState<any[]>([]);
+  const [keys, setKeys] = useState<VirtualKeyView[]>([]);
   const [name, setName] = useState("my-app");
   const [scopes, setScopes] = useState('{"models":["*"],"providers":["*"]}');
   const [rpm, setRpm] = useState("60");
-  const [lastCreated, setLastCreated] = useState<any>(null);
+  const [lastCreated, setLastCreated] = useState<VirtualKeyView | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [genOpen, setGenOpen] = useState(true);
 
   const load = () => { fetch("/api/keys", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => setKeys(d.data || [])).catch(() => {}); };
   useEffect(() => { load(); }, []);
   const create = async () => {
-    let sc: any; try { sc = JSON.parse(scopes); } catch { alert("scopes JSON invalid"); return; }
+    let sc: { models?: string[]; providers?: string[] }; try { sc = JSON.parse(scopes); } catch { alert("scopes JSON invalid"); return; }
     const res = await fetch("/api/keys", { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ name, scopes: sc, rpmLimit: parseInt(rpm, 10) }) });
     const data = await res.json(); if (!res.ok) alert(JSON.stringify(data)); else { setLastCreated(data); load(); }
   };
@@ -60,7 +61,7 @@ export default function Keys() {
           </div>
           <div className="flex items-center gap-2 bg-white/90 p-2.5 rounded-lg border border-amber-200">
             <code className="flex-1 font-mono text-xs truncate select-all">{lastCreated.key}</code>
-            <button onClick={() => { navigator.clipboard.writeText(lastCreated.key); setCopied("new"); setTimeout(()=>setCopied(null),1500); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 text-white">{copied==="new" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}{copied==="new" ? "Copied" : "Copy Key"}</button>
+            <button onClick={() => { navigator.clipboard.writeText(lastCreated.key || ""); setCopied("new"); setTimeout(()=>setCopied(null),1500); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 text-white">{copied==="new" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}{copied==="new" ? "Copied" : "Copy Key"}</button>
           </div>
           <p className="text-[11px] text-amber-800">{t("keys.save_desc")}</p>
         </div>
@@ -105,7 +106,7 @@ export default function Keys() {
                   <td className="px-4 py-3 font-mono text-[11px] text-slate-600 max-w-xs truncate">{JSON.stringify(k.scopes)}</td>
                   <td className="px-4 py-3 font-mono font-bold">{k.rpmLimit}</td>
                   <td className="px-4 py-3 font-mono">{k.requestCount ?? 0}</td>
-                  <td className="px-4 py-3 text-slate-500">{new Date(k.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-slate-500">{k.createdAt ? new Date(k.createdAt).toLocaleDateString() : "-"}</td>
                   <td className="px-4 py-3">{k.id !== "vk-master" && <button onClick={() => del(k.id)} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-md border border-transparent hover:border-rose-200"><Trash2 className="w-3.5 h-3.5" />Delete</button>}</td>
                 </tr>
               ))}

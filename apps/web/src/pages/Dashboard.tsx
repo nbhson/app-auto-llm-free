@@ -3,15 +3,16 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { Layers, Activity, Clock, Sparkles, BarChart3, Copy, Check, X, PanelRight, Zap, Key, Terminal, ArrowRight } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLang } from "../lib/i18n.tsx";
+import type { ApiLog, GatewayStats, VerifySummary } from "../lib/api-types.ts";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
 export default function Dashboard() {
   const { t } = useLang();
-  const [health, setHealth] = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [verify, setVerify] = useState<any>(null);
-  const [recent, setRecent] = useState<any[]>([]);
+  const [health, setHealth] = useState<{ status?: string; providers?: number; [key: string]: unknown } | null>(null);
+  const [stats, setStats] = useState<GatewayStats | null>(null);
+  const [verify, setVerify] = useState<VerifySummary | null>(null);
+  const [recent, setRecent] = useState<ApiLog[]>([]);
   const [copiedHealth, setCopiedHealth] = useState(false);
   const [copiedStats, setCopiedStats] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -178,7 +179,7 @@ export default function Dashboard() {
           </div>
           {recent.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={[...recent].reverse().map((r) => ({ time: new Date(r.timestamp).toLocaleTimeString(), ms: r.latencyMs }))}>
+              <LineChart data={[...recent].reverse().map((r) => ({ time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : "-", ms: r.latencyMs }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="time" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} />
@@ -216,7 +217,7 @@ export default function Dashboard() {
                   <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Model</th><th className="px-4 py-3">Tokens</th><th className="px-4 py-3">MS</th><th className="px-4 py-3">Status</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {recent.map((l) => <tr key={l.id} className="hover:bg-slate-50/80"><td className="px-4 py-3 font-mono text-slate-600">{new Date(l.timestamp).toLocaleTimeString()}</td><td className="px-4 py-3"><span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 border font-semibold">{l.provider}</span></td><td className="px-4 py-3 font-semibold text-slate-800">{l.model.split("/").pop()}</td><td className="px-4 py-3 font-mono">{l.totalTokens ?? "-"}<span className="text-slate-400"> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td><td className="px-4 py-3 font-mono">{l.latencyMs}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full text-[11px] border ${l.status === 200 ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-rose-700 bg-rose-50 border-rose-200"}`}>{l.status}</span></td></tr>)}
+                  {recent.map((l) => <tr key={l.id} className="hover:bg-slate-50/80"><td className="px-4 py-3 font-mono text-slate-600">{l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : "-"}</td><td className="px-4 py-3"><span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 border font-semibold">{l.provider}</span></td><td className="px-4 py-3 font-semibold text-slate-800">{l.model.split("/").pop()}</td><td className="px-4 py-3 font-mono">{l.totalTokens ?? "-"}<span className="text-slate-400"> ({l.promptTokens ?? 0}+{l.completionTokens ?? 0})</span></td><td className="px-4 py-3 font-mono">{l.latencyMs}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full text-[11px] border ${l.status === 200 ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-rose-700 bg-rose-50 border-rose-200"}`}>{l.status}</span></td></tr>)}
                 </tbody>
               </table>
             )}

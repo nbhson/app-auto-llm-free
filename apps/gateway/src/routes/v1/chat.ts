@@ -16,6 +16,8 @@ import { logGenAI } from "../../lib/otel.js";
 import { FREELLMS_COST, rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
 import { loadVerifiedMap, loadHealthMap } from "../../lib/model-store.js";
+import { getRequestVk, errMessage, type ProviderError, type UpstreamChatCompletion, type CompressibleMessage } from "../../lib/types.js";
+import type { ChatMessage } from "../../providers/base.js";
 
 const chatSchema = z.object({
   model: z.string().min(1),
@@ -50,7 +52,7 @@ chatRoute.post(
   async (c) => {
     const body = c.req.valid("json");
     const model = body.model || config.defaultModel;
-    const vk = (c as any).get("vk") as any;
+    const vk = getRequestVk(c);
 
     // Scope check for virtual key
     if (vk && !hasScope(vk, model, undefined)) {
@@ -95,9 +97,9 @@ chatRoute.post(
       } catch { /* ignore */ }
     }
 
-    const estimated = estimateChatTokens({ messages: body.messages as any, max_tokens: body.max_tokens });
+    const estimated = estimateChatTokens({ messages: body.messages, max_tokens: body.max_tokens });
     const startAll = Date.now();
-    const errors: any[] = [];
+    const errors: ProviderError[] = [];
 
     // Vector 2: semantic cache check first (cheapest) - only for non-stream
     // harness 01 Retrieve: tenant-aware key (vkId + tools + temperature) prevents poisoning
@@ -113,7 +115,7 @@ chatRoute.post(
         if (cacheHitContent) {
           logger.info({ model, vkId: vk?.id }, "semantic cache hit");
           logGenAI("chat", { model, provider: "cache", promptTokens: estimated.prompt, latencyMs: Date.now() - startAll, cacheHit: true });
-          addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimated.prompt, completionTokens: estimateChatTokens({ messages: [{ role: "assistant", content: cacheHitContent }] as any }).prompt, totalTokens: estimated.prompt + 20, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
+          addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimated.prompt, completionTokens: estimateChatTokens({ messages: [{ role: "assistant", content: cacheHitContent }] }).prompt, totalTokens: estimated.prompt + 20, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
           return c.json({ id: `chatcmpl-cache-${Date.now()}`, object: "chat.completion", created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, message: { role: "assistant", content: cacheHitContent }, finish_reason: "stop" }], usage: { prompt_tokens: estimated.prompt, completion_tokens: 20, total_tokens: estimated.prompt + 20 } });
         }
       } catch { /* ignore */ }
@@ -121,20 +123,20 @@ chatRoute.post(
 
     // Vector 2: optional compression (only on cache miss) - harness 02 Build Context pipeline
     // Workflow Stage: metrics + guard + token budget
-    let messagesToSend: any = body.messages;
+    let messagesToSend: CompressibleMessage[] = body.messages;
     let compressionRatio: number | undefined;
     let compressedTokens: number | undefined;
     if (config.compressionEnabled && body.messages?.length > 6) {
-      const maxTokens = (config as any).compressionMaxTokens || 4096;
-      const comp = compressWithMetrics(body.messages as any, { maxTokens: estimated.prompt > maxTokens ? maxTokens : undefined });
+      const maxTokens = config.compressionMaxTokens || 4096;
+      const comp = compressWithMetrics(body.messages, { maxTokens: estimated.prompt > maxTokens ? maxTokens : undefined });
       if (comp.metrics.applied) {
         messagesToSend = comp.messages;
         compressionRatio = comp.ratio;
         compressedTokens = Math.max(0, estimated.prompt - comp.savedTokens);
-        logger.info({ model, original: (body.messages as any).length, compressed: messagesToSend.length, ratio: comp.ratio, savedTokens: comp.savedTokens, durationMs: comp.metrics.durationMs }, "compression applied");
+        logger.info({ model, original: body.messages.length, compressed: messagesToSend.length, ratio: comp.ratio, savedTokens: comp.savedTokens, durationMs: comp.metrics.durationMs }, "compression applied");
       }
     }
-    const estimatedForQuota = estimateChatTokens({ messages: messagesToSend as any, max_tokens: body.max_tokens });
+    const estimatedForQuota = estimateChatTokens({ messages: messagesToSend, max_tokens: body.max_tokens });
 
     for (const pid of providerOrder) {
       const provider = providers[pid];
@@ -182,7 +184,7 @@ chatRoute.post(
         const res = await provider.chat(
           {
             model,
-            messages: (typeof messagesToSend !== "undefined" ? messagesToSend : body.messages) as any,
+            messages: messagesToSend as unknown as ChatMessage[],
             temperature: body.temperature,
             max_tokens: body.max_tokens,
             stream: body.stream,
@@ -254,7 +256,7 @@ chatRoute.post(
           });
         }
 
-        const data: any = await res.json().catch(async () => ({ text: await res.text() }));
+        const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamChatCompletion;
         if (data.choices) {
           c.header("X-Provider", pid);
           c.header("X-Verified", vStatus);
@@ -313,9 +315,9 @@ chatRoute.post(
           choices: [{ index: 0, message: { role: "assistant", content: typeof data === "string" ? data : JSON.stringify(data) }, finish_reason: "stop" }],
           usage: { prompt_tokens: estimated.prompt, completion_tokens: 0, total_tokens: estimated.total },
         });
-      } catch (e: any) {
-        logger.warn({ provider: pid, err: e.message }, "provider failed, trying next");
-        errors.push({ provider: pid, error: e.message });
+      } catch (e) {
+        logger.warn({ provider: pid, err: errMessage(e) }, "provider failed, trying next");
+        errors.push({ provider: pid, error: errMessage(e) });
         recordFailure(pid);
         continue;
       }
@@ -348,7 +350,7 @@ chatRoute.post(
               index: 0,
               message: {
                 role: "assistant",
-                content: `[mock] All providers failed, returning mock. Errors: ${JSON.stringify(errors).slice(0, 900)} — configure API keys in .env to get real responses. You asked: "${(body.messages.at(-1)?.content as any)?.toString?.().slice(0, 100) || ""}"`,
+                content: `[mock] All providers failed, returning mock. Errors: ${JSON.stringify(errors).slice(0, 900)} — configure API keys in .env to get real responses. You asked: "${String(body.messages.at(-1)?.content ?? "").slice(0, 100)}"`,
               },
               finish_reason: "stop",
             },

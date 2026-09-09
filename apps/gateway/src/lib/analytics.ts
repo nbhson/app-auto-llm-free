@@ -50,7 +50,7 @@ export function getCostBreakdown(): Record<string, { tokens: number; cost: numbe
   return Object.fromEntries(map.entries());
 }
 
-export async function getAnalytics(opts: AnalyticsOpts): Promise<any> {
+export async function getAnalytics(opts: AnalyticsOpts): Promise<Record<string, unknown>> {
   const limit = opts.limit ?? 100;
   const logs = getLogs(limit);
   const stats = getStats();
@@ -78,7 +78,7 @@ export async function getAnalytics(opts: AnalyticsOpts): Promise<any> {
     // assume provider grouping for cost, else 0
     const costProvider = opts.groupBy === "provider" ? k : "";
     g.cost = costProvider ? Number(costFor(costProvider, g.tokens).toFixed(6)) : 0;
-    (g as any).latencies = undefined;
+    (g as { latencies?: number[] }).latencies = undefined;
   }
 
   const costBreakdown = getCostBreakdown();

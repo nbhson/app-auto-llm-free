@@ -12,6 +12,8 @@ import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.
 import { addLog } from "../../lib/request-log.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { translateResponsesToChat, translateChatToResponses, createResponsesStreamChunk } from "../../lib/responses-translator.js";
+import { getRequestVk, errMessage, type ProviderError, type UpstreamChatCompletion } from "../../lib/types.js";
+import type { ResponsesRequest } from "../../providers/base.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -35,14 +37,14 @@ function loadVerifiedMap(): Map<string, string> {
   try {
     const p = path.resolve("data/verified-models.json");
     if (!fs.existsSync(p)) return new Map();
-    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    const data = JSON.parse(fs.readFileSync(p, "utf-8")) as { models?: Array<{ id: string; status: string }> };
     const m = new Map<string, string>();
     for (const row of data.models || []) m.set(row.id, row.status);
     const hp = path.resolve("data/model-health.json");
     if (fs.existsSync(hp)) {
-      const hdata = JSON.parse(fs.readFileSync(hp, "utf-8"));
-      for (const [id, v] of Object.entries(hdata as any)) {
-        if ((v as any).http_status === 404 || (v as any).http_status === 410) m.set(id, "deprecated");
+      const hdata = JSON.parse(fs.readFileSync(hp, "utf-8")) as Record<string, { http_status?: number }>;
+      for (const [id, v] of Object.entries(hdata)) {
+        if (v.http_status === 404 || v.http_status === 410) m.set(id, "deprecated");
       }
     }
     return m;
@@ -53,10 +55,18 @@ function loadVerifiedMap(): Map<string, string> {
 
 export const responsesRoute = new Hono();
 
-async function handleResponses(c: any) {
-  const body = c.req.valid("json");
+/** Minimal context surface used by the shared responses handler (3 routes). */
+interface ResponsesHandlerContext {
+  req: {
+    header: (name: string) => string | undefined;
+  };
+  header: (name: string, value: string) => void;
+  json: (obj: unknown, status?: 200 | 403 | 502) => Response;
+}
+
+async function handleResponses(c: ResponsesHandlerContext, body: ResponsesRequest) {
   const model = body.model || config.defaultModel;
-  const vk = (c as any).get("vk") as any;
+  const vk = getRequestVk(c);
 
   if (vk && !hasScope(vk, model, undefined)) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
@@ -80,18 +90,18 @@ async function handleResponses(c: any) {
     providerOrder = providerOrder.filter((p) => p !== prefix);
   }
 
-  const chatReq = translateResponsesToChat(body as any);
+  const chatReq = translateResponsesToChat(body);
   const estimated = estimateChatTokens({
-    messages: chatReq.messages as any,
+    messages: chatReq.messages,
     max_tokens: body.max_output_tokens ?? body.max_tokens,
   });
   const startAll = Date.now();
-  const errors: any[] = [];
+  const errors: ProviderError[] = [];
 
   const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
   const parentSessionId = c.req.header("x-parent-session-id") || c.req.header("X-Parent-Session-ID") || undefined;
-  if (sessionId) (chatReq as any).sessionId = sessionId;
-  if (parentSessionId) (chatReq as any).parentSessionId = parentSessionId;
+  if (sessionId) chatReq.sessionId = sessionId;
+  if (parentSessionId) chatReq.parentSessionId = parentSessionId;
 
   for (const pid of providerOrder) {
     const provider = providers[pid];
@@ -127,8 +137,8 @@ async function handleResponses(c: any) {
 
     try {
       const res = provider.responses
-        ? await provider.responses(body as any, key)
-        : await provider.chat(chatReq as any, key);
+        ? await provider.responses(body, key)
+        : await provider.chat(chatReq, key);
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
@@ -178,7 +188,7 @@ async function handleResponses(c: any) {
 
         const stream = new ReadableStream({
           async start(controller) {
-            const reader = (res.body as any)?.getReader();
+            const reader = res.body?.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
             const encoder = new TextEncoder();
@@ -215,7 +225,7 @@ async function handleResponses(c: any) {
                 }
               }
             } catch (e) {
-              logger.warn({ provider: pid, err: (e as any).message }, "responses stream error");
+              logger.warn({ provider: pid, err: errMessage(e) }, "responses stream error");
             } finally {
               controller.close();
             }
@@ -235,8 +245,8 @@ async function handleResponses(c: any) {
         });
       }
 
-      const data: any = await res.json().catch(async () => ({ text: await res.text() }));
-      let out: any;
+      const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamChatCompletion;
+      let out: UpstreamChatCompletion;
       if (provider.responses) {
         out = data;
         if (!out.id) out.id = `resp_${Date.now()}`;
@@ -272,9 +282,9 @@ async function handleResponses(c: any) {
         verifiedStatus: vStatus,
       });
       return c.json(out);
-    } catch (e: any) {
-      logger.warn({ provider: pid, err: e.message }, "provider failed (responses)");
-      errors.push({ provider: pid, error: e.message });
+    } catch (e) {
+      logger.warn({ provider: pid, err: errMessage(e) }, "provider failed (responses)");
+      errors.push({ provider: pid, error: errMessage(e) });
       recordFailure(pid);
       continue;
     }
@@ -316,8 +326,8 @@ async function handleResponses(c: any) {
   return c.json({ error: { message: "All providers failed", type: "provider_error", provider_errors: errors } }, 502);
 }
 
-responsesRoute.post("/", zValidator("json", responsesSchema), handleResponses);
-responsesRoute.post("", zValidator("json", responsesSchema), handleResponses);
+responsesRoute.post("/", zValidator("json", responsesSchema), (c) => handleResponses(c, c.req.valid("json")));
+responsesRoute.post("", zValidator("json", responsesSchema), (c) => handleResponses(c, c.req.valid("json")));
 
 responsesRoute.get("/:id", async (c) => {
   const id = c.req.param("id");
@@ -335,6 +345,6 @@ responsesRoute.get("/:id", async (c) => {
   return c.json({ error: { message: `Response ${id} not found`, type: "not_found" } }, 404);
 });
 
-responsesRoute.post("/conversations", zValidator("json", responsesSchema), handleResponses);
+responsesRoute.post("/conversations", zValidator("json", responsesSchema), (c) => handleResponses(c, c.req.valid("json")));
 
 export const conversationsRoute = responsesRoute;

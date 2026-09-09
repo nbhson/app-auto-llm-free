@@ -1,5 +1,15 @@
 import type { ChatRequest } from "../providers/base.js";
 
+interface OpenAIToolDef {
+  function?: { name?: string; description?: string; parameters?: unknown };
+  name?: string;
+  description?: string;
+}
+
+interface GeminiPart {
+  text?: unknown;
+}
+
 // OpenAI -> Gemini (with tools support)
 export function translateOpenAIToGemini(req: ChatRequest) {
   const contents = req.messages
@@ -12,15 +22,15 @@ export function translateOpenAIToGemini(req: ChatRequest) {
   const systemInstruction = req.messages.find((m) => m.role === "system");
 
   // Tools -> Gemini functionDeclarations
-  let tools: any = undefined;
+  let tools: Array<{ functionDeclarations: Array<{ name?: string; description?: string; parameters?: unknown }> }> | undefined = undefined;
   if (req.tools && Array.isArray(req.tools) && req.tools.length > 0) {
-    const fns = req.tools
-      .map((t: any) => t.function || t)
+    const fns = (req.tools as OpenAIToolDef[])
+      .map((t) => t.function || t)
       .filter(Boolean)
-      .map((fn: any) => ({
+      .map((fn) => ({
         name: fn.name,
         description: fn.description || "",
-        parameters: fn.parameters,
+        parameters: (fn as { parameters?: unknown }).parameters,
       }));
     if (fns.length > 0) tools = [{ functionDeclarations: fns }];
   }
@@ -51,10 +61,11 @@ export function createOpenAIChunk(model: string, content: string, finish?: strin
 }
 
 // Gemini -> OpenAI
-export function translateGeminiToOpenAI(data: any, geminiModel: string, originalModel: string) {
-  const candidate = data.candidates?.[0];
-  const text = candidate?.content?.parts?.map((p: any) => p.text).join("") || "";
-  const usage = data.usageMetadata || {};
+export function translateGeminiToOpenAI(data: unknown, geminiModel: string, originalModel: string) {
+  const root = (data ?? {}) as { candidates?: Array<{ content?: { parts?: GeminiPart[] }; finishReason?: string }>; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } };
+  const candidate = root.candidates?.[0];
+  const text = candidate?.content?.parts?.map((p) => String(p.text ?? "")).join("") || "";
+  const usage = root.usageMetadata || {};
   return {
     id: `chatcmpl-${Date.now()}`,
     object: "chat.completion",

@@ -110,7 +110,7 @@ export function recordUsage(provider: string, key: string, tokens: number) {
   try {
     // dynamic import to avoid circular dep
     import("./redis.js").then(({ getRedis }) => {
-      const r: any = getRedis?.();
+      const r = getRedis?.();
       if (!r) return;
       const dayKey = `quota:${k}:${Math.floor(now / 86400000)}`;
       r.incr(dayKey).catch(() => {});

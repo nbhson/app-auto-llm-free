@@ -4,6 +4,7 @@ import { logger } from "../middleware/logger.js";
 import { config } from "../config.js";
 import fs from "node:fs";
 import { resolveDataPath } from "../lib/paths.js";
+import { errMessage } from "../lib/types.js";
 
 const INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS || "86400000", 10); // 24h
 const VERIFIED_PATH = resolveDataPath("verified-models.json");
@@ -26,8 +27,8 @@ export function startScheduler() {
       try {
         const { syncPricing } = await import("../lib/cost-router.js");
         await syncPricing();
-      } catch (e: any) {
-        logger.warn({ err: e.message }, "scheduler: cost-router syncPricing failed");
+      } catch (e) {
+        logger.warn({ err: errMessage(e) }, "scheduler: cost-router syncPricing failed");
       }
     }, 8000);
     // then every 6h
@@ -47,8 +48,8 @@ export function startScheduler() {
         await saveVerifyReport(report);
         try { await syncLiveModels(); } catch { /* ignore */ }
         logger.info("scheduler: initial verify done");
-      } catch (e: any) {
-        logger.error({ err: e.message }, "scheduler: initial verify failed");
+      } catch (e) {
+        logger.error({ err: errMessage(e) }, "scheduler: initial verify failed");
       }
     }, 5000);
   } else {
@@ -63,8 +64,8 @@ export function startScheduler() {
       await saveVerifyReport(report);
       try { await syncLiveModels(); } catch { /* ignore */ }
       logger.info({ verified: report.total_verified_free, deprecated: report.total_deprecated }, "scheduler: periodic verify done");
-    } catch (e: any) {
-      logger.error({ err: e.message }, "scheduler: periodic verify failed");
+    } catch (e) {
+      logger.error({ err: errMessage(e) }, "scheduler: periodic verify failed");
     }
   }, INTERVAL_MS);
 

@@ -3,12 +3,25 @@ import { Search, RefreshCw, ExternalLink, Copy, Check, Layers, ArrowUpDown } fro
 import { getKeyUrl } from "../lib/getKeyUrls";
 import { getBaseUrl } from "../lib/getBaseUrls";
 import { useLang } from "../lib/i18n.tsx";
+import { errMsg, type ApiHealth, type ApiProvider } from "../lib/api-types.ts";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
+
+interface ProvidersPayload {
+  detailed?: ApiProvider[];
+  pagination?: { page: number; limit: number; total: number; total_pages: number; has_next?: boolean; has_prev?: boolean };
+  count?: number;
+  tiers?: unknown;
+}
+
+interface HealthPayload {
+  providers?: ApiHealth[];
+  summary?: { online?: number; total?: number };
+}
 
 export default function Providers() {
   const { t } = useLang();
-  const [data, setData] = useState<any>(null);
-  const [health, setHealth] = useState<any>(null);
+  const [data, setData] = useState<ProvidersPayload | null>(null);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "free", dir: "desc" });
   const [page, setPage] = useState(1);
@@ -43,7 +56,7 @@ export default function Providers() {
       await fetch(`/api/verify`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) }).catch(() => {});
       alert(data ? `Sync xong: ${data.total} live models` : "Sync done");
       load();
-    } catch (e: any) { alert("Sync failed: " + e.message); } finally { setSyncing(false); }
+    } catch (e) { alert("Sync failed: " + errMsg(e)); } finally { setSyncing(false); }
   };
   const checkHealth = () => {
     setLoadingHealth(true);
@@ -139,15 +152,15 @@ export default function Providers() {
                     const dir = sort.dir === "asc" ? 1 : -1;
                     if (sort.col === "provider") return a.id.localeCompare(b.id) * dir;
                     if (sort.col === "tier") return (a.tier_type || "").localeCompare(b.tier_type || "") * dir;
-                    if (sort.col === "free") return (a.free_models - b.free_models) * dir;
+                    if (sort.col === "free") return ((a.free_models || 0) - (b.free_models || 0)) * dir;
                     if (sort.col === "keys") {
-                      const ak = (a.keys === "none" ? 0 : parseInt(a.keys) || 0);
-                      const bk = (b.keys === "none" ? 0 : parseInt(b.keys) || 0);
+                      const ak = (a.keys === "none" ? 0 : parseInt(a.keys || "") || 0);
+                      const bk = (b.keys === "none" ? 0 : parseInt(b.keys || "") || 0);
                       return (ak - bk) * dir;
                     }
                     return 0;
-                  }).map((p: any) => {
-                    const h = health?.providers?.find((x: any) => x.id === p.id);
+                  }).map((p: ApiProvider) => {
+                    const h = health?.providers?.find((x) => x.id === p.id);
                     const baseUrl = p.baseUrl || getBaseUrl(p.id);
                     const hasKey = p.hasRealKey;
                     return (

@@ -2,13 +2,14 @@ import React, { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 import { RefreshCw, Radio } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
+import type { ApiLog, GatewayStats } from "../lib/api-types.ts";
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
 export default function Logs() {
   const { t } = useLang();
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<ApiLog[]>([]);
   const [live, setLive] = useState(false);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<GatewayStats | null>(null);
 
   const DISPLAY_LIMIT = 50;
   const [authError, setAuthError] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export default function Logs() {
             </div>
             <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">{t("logs.status_distribution")}</h3>
-              {stats?.logs?.total > 0 ? (
+              {(stats?.logs?.total || 0) > 0 ? (
                 <ResponsiveContainer width="100%" height={160}><PieChart><Pie data={[{ name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) }, { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) }]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label><Cell fill="#10b981" /><Cell fill="#ef4444" /></Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
               ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
             </div>
@@ -100,12 +101,12 @@ export default function Logs() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visibleLogs.map((l) => {
-                const expanded = (l as any)._expanded;
+                const expanded = l._expanded;
                 return (
                   <React.Fragment key={l.id}>
-                    <tr className={`${expanded ? "bg-slate-50/80" : "hover:bg-slate-50/80"} cursor-pointer`} onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !(x as any)._expanded } : x))}>
+                    <tr className={`${expanded ? "bg-slate-50/80" : "hover:bg-slate-50/80"} cursor-pointer`} onClick={() => setLogs((prev) => prev.map((x) => x.id === l.id ? { ...x, _expanded: !x._expanded } : x))}>
                       <td className="px-4 py-3"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-slate-100 border border-slate-200 text-[11px] font-bold">{expanded ? "−" : "+"}</span></td>
-                      <td className="px-4 py-3 font-mono text-slate-600">{new Date(l.timestamp).toLocaleTimeString()}</td>
+                      <td className="px-4 py-3 font-mono text-slate-600">{l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : "-"}</td>
                       <td className="px-4 py-3 font-mono text-[11px]">{l.virtualKeyName || l.virtualKeyId || "-"}</td>
                       <td className="px-4 py-3"><span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200">{l.provider}</span></td>
                       <td className="px-4 py-3 font-mono text-[11px] max-w-[200px] truncate" title={l.model}>{l.model}</td>
@@ -118,7 +119,7 @@ export default function Logs() {
                       <tr>
                         <td colSpan={9} className="bg-slate-50/80 p-4">
                           <div className="grid md:grid-cols-2 gap-4 text-xs">
-                            <div className="space-y-1"><div><b>ID:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.id}</code></div><div><b>Time:</b> {new Date(l.timestamp).toLocaleString()}</div><div><b>Key:</b> {l.virtualKeyName} ({l.virtualKeyId})</div><div><b>Provider:</b> {l.provider}</div><div><b>Model:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.model}</code></div></div>
+                            <div className="space-y-1"><div><b>ID:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.id}</code></div><div><b>Time:</b> {l.timestamp ? new Date(l.timestamp).toLocaleString() : "-"}</div><div><b>Key:</b> {l.virtualKeyName} ({l.virtualKeyId})</div><div><b>Provider:</b> {l.provider}</div><div><b>Model:</b> <code className="bg-white border px-1.5 py-0.5 rounded font-mono text-[11px]">{l.model}</code></div></div>
                             <div className="space-y-1"><div><b>Tokens:</b> {l.promptTokens ?? 0} prompt + {l.completionTokens ?? 0} completion = <b>{l.totalTokens ?? 0}</b></div><div><b>Latency:</b> {l.latencyMs}ms</div><div><b>Status:</b> {l.status}</div><div><b>Verified:</b> {l.verifiedStatus || "-"}</div><pre className="bg-white border border-slate-200 rounded-lg p-3 max-h-32 overflow-auto font-mono text-[11px] whitespace-pre-wrap break-all">{l.error || "—"}</pre></div>
                           </div>
                           <div className="mt-3"><b className="text-xs">Raw JSON:</b><pre className="bg-slate-950 text-slate-200 rounded-xl p-4 font-mono text-xs overflow-auto max-h-48 mt-1">{JSON.stringify(l, null, 2)}</pre></div>

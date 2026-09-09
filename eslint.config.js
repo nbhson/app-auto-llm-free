@@ -13,7 +13,7 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "no-empty": "error",
       "prefer-const": "error",
       "no-useless-escape": "error",
@@ -29,12 +29,11 @@ export default tseslint.config(
       "no-console": "off",
     },
   },
-  // Web frontend: allow pragmatic `any` for API payloads during migration,
-  // but keep unused-vars and console strict
+  // Tests: mocks/stubs legitimately use `any` — keep the gate for shipped code
   {
-    files: ["apps/web/**/*.{ts,tsx}"],
+    files: ["**/*.test.{ts,tsx}"],
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
 );

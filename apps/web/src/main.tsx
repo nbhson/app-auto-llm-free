@@ -21,7 +21,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const [showKey, setShowKey] = React.useState(false);
   const [copiedKey, setCopiedKey] = React.useState(false);
   const [langMenuOpen, setLangMenuOpen] = React.useState(false);
-  const [headerStats, setHeaderStats] = React.useState<any>(null);
+  const [headerStats, setHeaderStats] = React.useState<{ providers?: number; count?: number; free_models?: number } | null>(null);
   const { lang, setLang, t } = useLang();
 
   React.useEffect(() => {

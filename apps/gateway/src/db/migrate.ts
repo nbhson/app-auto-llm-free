@@ -1,6 +1,7 @@
 import { config, isPostgres } from "../config.js";
 import fs from "node:fs";
 import path from "node:path";
+import { errMessage } from "../lib/types.js";
 
 const createTablesSQL = `
 CREATE TABLE IF NOT EXISTS users (
@@ -50,7 +51,7 @@ async function migrateSqlite(dbPath: string) {
   const dir = path.dirname(path.resolve(resolved));
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   console.warn(`[migrate] SQLite DB: ${resolved}`);
-  const db = new (Database as any)(resolved);
+  const db = new Database(resolved);
   db.exec(createTablesSQL);
   console.warn("[migrate] SQLite tables ensured (users, virtual_keys, provider_keys, requests)");
   db.close();
@@ -62,14 +63,15 @@ async function migratePostgres(url: string) {
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { Pool } = await import("pg");
     const pool = new Pool({ connectionString: url });
-    const db: any = drizzle(pool);
+    const db = drizzle(pool);
     // Use raw SQL via pool for simplicity — ensures tables even without drizzle-kit generated files
     await pool.query(createTablesSQL.replace(/INTEGER/g, "BIGINT").replace(/TEXT PRIMARY KEY/g, "VARCHAR PRIMARY KEY").replace(/TEXT NOT NULL UNIQUE/g, "VARCHAR NOT NULL UNIQUE").replace(/TEXT NOT NULL/g, "VARCHAR NOT NULL").replace(/TEXT REFERENCES/g, "VARCHAR REFERENCES").replace(/TEXT,/g, "VARCHAR,"));
     console.warn("[migrate] Postgres tables ensured");
     await pool.end();
     void db;
-  } catch (e: any) {
-    if (e.code === "ERR_MODULE_NOT_FOUND" || e.message?.includes("Cannot find package 'pg'")) {
+  } catch (e) {
+    const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : "";
+    if (code === "ERR_MODULE_NOT_FOUND" || errMessage(e).includes("Cannot find package 'pg'")) {
       console.warn("[migrate] 'pg' not installed — run: npm install pg @types/pg");
       console.warn("[migrate] Skipping Postgres migration. Generate with: npx drizzle-kit generate && npx drizzle-kit migrate");
       return;

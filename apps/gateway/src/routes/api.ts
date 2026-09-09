@@ -7,11 +7,34 @@ import { getAllStates } from "../lib/circuit-breaker.js";
 import { readDataJson, resolveDataPath } from "../lib/paths.js";
 import { semanticCache } from "../lib/semantic-cache.js";
 import { hasRealKey, isPublicProvider } from "../lib/provider-keys.js";
+import { errMessage, type FreellmsModelEntry, type FreellmsProviderEntry } from "../lib/types.js";
 import fs from "node:fs";
 import path from "node:path";
 
-function loadProvidersJson() {
-  return readDataJson<any[]>("freellms-providers.json", []);
+/** Health entry persisted in data/model-health.json. */
+export interface ModelHealthEntry {
+  status?: string;
+  http_status?: number;
+  error?: string;
+  updated_at?: string;
+  provider?: string;
+  latency_ms?: number;
+  [key: string]: unknown;
+}
+
+/** Provider health row for GET /api/providers/health. */
+export interface ProviderHealthRow {
+  id: string;
+  status: string;
+  keys?: number;
+  latency_ms?: number;
+  breaker?: string;
+  failures?: number;
+  error?: string;
+}
+
+function loadProvidersJson(): FreellmsProviderEntry[] {
+  return readDataJson<FreellmsProviderEntry[]>("freellms-providers.json", []);
 }
 
 export const apiRoute = new Hono();
@@ -70,8 +93,8 @@ apiRoute.get("/providers", (c) => {
 
 apiRoute.get("/providers/health", async (c) => {
   const { providers } = await import("../providers/registry.js");
-  const breakers = getAllStates() as Record<string, any>;
-  const results: any[] = [];
+  const breakers = getAllStates() as Record<string, { state?: string; failures?: number }>;
+  const results: ProviderHealthRow[] = [];
   const timeoutMs = 5000;
 
   await Promise.all(
@@ -84,7 +107,7 @@ apiRoute.get("/providers/health", async (c) => {
         return;
       }
       const key = keys[0] || "";
-      const provider = (providers as any)[id];
+      const provider = providers[id];
       if (!provider) {
         results.push({ id, status: "unknown", error: "no provider" });
         return;
@@ -104,8 +127,8 @@ apiRoute.get("/providers/health", async (c) => {
           breaker: breakers[id]?.state || "closed",
           failures: breakers[id]?.failures || 0,
         });
-      } catch (e: any) {
-        results.push({ id, status: "error", keys: keys.length, latency_ms: Date.now() - start, error: e.message, breaker: breakers[id]?.state || "closed" });
+      } catch (e) {
+        results.push({ id, status: "error", keys: keys.length, latency_ms: Date.now() - start, error: errMessage(e), breaker: breakers[id]?.state || "closed" });
       }
     })
   );
@@ -139,13 +162,13 @@ apiRoute.get("/models/sync", (c) => {
 });
 
 apiRoute.get("/verify", (c) => {
-  const data = readDataJson<any>("verified-models.json", null as any);
+  const data = readDataJson<Record<string, unknown> | null>("verified-models.json", null);
   if (!data) return c.json({ status: "no_data", message: "Run POST /api/verify or wait for 24h scheduler" }, 404);
   return c.json(data);
 });
 
 apiRoute.get("/verify/summary", (c) => {
-  const data = readDataJson<any>("verified-summary.json", null as any);
+  const data = readDataJson<Record<string, unknown> | null>("verified-summary.json", null);
   if (!data) return c.json({ status: "no_data" }, 404);
   return c.json(data);
 });
@@ -166,7 +189,7 @@ apiRoute.post("/models/live/sync", async (c) => {
   return c.json({ ...result, generated_at: new Date().toISOString(), free_only: freeOnly });
 });
 apiRoute.get("/models/live", (c) => {
-  const data = readDataJson<any>("live-models.json", null as any);
+  const data = readDataJson<{ total: number; models: unknown[]; generated_at: string | null } | null>("live-models.json", null);
   if (!data) return c.json({ total: 0, models: [], generated_at: null, note: "Run POST /api/models/live/sync with real keys to generate" });
   return c.json(data);
 });
@@ -185,8 +208,8 @@ apiRoute.get("/models/health", async (c) => {
   }
 
   // Bulk probe: provider filter or top models
-  const all = readDataJson<any[]>("freellms-models-free.json", []);
-  let ids: string[] = all.map((m: any) => `${m.slug}/${m.name}`);
+  const all = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
+  let ids: string[] = all.map((m) => `${m.slug}/${m.name}`);
   if (provider) ids = ids.filter((id) => id.startsWith(provider + "/"));
   ids = ids.slice(0, limit);
   if (ids.length === 0) return c.json({ error: "no models found", provider, limit }, 400);
@@ -203,17 +226,17 @@ apiRoute.get("/models/health", async (c) => {
 
 // Persisted 404/410 health: stored in data/model-health.json so reload keeps strikethrough
 // MUST be before /:id route to avoid shadowing
-function readModelHealth(): Record<string, any> {
-  return readDataJson<Record<string, any>>("model-health.json", {});
+function readModelHealth(): Record<string, ModelHealthEntry> {
+  return readDataJson<Record<string, ModelHealthEntry>>("model-health.json", {});
 }
-function writeModelHealth(map: Record<string, any>) {
+function writeModelHealth(map: Record<string, ModelHealthEntry>) {
   const p = resolveDataPath("model-health.json");
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(map, null, 2));
 }
 apiRoute.get("/models/health/persisted", (c) => {
   const map = readModelHealth();
-  const list = Object.entries(map).map(([id, v]: any) => ({ id, ...v }));
+  const list = Object.entries(map).map(([id, v]) => ({ id, ...v }));
   return c.json({ object: "list", total: list.length, data: list });
 });
 apiRoute.post("/models/health/mark", async (c) => {
@@ -337,16 +360,16 @@ apiRoute.get("/config", (c) => {
     SEMANTIC_CACHE_ENABLED: config.semanticCacheEnabled ? 1 : 0,
     SEMANTIC_THRESHOLD: config.semanticCacheThreshold,
     CACHE_TTL_S: config.semanticCacheTtlSec,
-    EMBEDDING_MODEL: (config as any).embeddingModels ? (config as any).embeddingModels.join(",") : config.embeddingModel,
-    EMBEDDING_FALLBACKS: (config as any).embeddingFallbacks ? (config as any).embeddingFallbacks.join(",") : "",
-    SEMANTIC_CACHE_MAX_MEM: (config as any).semanticCacheMaxMemEntries,
-    SEMANTIC_CACHE_SCAN_CAP: (config as any).semanticCacheScanCap,
+    EMBEDDING_MODEL: config.embeddingModels ? config.embeddingModels.join(",") : config.embeddingModel,
+    EMBEDDING_FALLBACKS: config.embeddingFallbacks ? config.embeddingFallbacks.join(",") : "",
+    SEMANTIC_CACHE_MAX_MEM: config.semanticCacheMaxMemEntries,
+    SEMANTIC_CACHE_SCAN_CAP: config.semanticCacheScanCap,
     COMPRESSION_ENABLED: config.compressionEnabled ? 1 : 0,
-    COMPRESSION_MAX_TOKENS: (config as any).compressionMaxTokens,
+    COMPRESSION_MAX_TOKENS: config.compressionMaxTokens,
     COST_ROUTING_ENABLED: config.costRoutingEnabled ? 1 : 0,
-    COST_WEIGHT: (config as any).costWeight,
-    LATENCY_WEIGHT: (config as any).latencyWeight,
-    HEADROOM_WEIGHT: (config as any).headroomWeight,
+    COST_WEIGHT: config.costWeight,
+    LATENCY_WEIGHT: config.latencyWeight,
+    HEADROOM_WEIGHT: config.headroomWeight,
     ANALYTICS_RETENTION_DAYS: config.analyticsRetentionDays,
     _source: ".env",
   });
@@ -354,7 +377,7 @@ apiRoute.get("/config", (c) => {
 
 apiRoute.get("/stats", (c) => {
   const freellms = loadProvidersJson();
-  const freeModelsArr = readDataJson<any[]>("freellms-models-free.json", []);
+  const freeModelsArr = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
   const freeModels = freeModelsArr.length || 316;
   const logStats = getStats();
   return c.json({
@@ -378,12 +401,12 @@ apiRoute.get("/analytics", async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") || "20", 10), 100);
   try {
     const { getAnalytics, getCostBreakdown, calculateSavings } = await import("../lib/analytics.js");
-    const analytics: any = getAnalytics({ interval, groupBy, limit });
+    const analytics: unknown = getAnalytics({ interval, groupBy, limit });
     const cost = getCostBreakdown();
     const savings = calculateSavings();
     return c.json({ interval, groupBy, analytics, cost, savings, generated_at: new Date().toISOString() });
-  } catch (e: any) {
-    return c.json({ interval, groupBy, error: e.message }, 500);
+  } catch (e) {
+    return c.json({ interval, groupBy, error: errMessage(e) }, 500);
   }
 });
 
@@ -391,8 +414,8 @@ apiRoute.get("/cache/stats", async (c) => {
   try {
     const stats = await semanticCache.getStats();
     return c.json({ enabled: config.semanticCacheEnabled, ...stats });
-  } catch (e: any) {
-    return c.json({ enabled: config.semanticCacheEnabled, error: e.message }, 500);
+  } catch (e) {
+    return c.json({ enabled: config.semanticCacheEnabled, error: errMessage(e) }, 500);
   }
 });
 
@@ -400,19 +423,22 @@ apiRoute.delete("/cache", async (c) => {
   try {
     await semanticCache.clear();
     return c.json({ cleared: true });
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
+  } catch (e) {
+    return c.json({ error: errMessage(e) }, 500);
   }
 });
 
 apiRoute.post("/compression/preview", async (c) => {
-  const body: any = await c.req.json().catch(() => ({}));
+  const body = (await c.req.json().catch(() => ({}))) as {
+    messages?: Array<{ role: string; content: unknown }>;
+    maxTokens?: number;
+  };
   const messages = body.messages || [];
   try {
     const { compressMessages } = await import("../lib/compression.js");
     const result = compressMessages(messages, body.maxTokens ? { maxTokens: body.maxTokens } : undefined);
     return c.json({ original: messages.length, compressed: result.messages.length, ratio: result.ratio, savedTokens: result.savedTokens, preview: result.messages.slice(0, 3) });
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
+  } catch (e) {
+    return c.json({ error: errMessage(e) }, 500);
   }
 });

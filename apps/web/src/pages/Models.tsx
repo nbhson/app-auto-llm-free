@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, RefreshCw, X, Check, ChevronDown, Filter, Zap, Copy } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
+import { errMsg, type ApiHealth, type ApiModel, type ApiProvider } from "../lib/api-types.ts";
 
 function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"; }
 
@@ -12,17 +13,17 @@ function badge(status?: string) {
   return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">{status || "unverified"}</span>;
 }
 
-function parseLimit(limit?: string): string { return limit || "-"; }
+function parseLimit(limit?: unknown): string { return typeof limit === "string" && limit ? limit : "-"; }
 
 export default function Models() {
   const { t } = useLang();
-  const [models, setModels] = useState<any[]>([]);
+  const [models, setModels] = useState<ApiModel[]>([]);
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
   const [provider, setProvider] = useState("");
   const [providerDebounced, setProviderDebounced] = useState("");
   const [verified, setVerified] = useState<string>("all");
-  const [live, setLive] = useState<Record<string, any>>({});
+  const [live, setLive] = useState<Record<string, ApiHealth>>({});
   const [checking, setChecking] = useState(false);
   const [checkingOne, setCheckingOne] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -55,14 +56,14 @@ export default function Models() {
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [allProviders, setAllProviders] = useState<any[]>([]);
+  const [allProviders, setAllProviders] = useState<ApiProvider[]>([]);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
   useEffect(() => { const id = setTimeout(() => setProviderDebounced(provider.trim()), 400); return () => clearTimeout(id); }, [provider]);
   useEffect(() => {
     fetch(`/api/providers?limit=50`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
-      const list = d.detailed || [];
-      list.sort((a: any, b: any) => a.id.localeCompare(b.id));
+      const list = (d.detailed || []) as ApiProvider[];
+      list.sort((a, b) => a.id.localeCompare(b.id));
       setAllProviders(list);
     }).catch(() => {});
   }, []);
@@ -113,7 +114,7 @@ export default function Models() {
       const data = await res.json().catch(() => null);
       await fetch(`/api/verify`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) }).catch(() => {});
       alert(data ? `Sync xong: ${data.total} live models từ ${data.providers} providers` : "Sync done"); fetchModels();
-    } catch (e: any) { alert("Sync failed: " + e.message); } finally { setSyncing(false); }
+    } catch (e) { alert("Sync failed: " + errMsg(e)); } finally { setSyncing(false); }
   };
 
   const filtered = [...models].sort((a, b) => {
@@ -126,17 +127,17 @@ export default function Models() {
     if (sort.col === "status") return (a.live_status || "").localeCompare(b.live_status || "") * dir;
     return 0;
   });
-  const isDisabledForHide = (m: any) => {
+  const isDisabledForHide = (m: ApiModel) => {
     if ((usage[m.id] || 0) > 0) return false;
     const liveH = live[m.id];
     if (liveH && (liveH.status === "usable" || liveH.http_status === 200)) return false;
-    const h = (m as any).health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
+    const h = m.health; const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!m.persisted_404; const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || "")); return is404 || isGone || m.live_status === "deprecated";
   };
-  const isPaymentForHide = (m: any) => {
+  const isPaymentForHide = (m: ApiModel) => {
     if ((usage[m.id] || 0) > 0) return false;
     const liveH = live[m.id];
     if (liveH && (liveH.status === "usable" || liveH.http_status === 200)) return false;
-    const h = (m as any).health;
+    const h = m.health;
     if (!h) return false;
     const status = h.http_status;
     const err = (h.error || h.message || "").toLowerCase();
@@ -148,7 +149,7 @@ export default function Models() {
     return false;
   };
   const ALIAS_IDS = new Set(["free-llm-gateway/auto","auto","gpt-4","gpt-3.5","claude-3","gemini","gemini-flash","llama","qwen","glm","kimi","code","embedding","rerank","deepseek","mistral","kilo-auto"]);
-  const isInvalidId = (m: any) => {
+  const isInvalidId = (m: ApiModel) => {
     const id: string = (m.id || "").trim();
     if (!id) return true;
     if (ALIAS_IDS.has(id)) return false;
@@ -166,18 +167,18 @@ export default function Models() {
   const visible = Array.from(new Map(filteredAfterHide.map((m) => [m.id, m])).values());
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "id" ? "asc" : "desc" }));
   const arrow = (col: string) => (sort.col !== col ? "↕" : sort.dir === "asc" ? "↑" : "↓");
-  const isRowDisabled = (m: any) => {
+  const isRowDisabled = (m: ApiModel) => {
     // If model was recently used successfully (via chat logs), don't show as disabled even if health says 404
     if ((usage[m.id] || 0) > 0) return false;
     const liveH = live[m.id];
     if (liveH && (liveH.status === "usable" || liveH.http_status === 200)) return false;
-    const h = liveH || (m as any).health;
-    const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!(m as any).persisted_404;
+    const h = liveH || m.health;
+    const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || !!m.persisted_404;
     const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
     const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you're out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
     return is404 || isGone || isPayment || isInvalidId(m) || m.live_status === "deprecated";
   };
-  const isCheckboxDisabled = (m: any) => isInvalidId(m);
+  const isCheckboxDisabled = (m: ApiModel) => isInvalidId(m);
   const visibleEnabled = visible.filter((m) => !isCheckboxDisabled(m));
   const allVisibleSelected = visibleEnabled.length > 0 && visibleEnabled.every((m) => selected.has(m.id));
   const toggle = (id: string) => {
@@ -188,12 +189,12 @@ export default function Models() {
   const toggleAll = () => { if (allVisibleSelected) setSelected(new Set()); else setSelected(new Set(visibleEnabled.map((m) => m.id))); };
   const hasFilter = !!(qDebounced || providerDebounced);
   const checkSingle = async (id: string) => {
-    const found = visible.find((x) => x.id === id) as any;
+    const found = visible.find((x) => x.id === id);
     if (found && isCheckboxDisabled(found)) return;
     setCheckingOne(id);
     try {
       const res = await fetch(`/api/models/health?model=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${mk()}` } });
-      const data = await res.json().catch(() => null);
+      const data = (await res.json().catch(() => null)) as ApiHealth | null;
       if (data) {
         setLive((prev) => ({ ...prev, [id]: data }));
         if (data.http_status === 404 || data.http_status === 410 || /model_not_found|Gone/i.test(data.error || "")) {
@@ -201,11 +202,11 @@ export default function Models() {
           try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); cur[id] = { http_status: data.http_status, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } catch { /* ignore */ }
         } else if (data.status === "usable" || data.http_status === 200) {
           // persist usable to DB so reload keeps non-red (overwrites 404)
-          await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], status: "usable", http_status: 200, latency_ms: (data as any).latency_ms || 0 }) }).catch(() => {});
+          await fetch(`/api/models/health/mark`, { method: "POST", headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [id], status: "usable", http_status: 200, latency_ms: data.latency_ms || 0 }) }).catch(() => {});
           try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (cur[id]) { delete cur[id]; localStorage.setItem("modelHealth404", JSON.stringify(cur)); } } catch { /* ignore */ }
           try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); cur2[id] = { status: "usable", http_status: data.http_status || 200, latency_ms: data.latency_ms, updated_at: new Date().toISOString() }; localStorage.setItem("modelHealthUsable", JSON.stringify(cur2)); } catch { /* ignore */ }
           // Also clear persisted health in models state so isRowDisabled/isDisabledForHide no longer sees old 404
-          setModels((prev) => prev.map((m) => m.id === id ? { ...m, health: { status: "usable", http_status: 200, latency_ms: (data as any).latency_ms || 0 }, persisted_404: false, live_status: "verified_free" } : m));
+          setModels((prev) => prev.map((m) => m.id === id ? { ...m, health: { status: "usable", http_status: 200, latency_ms: data.latency_ms || 0 }, persisted_404: false, live_status: "verified_free" } : m));
         }
       }
     } finally { setCheckingOne(null); }
@@ -215,7 +216,7 @@ export default function Models() {
     if (ids.length > 20) { if (!confirm(`Check ${ids.length} models sẽ mất ~${ids.length * 2}s và có thể hit rate limit. Tiếp tục?`)) return; }
     setChecking(true);
     try {
-      const toPersist: string[] = []; const persistPayload: any[] = []; const toRemove: string[] = [];
+      const toPersist: string[] = []; const persistPayload: Array<{ id: string; http_status?: number; error?: string }> = []; const toRemove: string[] = [];
       for (const id of ids) {
         const res = await fetch(`/api/models/health?model=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${mk()}` } });
         const data = await res.json().catch(() => null);
@@ -241,7 +242,7 @@ export default function Models() {
     } finally { setChecking(false); }
   };
   useEffect(() => {
-    fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => { const map: Record<string, any> = {}; for (const row of d.data || []) map[row.id] = row; if (Object.keys(map).length > 0) setLive((prev) => ({ ...prev, ...map })); }).catch(() => {});
+    fetch(`/api/models/health/persisted`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => { const map: Record<string, ApiHealth> = {}; for (const row of (d.data || []) as ApiHealth[]) if (row.id) map[row.id] = row; if (Object.keys(map).length > 0) setLive((prev) => ({ ...prev, ...map })); }).catch(() => {});
     try { const cur = JSON.parse(localStorage.getItem("modelHealth404") || "{}"); if (Object.keys(cur).length > 0) setLive((prev) => ({ ...prev, ...cur })); } catch { /* ignore */ }
     try { const cur2 = JSON.parse(localStorage.getItem("modelHealthUsable") || "{}"); if (Object.keys(cur2).length > 0) setLive((prev) => ({ ...prev, ...cur2 })); } catch { /* ignore */ }
   }, []);
@@ -358,11 +359,11 @@ export default function Models() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((m, idx) => {
-                const h = live[m.id] || (m as any).health || (m.persisted_404 ? { http_status: 404, error: "model_not_found" } : null);
+                const h = live[m.id] || m.health || (m.persisted_404 ? { http_status: 404, error: "model_not_found" } : null);
                 const used = usage[m.id] || 0;
                 // use centralized logic so Check usable survives reload (live usable + DB 200)
                 const disabled = isRowDisabled(m);
-                const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || (m as any).persisted_404;
+                const is404 = (h && (h.http_status === 404 || /model_not_found|Not Found|404/i.test(h.error || ""))) || m.persisted_404;
                 const isGone = h && (h.http_status === 410 || /Gone/i.test(h.error || ""));
                 const isPayment = (()=>{ const err=(h?.error||"").toLowerCase(); const st=h?.http_status; return st===402 || /you're out of credits|out of credits|no payment method|payment required|insufficient|quota exceeded|billing|unpaid/i.test(err); })();
                 const isInvalid = isInvalidId(m);

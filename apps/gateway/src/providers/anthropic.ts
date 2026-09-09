@@ -30,7 +30,19 @@ export const anthropicProvider: Provider = {
   async anthropic(req: AnthropicRequest, apiKey: string): Promise<Response> {
     const model = stripPrefix(req.model) || "claude-3-5-sonnet-20241022";
 
-    const body: any = {
+    const body: {
+      model: string;
+      max_tokens: number;
+      messages: AnthropicRequest["messages"];
+      system?: string;
+      temperature?: number;
+      top_p?: number;
+      top_k?: number;
+      stream?: boolean;
+      tools?: unknown;
+      tool_choice?: unknown;
+      stop_sequences?: string[];
+    } = {
       model,
       max_tokens: req.max_tokens || 4096,
       messages: req.messages,
@@ -91,10 +103,12 @@ export const anthropicProvider: Provider = {
         },
       });
       if (!res.ok) return CLAUDE_MODELS;
-      const data: any = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        data?: Array<{ id?: string; name?: string; displayName?: string; context_window?: number }>;
+      };
       const list = Array.isArray(data.data) ? data.data : [];
       if (list.length === 0) return CLAUDE_MODELS;
-      return list.map((m: any) => ({
+      return list.map((m) => ({
         id: `anthropic/${m.id || m.name}`,
         provider: "anthropic",
         displayName: m.displayName || m.id,

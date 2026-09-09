@@ -16,6 +16,8 @@ import { compressWithMetrics } from "../../lib/compression.js";
 import { rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
 import { loadVerifiedMap } from "../../lib/model-store.js";
+import { getRequestVk, errMessage, type ProviderError, type UpstreamChatCompletion, type UpstreamAnthropicMessage, type CompressibleMessage } from "../../lib/types.js";
+import type { AnthropicRequest, ChatRequest } from "../../providers/base.js";
 
 const anthropicSchema = z.object({
   model: z.string().min(1),
@@ -130,23 +132,23 @@ function normalizeAnthropicModel(m: string): string {
 }
 
 anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
-  const rawBody: any = c.req.valid("json");
+  const rawBody = c.req.valid("json");
   // Normalize system: array -> string, and extract system-role messages
   let systemNorm: string | undefined = undefined;
   if (Array.isArray(rawBody.system)) {
-    systemNorm = rawBody.system.map((b: any) => b?.text ?? (typeof b === "string" ? b : "")).join("\n");
+    systemNorm = rawBody.system.map((b: { text?: unknown } | string) => (typeof b === "string" ? b : String(b.text ?? ""))).join("\n");
   } else if (typeof rawBody.system === "string") {
     systemNorm = rawBody.system;
   }
-  let messagesNorm: any[] = Array.isArray(rawBody.messages) ? [...rawBody.messages] : [];
+  let messagesNorm = Array.isArray(rawBody.messages) ? [...rawBody.messages] : [];
   // Extract messages with role system into systemNorm
   const systemMsgs: string[] = [];
-  messagesNorm = messagesNorm.filter((m: any) => {
+  messagesNorm = messagesNorm.filter((m) => {
     if (m?.role === "system") {
-      const c = m.content;
-      if (typeof c === "string") systemMsgs.push(c);
-      else if (Array.isArray(c)) systemMsgs.push(c.map((b: any) => b?.text ?? "").join("\n"));
-      else if (c) systemMsgs.push(String(c));
+      const content = m.content;
+      if (typeof content === "string") systemMsgs.push(content);
+      else if (Array.isArray(content)) systemMsgs.push(content.map((b: { text?: unknown } | string) => (typeof b === "string" ? b : String(b.text ?? ""))).join("\n"));
+      else if (content) systemMsgs.push(String(content));
       return false;
     }
     return true;
@@ -155,10 +157,10 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     const extra = systemMsgs.join("\n");
     systemNorm = systemNorm ? systemNorm + "\n" + extra : extra;
   }
-  const body: any = { ...rawBody, system: systemNorm, messages: messagesNorm, max_tokens: rawBody.max_tokens || 4096 };
+  const body = { ...rawBody, system: systemNorm, messages: messagesNorm, max_tokens: rawBody.max_tokens || 4096 };
   const rawModel = body.model || config.defaultModel;
   const model = normalizeAnthropicModel(rawModel);
-  const vk = (c as any).get("vk") as any;
+  const vk = getRequestVk(c);
 
   if (vk && !hasScope(vk, model, undefined)) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
@@ -181,7 +183,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
   }
 
   // Also inject anthropic provider if not in registry but imported directly
-  const allProviders: Record<string, any> = { ...providers };
+  const allProviders: Record<string, (typeof providers)[string] | undefined> = { ...providers };
   if (!allProviders["anthropic"]) allProviders["anthropic"] = anthropicProvider;
   if (model.toLowerCase().includes("claude") && !providerOrder.includes("anthropic")) {
     providerOrder.unshift("anthropic");
@@ -202,9 +204,9 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     } catch { /* ignore: cost routing failed */ }
   }
 
-  const estimated = estimateMessagesTokens(body.messages as any) + (body.max_tokens || 0);
+  const estimated = estimateMessagesTokens(body.messages) + (body.max_tokens || 0);
   const startAll = Date.now();
-  const errors: any[] = [];
+  const errors: ProviderError[] = [];
 
   // harness 01 Retrieve: semantic cache check (non-stream only, parity) - query includes system
   if (config.semanticCacheEnabled && !body.stream) {
@@ -213,7 +215,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
       const hit = await semanticCache.get(q, model, { vkId: vk?.id, tools: body.tools, temperature: body.temperature });
       if (hit) {
         logger.info({ model, vkId: vk?.id }, "semantic cache hit (anthropic)");
-        addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimateMessagesTokens(body.messages as any), totalTokens: estimated, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
+        addLog({ id: `req-${Date.now()}`, timestamp: new Date().toISOString(), virtualKeyId: vk?.id, virtualKeyName: vk?.name, provider: "cache", model, promptTokens: estimateMessagesTokens(body.messages), totalTokens: estimated, latencyMs: Date.now() - startAll, status: 200, verifiedStatus: "cache", cacheHit: true });
         return c.json({
           id: `msg_cache_${Date.now()}`,
           type: "message",
@@ -222,20 +224,20 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           model,
           stop_reason: "end_turn",
           stop_sequence: null,
-          usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: estimateTokens(hit) },
+          usage: { input_tokens: estimateMessagesTokens(body.messages), output_tokens: estimateTokens(hit) },
         });
       }
     } catch { /* ignore: semantic cache failed */ }
   }
 
   // harness 02 Build Context: compression (parity with chat.ts)
-  let messagesToSend: any = body.messages;
+  let messagesToSend: CompressibleMessage[] = body.messages;
   let compressionRatio: number | undefined;
   let compressedTokens: number | undefined;
   if (config.compressionEnabled && body.messages?.length > 6) {
-    const maxTokens = (config as any).compressionMaxTokens || 4096;
-    const promptTokens = estimateMessagesTokens(body.messages as any);
-    const comp = compressWithMetrics(body.messages as any, { maxTokens: promptTokens > maxTokens ? maxTokens : undefined });
+    const maxTokens = config.compressionMaxTokens || 4096;
+    const promptTokens = estimateMessagesTokens(body.messages);
+    const comp = compressWithMetrics(body.messages, { maxTokens: promptTokens > maxTokens ? maxTokens : undefined });
     if (comp.metrics.applied) {
       messagesToSend = comp.messages;
       compressionRatio = comp.ratio;
@@ -263,7 +265,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
       continue;
     }
 
-    const estimatedForQuota = estimateMessagesTokens(messagesToSend as any) + (body.max_tokens || 0);
+    const estimatedForQuota = estimateMessagesTokens(messagesToSend) + (body.max_tokens || 0);
     const quota = checkQuota(pid, key, estimatedForQuota);
     if (!quota.allowed) {
       errors.push({ provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs });
@@ -282,7 +284,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
       const effectiveAnthMessages = messagesToSend || body.messages;
       const anthReq = {
         model,
-        messages: effectiveAnthMessages as any,
+        messages: effectiveAnthMessages as unknown as AnthropicRequest["messages"],
         max_tokens: body.max_tokens,
         system: body.system,
         temperature: body.temperature,
@@ -307,18 +309,18 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           model,
           messages: [
             ...(body.system ? [{ role: "system" as const, content: body.system }] : []),
-            ...effectiveMessages.map((m: any) => ({ role: m.role, content: m.content })),
+            ...effectiveMessages.map((m) => ({ role: m.role, content: m.content })),
           ],
           temperature: body.temperature,
           max_tokens: body.max_tokens,
           stream: body.stream,
-          tools: body.tools ? (body.tools as any[]).map((t: any) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })) : undefined,
+          tools: body.tools ? (body.tools as Array<{ name?: string; description?: string; input_schema?: unknown }>).map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })) : undefined,
           tool_choice: body.tool_choice,
           top_p: body.top_p,
           top_k: body.top_k,
           stop: body.stop_sequences,
         };
-        res = await provider.chat(chatReq as any, key);
+        res = await provider.chat(chatReq as unknown as ChatRequest, key);
         isAnthropicUpstream = false;
       } else {
         errors.push({ provider: pid, error: "provider has no anthropic or chat method" });
@@ -351,7 +353,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           virtualKeyName: vk?.name,
           provider: pid,
           model,
-          promptTokens: estimateMessagesTokens(body.messages as any),
+          promptTokens: estimateMessagesTokens(body.messages),
           totalTokens: estimated,
           latencyMs: latency,
           status: 200,
@@ -394,7 +396,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
 
       // Non-stream: translate back to Anthropic format
       if (isAnthropicUpstream) {
-        const data: any = await res.json().catch(async () => ({ text: await res.text() }));
+        const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamAnthropicMessage;
         addLog({
           id: `req-${Date.now()}`,
           timestamp: new Date().toISOString(),
@@ -402,7 +404,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
           virtualKeyName: vk?.name,
           provider: pid,
           model,
-          promptTokens: data.usage?.input_tokens ?? estimateMessagesTokens(body.messages as any),
+          promptTokens: data.usage?.input_tokens ?? estimateMessagesTokens(body.messages),
           completionTokens: data.usage?.output_tokens ?? 0,
           totalTokens: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0) || estimated,
           latencyMs: latency,
@@ -420,11 +422,21 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
         c.header("X-Verified", vStatus);
         return c.json(data);
       } else {
-        const data: any = await res.json().catch(async () => ({ text: await res.text() }));
-        let anthData: any;
+        const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamChatCompletion;
+        let anthData: {
+          id: string;
+          type: string;
+          role: string;
+          content: Array<{ type: string; text: string }>;
+          model: string;
+          stop_reason: string;
+          stop_sequence: null;
+          usage: { input_tokens: number; output_tokens: number };
+        };
         if (data.choices) {
           // OpenAI format -> Anthropic format
-          const text = data.choices?.[0]?.message?.content || data.choices?.[0]?.delta?.content || "";
+          const rawContent = data.choices?.[0]?.message?.content ?? data.choices?.[0]?.delta?.content ?? "";
+          const text = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
           const finish = data.choices?.[0]?.finish_reason || "stop";
           const finishMap: Record<string, string> = { stop: "end_turn", length: "max_tokens", tool_calls: "tool_use" };
           anthData = {
@@ -436,7 +448,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
             stop_reason: finishMap[finish] || "end_turn",
             stop_sequence: null,
             usage: {
-              input_tokens: data.usage?.prompt_tokens || estimateMessagesTokens(body.messages as any),
+              input_tokens: data.usage?.prompt_tokens || estimateMessagesTokens(body.messages),
               output_tokens: data.usage?.completion_tokens || estimateTokens(text),
             },
           };
@@ -450,7 +462,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
             model,
             stop_reason: "end_turn",
             stop_sequence: null,
-            usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: 0 },
+            usage: { input_tokens: estimateMessagesTokens(body.messages), output_tokens: 0 },
           };
         }
         addLog({
@@ -477,9 +489,9 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
         c.header("X-Verified", vStatus);
         return c.json(anthData);
       }
-    } catch (e: any) {
-      logger.warn({ provider: pid, err: e.message }, "anthropic provider failed, trying next");
-      errors.push({ provider: pid, error: e.message });
+    } catch (e) {
+      logger.warn({ provider: pid, err: errMessage(e) }, "anthropic provider failed, trying next");
+      errors.push({ provider: pid, error: errMessage(e) });
       recordFailure(pid);
       continue;
     }
@@ -492,7 +504,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     virtualKeyName: vk?.name,
     provider: errors[0]?.provider || "none",
     model,
-    promptTokens: estimateMessagesTokens(body.messages as any),
+    promptTokens: estimateMessagesTokens(body.messages),
     totalTokens: estimated,
     latencyMs: Date.now() - startAll,
     status: 502,
@@ -509,7 +521,7 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
         model,
         stop_reason: "end_turn",
         stop_sequence: null,
-        usage: { input_tokens: estimateMessagesTokens(body.messages as any), output_tokens: 20 },
+        usage: { input_tokens: estimateMessagesTokens(body.messages), output_tokens: 20 },
         _mock: true,
         _errors: errors,
       },
@@ -521,10 +533,14 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
 });
 
 anthropicRoute.post("/count_tokens", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = (await c.req.json().catch(() => ({}))) as {
+    messages?: Array<{ role: string; content: unknown }>;
+    system?: string;
+    tools?: unknown;
+  };
   const messages = body.messages || [];
   const system = body.system || "";
-  let tokens = estimateMessagesTokens(messages as any);
+  let tokens = estimateMessagesTokens(messages);
   if (system) tokens += estimateTokens(system);
   // Add tools overhead if present
   if (body.tools) tokens += estimateTokens(JSON.stringify(body.tools));

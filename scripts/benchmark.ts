@@ -20,7 +20,7 @@ async function main() {
     console.error("Health failed", health.status, health.text.slice(0, 500));
     process.exit(1);
   }
-  const providers = health.json.providers || [];
+  const providers = (health.json.providers || []) as Array<{ id?: string; status?: string; latency_ms?: number; breaker?: string }>;
   console.log(`Health: ${health.json.summary.online} online / ${health.json.summary.total} total`);
 
   // Chat benchmark (only if pollinations public works, no key needed)
@@ -41,7 +41,7 @@ async function main() {
     generated_at: new Date().toISOString(),
     gateway: GATEWAY,
     health: health.json.summary,
-    providers: providers.map((p: any) => ({ id: p.id, status: p.status, latency_ms: p.latency_ms, breaker: p.breaker })),
+    providers: providers.map((p) => ({ id: p.id, status: p.status, latency_ms: p.latency_ms, breaker: p.breaker })),
     chat: { ok: chat.ok, latency_ms: chatLatency, status: chat.status },
     models: { total: models.json?.total ?? 0, free: models.json?.free ?? 0 },
     verified: verified.json || null,

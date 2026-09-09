@@ -8,6 +8,7 @@ import { getNextKeyManaged, markRateLimited, markSuccess } from "../../lib/key-m
 import { isOpen, recordSuccess, recordFailure } from "../../lib/circuit-breaker.js";
 import { hasScope } from "../../lib/virtual-keys.js";
 import { logger } from "../../middleware/logger.js";
+import { getRequestVk, errMessage, type ProviderError, type UpstreamImages } from "../../lib/types.js";
 
 const imagesSchema = z.object({
   model: z.string().optional(),
@@ -23,7 +24,7 @@ export const imagesRoute = new Hono();
 imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => {
   const body = c.req.valid("json");
   const model = body.model || "agnes-ai/agnes-image-2.1-flash";
-  const vk = (c as any).get("vk") as any;
+  const vk = getRequestVk(c);
 
   if (vk && !hasScope(vk, model, undefined)) {
     return c.json({ error: { message: `Key not allowed for model ${model}`, type: "insufficient_scope" } }, 403);
@@ -45,7 +46,7 @@ imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => 
     }
   }
 
-  const errors: any[] = [];
+  const errors: ProviderError[] = [];
   const startAll = Date.now();
 
   for (const pid of providerOrder) {
@@ -82,7 +83,7 @@ imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => 
       }
       recordSuccess(pid);
       markSuccess(pid, key);
-      const data: any = await res.json().catch(async () => ({ text: await res.text() }));
+      const data = (await res.json().catch(async () => ({ text: await res.text() }))) as UpstreamImages;
       if (data.data && Array.isArray(data.data)) {
         c.header("X-Provider", pid);
         return c.json(data);
@@ -92,9 +93,9 @@ imagesRoute.post("/generations", zValidator("json", imagesSchema), async (c) => 
         created: Math.floor(Date.now() / 1000),
         data: data.data || [{ url: data.url || "", b64_json: data.b64_json || "" }],
       });
-    } catch (e: any) {
-      logger.warn({ provider: pid, err: e.message }, "images provider failed");
-      errors.push({ provider: pid, error: e.message });
+    } catch (e) {
+      logger.warn({ provider: pid, err: errMessage(e) }, "images provider failed");
+      errors.push({ provider: pid, error: errMessage(e) });
       recordFailure(pid);
       continue;
     }
