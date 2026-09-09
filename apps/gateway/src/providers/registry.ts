@@ -35,6 +35,8 @@ export const providers: Record<string, Provider> = {
   "aion-labs": OPENAI({ id: "aion-labs", baseUrl: "https://api.aionlabs.ai/v1" }), // 5
   "z-ai-zhipu-ai": OPENAI({ id: "z-ai-zhipu-ai", baseUrl: "https://open.bigmodel.cn/api/paas/v4" }), // 4 GLM
   "experientiallabs": OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // 3 free promotional (qwen3.8-27b, deepseek-v4-flash, gpt-5.6-luna) — OpenAI compatible
+  kiraai: OPENAI({ id: "kiraai", baseUrl: "https://kiraai.vn/api/v1" }), // KiraAI Vietnam — OpenAI compatible, 150M free tokens/day (kira-mini-1.0 + Kira family)
+  kira: OPENAI({ id: "kiraai", baseUrl: "https://kiraai.vn/api/v1" }), // alias
   experiential: OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // alias
   "experiential-cloud": OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // alias hyphen
   experiential_cloud: OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // alias underscore (catalog id)
@@ -92,6 +94,8 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   experiential: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   "experiential-cloud": { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   experiential_cloud: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  kiraai: { name: "KiraAI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","vision","image","audio"], noCard: true },
+  kira: { name: "KiraAI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","vision","image","audio"], noCard: true },
   sambanova: { name: "SambaNova", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   "ollama-cloud": { name: "Ollama Cloud", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
   "chutes-ai": { name: "Chutes.ai", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
@@ -125,6 +129,7 @@ export const modelAliases: Record<string, string[]> = {
     "cohere",
     "sambanova",
     "siliconflow",
+    "kiraai",
     "ovhcloud-ai-endpoints",
     "modelscope",
     "freeai",
@@ -132,11 +137,53 @@ export const modelAliases: Record<string, string[]> = {
   ],
   // Experiential Labs — promotional free (https://platform.experientiallabs.ai/models)
   "qwen3.8-27b": ["experientiallabs", "orcarouter", "modelscope"],
-  "deepseek-v4-flash": ["experientiallabs", "cline", "deepseek", "nvidia-nim"],
-  "gpt-5.6-luna": ["experientiallabs", "openrouter"],
+  "deepseek-v4-flash": ["experientiallabs", "kiraai", "cline", "deepseek", "nvidia-nim"],
+  "gpt-5.6-luna": ["experientiallabs", "kiraai", "openrouter"],
   "experientiallabs/qwen3.8-27b": ["experientiallabs"],
   "experientiallabs/deepseek-v4-flash": ["experientiallabs"],
   "experientiallabs/gpt-5.6-luna": ["experientiallabs"],
+  // KiraAI Vietnam (https://kiraai.vn/api/v1) — OpenAI compatible, 150M free tokens/day
+  "kira-mini-1.0": ["kiraai"],
+  "kira-auto": ["kiraai"],
+  "kira-3.5-pro": ["kiraai"],
+  "kira-3.5-flash": ["kiraai"],
+  "kira-2.5-pro": ["kiraai"],
+  "kira-2.5-flash": ["kiraai"],
+  "kira-3.0-image": ["kiraai"],
+  "kira-2.0-image": ["kiraai"],
+  "kira-3.0-video": ["kiraai"],
+  "kira-3.0-video-flash": ["kiraai"],
+  "kira-3.0-flash-tts": ["kiraai"],
+  "kira-2.0-flash-tts": ["kiraai"],
+  "gpt-5.6-sol": ["kiraai"],
+  "gpt-oss-120b": ["kiraai", "ollama-cloud", "openrouter"],
+  // KiraAI free tier (150M tokens/day) — community free models
+  "hy3-free": ["kiraai"],
+  "glm-5.3-flash-free": ["kiraai", "cline", "z-ai-zhipu-ai"],
+  "glm-5.3-free": ["kiraai", "z-ai-zhipu-ai"],
+  "qwen3.8-flash-free": ["kiraai"],
+  "qwen3.8-27b-free": ["kiraai", "orcarouter", "modelscope"],
+  "ling-3.0-flash-sante-free": ["kiraai", "opencode", "kilo-code"],
+  "deepseek-v4-flash-0731": ["nvidia-nim", "kiraai", "modelscope", "chutes-ai"],
+  "deepseek-v4-pro": ["kiraai", "nvidia-nim", "modelscope"],
+  "kiraai/mimo-v2.5-free": ["kiraai"],
+  "kiraai/hy3-free": ["kiraai"],
+  "kiraai/glm-5.3-flash-free": ["kiraai"],
+  "kiraai/glm-5.3-free": ["kiraai"],
+  "kiraai/qwen3.8-flash-free": ["kiraai"],
+  "kiraai/qwen3.8-27b-free": ["kiraai"],
+  "kiraai/ling-3.0-flash-sante-free": ["kiraai"],
+  "kiraai/deepseek-v4-flash-0731": ["kiraai"],
+  "kiraai/deepseek-v4-flash": ["kiraai"],
+  "kiraai/deepseek-v4-pro": ["kiraai"],
+  "kiraai/kira-mini-1.0": ["kiraai"],
+  "kiraai/kira-auto": ["kiraai"],
+  "kiraai/kira-3.5-pro": ["kiraai"],
+  "kiraai/kira-3.5-flash": ["kiraai"],
+  "kiraai/kira-2.5-pro": ["kiraai"],
+  "kiraai/kira-2.5-flash": ["kiraai"],
+  kira: ["kiraai"],
+  kiraai: ["kiraai"],
   // Opencode custom — agnes
   "agnes-2.5-flash": ["agnes-ai"],
   // Opencode custom — openrouter free tier
@@ -158,8 +205,8 @@ export const modelAliases: Record<string, string[]> = {
   "poolside/laguna-s-2.1:free": ["kilo-code", "openrouter"],
   // Nvidia custom
   "nvidia/nemotron-3-ultra-550b-a55b": ["nvidia-nim", "kilo-code"],
-  "deepseek-ai/deepseek-v4-flash-0731": ["nvidia-nim", "modelscope", "chutes-ai"],
-  "deepseek-ai/deepseek-v4-pro-0813": ["nvidia-nim", "modelscope"],
+  "deepseek-ai/deepseek-v4-flash-0731": ["nvidia-nim", "kiraai", "modelscope", "chutes-ai"],
+  "deepseek-ai/deepseek-v4-pro-0813": ["nvidia-nim", "kiraai", "modelscope"],
   "moonshotai/kimi-k3": ["nvidia-nim", "ollama-cloud", "groq"],
   // OrcaRouter
   "deepseek/deepseek-v4-flash-free": ["orcarouter", "deepseek"],
@@ -167,7 +214,7 @@ export const modelAliases: Record<string, string[]> = {
   // Cline / OpenCode Zen
   "nemotron-3.5-lightning-free": ["opencode", "nvidia-nim"],
   "nemotron-3-ultra-free": ["opencode", "nvidia-nim"],
-  "mimo-v2.5-free": ["opencode"],
+  "mimo-v2.5-free": ["opencode", "kiraai"],
   "ling-3.0-flash-fin-free": ["opencode", "kilo-code"],
   "glm-5.3-flash": ["cline", "z-ai-zhipu-ai"],
   // Google custom gemini

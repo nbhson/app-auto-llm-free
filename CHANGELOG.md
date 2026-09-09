@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.3] - 2026-09-09
+
+### Added
+- **KiraAI provider**: `registry.ts` `kiraai` + alias `kira` (`https://kiraai.vn/api/v1`, OpenAI compatible, 150M free tokens/day), `providerMeta` Permanent Free, `KIRAAI_API_KEYS` (`config.ts`, `.env.example`, `docker-compose.yml`, web `getBaseUrls/getKeyUrls`), 20 models `kiraai/*` (`models.yaml` + `models.ts:opencodeSupplement` vì `freellms-models-free.json` override `models.yaml`): `kira-mini-1.0` (free default), `kira-auto`, `kira-3.5/2.5-pro/flash`, `kira-3.0/2.0-image`, `kira-3.0/2.0-flash-tts`, `mimo-v2.5-free`, `hy3-free`, `glm-5.3(-flash)-free`, `qwen3.8(-27b)-flash-free`, `ling-3.0-flash-sante-free`, `deepseek-v4(-flash/-pro/-flash-0731)`; `gpt-5.6-luna` thêm fallback `kiraai`
+
+### Changed
+- **Bootstrap enabled by default**: `app.ts` `isBootstrapExposed()` opt-out (chỉ tắt khi `0/false/no/off`), `.env.example` + `docker-compose.yml` default `1`, docs EN/VI `CONFIGURATION/API/GETTING_STARTED` đồng bộ
+- **Version bump**: `package.json` `apps/gateway` `apps/web` `0.7.2→0.7.3`, `main.tsx` badge `v0.7.3`, `app.ts` + `health.ts` `version 0.7.3`
+
 ## [0.7.2] - 2026-09-09
 
 ### Fixed

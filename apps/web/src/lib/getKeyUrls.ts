@@ -29,6 +29,8 @@ export const getKeyUrls: Record<string, string> = {
   experiential: "https://platform.experientiallabs.ai",
   "experiential-cloud": "https://platform.experientiallabs.ai",
   experiential_cloud: "https://platform.experientiallabs.ai",
+  kiraai: "https://kiraai.vn",
+  kira: "https://kiraai.vn",
   "grok-xai": "https://console.x.ai/",
   xai: "https://console.x.ai/",
   deepseek: "https://platform.deepseek.com/api_keys",

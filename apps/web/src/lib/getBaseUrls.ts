@@ -26,6 +26,8 @@ export const baseUrls: Record<string, string> = {
   experiential: "https://api.experientiallabs.ai/v1",
   "experiential-cloud": "https://api.experientiallabs.ai/v1",
   experiential_cloud: "https://api.experientiallabs.ai/v1",
+  kiraai: "https://kiraai.vn/api/v1",
+  kira: "https://kiraai.vn/api/v1",
   "grok-xai": "https://api.x.ai/v1",
   xai: "https://api.x.ai/v1",
   deepseek: "https://api.deepseek.com/v1",

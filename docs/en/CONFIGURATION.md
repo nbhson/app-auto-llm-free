@@ -68,6 +68,9 @@ NSCALE_API_KEYS=nsc_xxx
 NEBIUS_API_KEYS=nebius_xxx
 AI21_API_KEYS=ai21_xxx
 POLLINATIONS_API_KEY= # usually not needed
+
+# KiraAI Vietnam (https://kiraai.vn/api/v1) — OpenAI compatible, 150M free tokens/day
+KIRAAI_API_KEYS=kira_xxx
 ```
 
 Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped providers, which are auto-enabled). Real-key `k.length>20 && !k.includes('xxx') && !k.includes('change-me')` for `hasRealKey` `api.ts:27`. **Changing `.env` requires killing old process & restarting** because `config.ts:22` reads only at boot (`tsx watch` does not watch `.env`):

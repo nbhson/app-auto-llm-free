@@ -74,6 +74,8 @@ export function createOpenAICompatibleProvider(opts: {
         experiential: "qwen3.8-27b",
         "experiential-cloud": "qwen3.8-27b",
         experiential_cloud: "qwen3.8-27b",
+        kiraai: "kira-mini-1.0",
+        kira: "kira-mini-1.0",
         "grok-xai": "grok-2",
         xai: "grok-2",
         deepseek: "deepseek-chat",
