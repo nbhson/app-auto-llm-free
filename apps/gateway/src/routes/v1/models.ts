@@ -30,31 +30,7 @@ export interface ModelListEntry {
   persisted_404?: boolean;
   [key: string]: unknown;
 }
- // Load freellms free models if available (316 models) — fallback to models.yaml for fresh clone (b930e6d deletes data/*.json)
-function loadFreellmsModels(): ModelListEntry[] {
-  const arr = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
-  if (arr.length > 0) {
-    return arr.map((m) => {
-      const sanitized = sanitizeFreellmsName(String(m.name ?? ""));
-      return {
-        id: `${m.slug}/${sanitized}`,
-        raw_id: `${m.slug}/${m.name}`,
-        object: "model",
-        owned_by: m.slug || "unknown",
-        provider: m.slug,
-        display_name: m.name,
-        context_length: parseInt(String(m.context ?? "")) || 8192,
-        score: parseInt(String(m.score ?? "")) || 0,
-        tier: m.tier_type,
-        freellms_verified: m.verified,
-        no_card: m.nocard,
-        capabilities: m.modality,
-        limit: m.limit,
-        created: 1715433600,
-      };
-    });
-  }
-  // Fallback: read models.yaml snapshot at repo root (316 models) — regex parse to avoid yaml dep
+function parseModelsYaml(): ModelListEntry[] {
   try {
     const candidates = [
       path.resolve("models.yaml"),
@@ -67,8 +43,6 @@ function loadFreellmsModels(): ModelListEntry[] {
     for (const p of candidates) if (fs.existsSync(p)) { yamlPath = p; break; }
     if (!yamlPath) return [];
     const raw = fs.readFileSync(yamlPath, "utf-8");
-    // Parse models.yaml: each entry has id, provider, display_name, context_length, score, tier, verified, capabilities, limit
-    // Use block regex to extract each model entry
     const blocks = raw.split(/\n\s*-\s+id:\s*/);
     const out: ModelListEntry[] = [];
     for (let i = 1; i < blocks.length; i++) {
@@ -89,11 +63,46 @@ function loadFreellmsModels(): ModelListEntry[] {
       out.push({ id, raw_id: id, object: "model", owned_by: provider, provider, display_name, context_length, score, tier, freellms_verified: verified, no_card, capabilities, limit, created: 1715433600 });
     }
     if (out.length > 0) return out;
-    // Final fallback regex for id only
     const ids = [...raw.matchAll(/-\s+id:\s*"([^"]+)"/g)].map((m) => m[1]);
     return ids.map((id) => ({ id, raw_id: id, object: "model", owned_by: id.split("/")[0], provider: id.split("/")[0], display_name: id, context_length: 8192, score: 50, tier: "permanent", freellms_verified: false, no_card: true, capabilities: ["text"], limit: "", created: 1715433600 }));
   } catch { /* ignore */ }
   return [];
+}
+ // Load freellms free models if available (316 models) — fallback to models.yaml for fresh clone (b930e6d deletes data/*.json)
+ // Also merges models.yaml supplement so b-ai/tokenharbor (8 models) always visible even when freellms json stale
+function loadFreellmsModels(): ModelListEntry[] {
+  const arr = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
+  if (arr.length > 0) {
+    const base = arr.map((m) => {
+      const sanitized = sanitizeFreellmsName(String(m.name ?? ""));
+      return {
+        id: `${m.slug}/${sanitized}`,
+        raw_id: `${m.slug}/${m.name}`,
+        object: "model",
+        owned_by: m.slug || "unknown",
+        provider: m.slug,
+        display_name: m.name,
+        context_length: parseInt(String(m.context ?? "")) || 8192,
+        score: parseInt(String(m.score ?? "")) || 0,
+        tier: m.tier_type,
+        freellms_verified: m.verified,
+        no_card: m.nocard,
+        capabilities: m.modality,
+        limit: m.limit,
+        created: 1715433600,
+      };
+    });
+    // Merge missing models from models.yaml (e.g. b-ai/tokenharbor when freellms json stale at 319)
+    try {
+      const yamlModels = parseModelsYaml();
+      if (yamlModels.length > 0) {
+        const seen = new Set(base.map((m) => m.id));
+        for (const ym of yamlModels) if (!seen.has(ym.id)) (base as ModelListEntry[]).push(ym as ModelListEntry);
+      }
+    } catch { /* ignore */ }
+    return base;
+  }
+  return parseModelsYaml();
 }
 
 // Models route needs full verified entry (not just status string)
@@ -184,6 +193,15 @@ const opencodeSupplement: ModelListEntry[] = [
   { id: "kiraai/deepseek-v4-flash-0731", owned_by: "kiraai", provider: "kiraai", display_name: "deepseek-v4-flash-0731", context_length: 128000, score: 66, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "150M free tokens/day" },
   { id: "kiraai/deepseek-v4-flash", owned_by: "kiraai", provider: "kiraai", display_name: "deepseek-v4-flash", context_length: 128000, score: 65, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "150M free tokens/day" },
   { id: "kiraai/deepseek-v4-pro", owned_by: "kiraai", provider: "kiraai", display_name: "deepseek-v4-pro", context_length: 128000, score: 65, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "150M free tokens/day" },
+  // b-ai (4 free) + tokenharbor (4 :free) — ensure visible even when hasKey live filter or freellms stale
+  { id: "b-ai/qwen3.8-flash", owned_by: "b-ai", provider: "b-ai", display_name: "qwen3.8-flash", context_length: 131072, score: 72, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning","image","video"], limit: "0 Credits (free)" },
+  { id: "b-ai/hy3", owned_by: "b-ai", provider: "b-ai", display_name: "hy3", context_length: 131072, score: 71, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "0 Credits (free)" },
+  { id: "b-ai/mimo-v2.5", owned_by: "b-ai", provider: "b-ai", display_name: "mimo-v2.5", context_length: 131072, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text","image","audio","video","reasoning"], limit: "0 Credits (free)" },
+  { id: "b-ai/glm-5.3-flash", owned_by: "b-ai", provider: "b-ai", display_name: "glm-5.3-flash", context_length: 131072, score: 69, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning","image"], limit: "0 Credits (free)" },
+  { id: "tokenharbor/deepseek-v4.1-flash:free", owned_by: "tokenharbor", provider: "tokenharbor", display_name: "deepseek-v4.1-flash:free", context_length: 131072, score: 68, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "Free (:free tier)" },
+  { id: "tokenharbor/deepseek-v4-flash:free", owned_by: "tokenharbor", provider: "tokenharbor", display_name: "deepseek-v4-flash:free", context_length: 131072, score: 67, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning"], limit: "Free (:free tier)" },
+  { id: "tokenharbor/mimo-v2.5:free", owned_by: "tokenharbor", provider: "tokenharbor", display_name: "mimo-v2.5:free", context_length: 131072, score: 66, tier: "permanent", live_status: "alias", capabilities: ["text","image","audio","video","reasoning"], limit: "Free (:free tier)" },
+  { id: "tokenharbor/qwen3.8-flash:free", owned_by: "tokenharbor", provider: "tokenharbor", display_name: "qwen3.8-flash:free", context_length: 131072, score: 65, tier: "permanent", live_status: "alias", capabilities: ["text","reasoning","image","video"], limit: "Free (:free tier)" },
 ].map(m => ({ ...m, object: "model", created: 1715433600 }));
 
 // GET /v1/models and /v1/models/:id

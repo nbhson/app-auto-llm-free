@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { providerIds, providerMeta } from "../providers/registry.js";
+import { providerIds, providerMeta, providers } from "../providers/registry.js";
 import { config } from "../config.js";
 import { listVirtualKeys, createVirtualKey, deleteVirtualKey } from "../lib/virtual-keys.js";
 import { getLogs, getStats, onLog } from "../lib/request-log.js";
@@ -43,13 +43,39 @@ apiRoute.get("/providers", (c) => {
   const freellms = loadProvidersJson();
   const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
   const rawLimit = parseInt(c.req.query("limit") || c.req.query("per_page") || "25", 10);
-  const limit = [25, 50].includes(rawLimit) ? rawLimit : 25;
+  const limit = [25, 50, 100].includes(rawLimit) ? rawLimit : rawLimit > 50 ? 100 : 25;
   const q = (c.req.query("q") || "").toLowerCase();
+  // Fallback free_models from freellms-models-free.json + models.yaml when freellms-providers.json is stale (b-ai/tokenharbor)
+  const freeModelsArr = readDataJson<Array<{ slug?: string }>>("freellms-models-free.json", []);
+  const countBySlug = new Map<string, number>();
+  for (const m of freeModelsArr) if (m.slug) countBySlug.set(m.slug, (countBySlug.get(m.slug) || 0) + 1);
+  try {
+    const yamlCandidates = [resolveDataPath("../models.yaml"), resolveDataPath("models.yaml"), path.resolve("models.yaml")];
+    let yamlText = "";
+    for (const p of yamlCandidates) {
+      try { if (fs.existsSync(p)) { yamlText = fs.readFileSync(p, "utf-8"); if (yamlText) break; } } catch { /* ignore */ }
+    }
+    if (yamlText) {
+      const providerCounts = new Map<string, number>();
+      for (const m of yamlText.matchAll(/provider:\s*([^\n]+)/g)) {
+        const s = m[1].trim();
+        providerCounts.set(s, (providerCounts.get(s) || 0) + 1);
+      }
+      for (const [k, v] of providerCounts) if (!freellms.find((x) => x.slug === k)) countBySlug.set(k, v);
+    }
+  } catch { /* ignore */ }
   let detailed = providerIds.map((id) => {
     const meta = providerMeta[id] || { name: id, tier: "", tier_type: "", caps: [], noCard: true };
     const fre = freellms.find((x: { slug?: string; name?: string; tier?: string; tier_type?: string; caps?: string[]; noCard?: boolean; baseUrl?: string; free_models?: number; total_models?: number }) => x.slug === id);
     const keys = config.providerKeys[id] || [];
     const hasReal = hasRealKey(id);
+    // baseUrl fallback chain: freellms json -> registry provider -> empty
+    const registryBase = (() => {
+      try { const p = (providers as Record<string, { baseUrl?: string; id?: string }>)[id]; return (p as unknown as { baseUrl?: string })?.baseUrl || ""; } catch { return ""; }
+    })();
+    const fallbackBaseUrl = (fre as { baseUrl?: string } | undefined)?.baseUrl || registryBase || "";
+    const fallbackFree = fre?.free_models ?? (countBySlug.get(id) ?? 0);
+    const fallbackTotal = fre?.total_models ?? fallbackFree;
     return {
       id,
       name: meta.name || fre?.name || id,
@@ -57,9 +83,9 @@ apiRoute.get("/providers", (c) => {
       tier_type: meta.tier_type || fre?.tier_type || "",
       caps: meta.caps || fre?.caps || [],
       noCard: meta.noCard ?? fre?.noCard ?? true,
-      baseUrl: (fre as { baseUrl?: string } | undefined)?.baseUrl || "",
-      free_models: fre?.free_models ?? 0,
-      total_models: fre?.total_models ?? 0,
+      baseUrl: fallbackBaseUrl,
+      free_models: fallbackFree,
+      total_models: fallbackTotal,
       keys: keys.length > 0 ? `${keys.length} keys` : "none",
       hasRealKey: hasReal,
       status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key",

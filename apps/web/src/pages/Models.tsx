@@ -61,7 +61,7 @@ export default function Models() {
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
   useEffect(() => { const id = setTimeout(() => setProviderDebounced(provider.trim()), 400); return () => clearTimeout(id); }, [provider]);
   useEffect(() => {
-    fetch(`/api/providers?limit=50`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
+    fetch(`/api/providers?limit=100`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
       const list = (d.detailed || []) as ApiProvider[];
       list.sort((a, b) => a.id.localeCompare(b.id));
       setAllProviders(list);
