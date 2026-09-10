@@ -18,22 +18,49 @@ import { tryProviders } from "../../lib/provider-executor.js";
 import { getRequestVk, type UpstreamChatCompletion, type CompressibleMessage } from "../../lib/types.js";
 import type { ChatMessage } from "../../providers/base.js";
 
+const contentPartSchema = z.object({
+  type: z.string(),
+  text: z.string().optional(),
+  content: z.string().optional(),
+  image_url: z.object({ url: z.string() }).optional(),
+  source: z.unknown().optional(),
+}).passthrough();
+
+const toolCallSchema = z.object({
+  id: z.string().optional(),
+  type: z.string().optional(),
+  function: z.object({
+    name: z.string().optional(),
+    arguments: z.string().optional(),
+    description: z.string().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
+const toolSchema = z.object({
+  type: z.string().optional(),
+  function: z.object({
+    name: z.string(),
+    description: z.string().optional(),
+    parameters: z.unknown().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+
 const chatSchema = z.object({
   model: z.string().min(1),
   messages: z.array(
     z.object({
       role: z.string(),
-      content: z.union([z.string(), z.array(z.any())]),
+      content: z.union([z.string(), z.array(contentPartSchema)]),
       tool_call_id: z.string().optional(),
       name: z.string().optional(),
-      tool_calls: z.array(z.any()).optional(),
-    })
+      tool_calls: z.array(toolCallSchema).optional(),
+    }).passthrough()
   ),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
   stream: z.boolean().optional(),
-  tools: z.array(z.any()).optional(),
-  tool_choice: z.any().optional(),
+  tools: z.array(toolSchema).optional(),
+  tool_choice: z.union([z.string(), z.record(z.unknown())]).optional(),
   top_p: z.number().optional(),
   top_k: z.number().optional(),
   n: z.number().optional(),

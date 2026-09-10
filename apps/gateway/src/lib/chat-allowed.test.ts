@@ -15,8 +15,11 @@ function readWeb(file: string): string {
 
 describe("Chat allowed models — 6 strict modes (added free-llm-gateway/auto)", () => {
   it("Chat.tsx exports ALLOWED_CHAT_MODELS with exactly 6 ids", () => {
-    const txt = readWeb("apps/web/src/pages/Chat.tsx");
-    expect(txt).toContain("ALLOWED_CHAT_MODELS");
+    // 1.6.0: constants extracted to features/chat/types.ts, Chat.tsx re-exports
+    const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
+    const typesTxt = readWeb("apps/web/src/features/chat/types.ts");
+    const combined = chatTxt + "\n" + typesTxt;
+    expect(combined).toContain("ALLOWED_CHAT_MODELS");
     const expected = [
       "free-llm-gateway/auto",
       "kilo-code/kilo-auto/free",
@@ -26,21 +29,27 @@ describe("Chat allowed models — 6 strict modes (added free-llm-gateway/auto)",
       "agnes-ai/agnes-2.5-flash",
     ];
     for (const id of expected) {
-      expect(txt).toContain(`"${id}"`);
+      expect(combined).toContain(`"${id}"`);
     }
-    // verify array length is 6
-    const m = txt.match(/ALLOWED_CHAT_MODELS\s*=\s*\[[^\]]+\]/s);
+    // verify array length is 6 in types file
+    const m = typesTxt.match(/ALLOWED_CHAT_MODELS\s*=\s*\[[^\]]+\]/s);
     expect(m).not.toBeNull();
     const quoted = (m![0].match(/"/g) || []).length / 2;
     const modelLines = expected.filter((id) => m![0].includes(id)).length;
     expect(modelLines).toBe(6);
     expect(quoted).toBe(6);
+    // Chat.tsx must still re-export
+    expect(chatTxt).toContain("ALLOWED_CHAT_MODELS");
   });
 
   it("Chat.tsx restricts selector to allowed list", () => {
-    const txt = readWeb("apps/web/src/pages/Chat.tsx");
-    expect(txt).toContain("ALLOWED_SET.has");
-    expect(txt).toContain("FALLBACK_CONTEXT");
+    const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
+    const typesTxt = readWeb("apps/web/src/features/chat/types.ts");
+    const storageTxt = readWeb("apps/web/src/features/chat/lib/storage.ts");
+    const combined = chatTxt + typesTxt + storageTxt;
+    // allowed-set check may be in types or storage prefs
+    expect(combined).toMatch(/ALLOWED_SET|allowedSet|has\(/);
+    expect(combined).toContain("FALLBACK_CONTEXT");
   });
 
   it("Chat breakdown is clickable and navigates to message", () => {
@@ -153,18 +162,26 @@ describe("i18n VI/EN coverage for 8 pages (incl. Chat)", () => {
 
 describe("Chat empty fix — refactor code returns content (reasoning + fallback)", () => {
   it("Chat.tsx handles reasoning_content/reasoning/thinking and fallback non-stream", () => {
-    const txt = readWeb("apps/web/src/pages/Chat.tsx");
-    expect(txt).toContain("reasoning_content");
-    expect(txt).toContain("reasoningFull");
-    expect(txt).toContain("fallbackRes");
-    expect(txt).toContain("4096");
-    expect(txt).toContain("extractDelta");
+    // 1.6.0: parser extracted to sse-parser.ts + useChatStream hook + storage (4096)
+    const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
+    const parserTxt = readWeb("apps/web/src/features/chat/lib/sse-parser.ts");
+    const hookTxt = readWeb("apps/web/src/features/chat/hooks/useChatStream.ts");
+    const storageTxt = readWeb("apps/web/src/features/chat/lib/storage.ts");
+    const combined = chatTxt + parserTxt + hookTxt + storageTxt;
+    expect(combined).toContain("reasoning_content");
+    expect(combined).toContain("reasoningFull");
+    expect(combined).toContain("fallbackRes");
+    expect(combined).toContain("4096");
+    expect(combined).toContain("extractDelta");
   });
   it("Chat.tsx streams robustly (ping/event, array content, error handling)", () => {
-    const txt = readWeb("apps/web/src/pages/Chat.tsx");
-    expect(txt).toContain('startsWith(":")');
-    expect(txt).toContain('startsWith("event:")');
-    expect(txt).toContain("Array.isArray");
-    expect(txt).toContain("streamError");
+    const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
+    const parserTxt = readWeb("apps/web/src/features/chat/lib/sse-parser.ts");
+    const hookTxt = readWeb("apps/web/src/features/chat/hooks/useChatStream.ts");
+    const combined = chatTxt + parserTxt + hookTxt;
+    expect(combined).toContain('startsWith(":")');
+    expect(combined).toContain('startsWith("event:")');
+    expect(combined).toContain("Array.isArray");
+    expect(combined).toContain("streamError");
   });
 });

@@ -2,6 +2,23 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.6.0] - 2026-09-11
+
+### Added
+- **Chat 1.6.0 architecture refactor** — `apps/web/src/pages/Chat.tsx:1` 1127→~670 LOC, tách thành `features/chat/{types, lib/token, lib/sse-parser, lib/storage, hooks/useChatStream, hooks/useChatAttachments, components/MarkdownContent, components/CodeBlock}` — tuân thủ SRP/composition (Infinum/Telerik 2025), mỗi module <150 LOC, `React.memo` cho Markdown/CodeBlock, `useMemo` cho `totalPromptTokens`/`ctxPercent`
+- **Throttled streaming (RAF)** — `useChatStream:40` `requestAnimationFrame` batch `pending` delta thay vì `setMessages` mỗi token → giảm re-render/jank, spec SSE 2025 (throttle 100-500ms), auto-scroll RAF thay vì `setInterval 300ms`
+- **Abort cleanup & memoization** — `useEffect return () => abort()` + `cancelAnimationFrame` tránh leak khi unmount/StrictMode, `MarkdownContent`/`CodeBlock` `React.memo`, `totalPromptTokens` `useMemo`, `persistMessages` debounce 200ms
+- **Secure key handling** — `lib/storage.ts:10` `getMasterKey()` bỏ fallback cứng `fgk-master-dev-key` trong bundle, trả `""` khi thiếu và hiển thị lỗi `Missing MASTER key`, tránh lộ key mặc định
+- **Backend strict Zod** — `apps/gateway/src/routes/v1/chat.ts:21` `contentPartSchema`/`toolCallSchema`/`toolSchema` với `passthrough()`, loại bỏ `z.any()` → `z.union([z.string(), z.record(z.unknown())])`, type-safe cho `content` array/`tool_choice`
+
+### Changed
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.5.4→1.6.0`, `main.tsx` badge `v1.6.0`, `app.ts` version `1.6.0` — typecheck + build + 287 tests pass (46 files)
+- **Docs** — `README.md:60` + `README.vi.md:60` Dashboard Chat cập nhật 1.6.0 (modular, throttled RAF, memoized), `docs/en/OPERATIONS.md` + `docs/vi/OPERATIONS.md` bổ sung mục Chat 1.6.0, `CHANGELOG 1.6.0`
+
+### Fixed
+- **Per-token jank & leak** — throttling + RAF + Abort cleanup sửa UI jank và leak memory trên StrictMode/unmount
+- **Type safety** — xóa `any` trong chat route schema, đồng bộ 46 tests
+
 ## [1.5.4] - 2026-09-11
 
 ### Fixed
