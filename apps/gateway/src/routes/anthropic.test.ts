@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { anthropicRoute } from "./v1/anthropic.js";
 import { providers } from "../providers/registry.js";
@@ -49,12 +50,18 @@ describe("anthropic route", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Provider")).toBe("pollinations");
-    const data: any = await res.json();
+    const data = await resJson<{
+      type?: string;
+      role?: string;
+      content?: Array<{ type?: string; text?: string }>;
+      stop_reason?: string;
+      usage?: { input_tokens?: number; output_tokens?: number };
+    }>(res);
     expect(data.type).toBe("message");
     expect(data.role).toBe("assistant");
     expect(data.content).toEqual([{ type: "text", text: "hi-anthropic" }]);
     expect(data.stop_reason).toBe("end_turn");
-    expect(data.usage.input_tokens).toBeGreaterThan(0);
+    expect(data.usage?.input_tokens ?? 0).toBeGreaterThan(0);
   });
 
   it("accepts array system + system-role messages, passes native anthropic upstream through", async () => {
@@ -136,7 +143,7 @@ describe("anthropic route", () => {
       }),
     });
     expect(res.status).toBe(200);
-    const data: any = await res.json();
-    expect(data.input_tokens).toBeGreaterThan(10);
+    const data = await resJson<{ input_tokens?: number; usage?: { input_tokens?: number } }>(res);
+    expect(data.input_tokens ?? data.usage?.input_tokens ?? 0).toBeGreaterThan(10);
   });
 });

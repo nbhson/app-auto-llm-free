@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { responsesRoute } from "./v1/responses.js";
 import { providers } from "../providers/registry.js";
@@ -40,11 +41,16 @@ describe("responses route", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Provider")).toBe("pollinations");
-    const data: any = await res.json();
+    const data = await resJson<{
+      object?: string;
+      status?: string;
+      id?: string;
+      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+    }>(res);
     expect(data.object).toBe("response");
     expect(data.status).toBe("completed");
-    expect(data.output[0].content[0]).toMatchObject({ type: "output_text", text: "hello-resp" });
-    expect(data.id.startsWith("resp_")).toBe(true);
+    expect(data.output?.[0]?.content?.[0]).toMatchObject({ type: "output_text", text: "hello-resp" });
+    expect(data.id?.startsWith("resp_")).toBe(true);
   });
 
   it("passes through native responses upstream", async () => {
@@ -103,7 +109,7 @@ describe("responses route", () => {
       body: JSON.stringify({ model: "pollinations/openai", input: "hi" }),
     });
     expect(res.status).toBe(502);
-    const data: any = await res.json();
-    expect(data.error.type).toBe("provider_error");
+    const data = await resJson<{ error?: { type?: string } }>(res);
+    expect(data.error?.type).toBe("provider_error");
   });
 });

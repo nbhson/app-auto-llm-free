@@ -1,0 +1,22 @@
+# Provider: siliconflow — auto-split from models.yaml (2 models)
+models:
+  - id: "siliconflow/abbreviation"
+    display_name: abbreviation
+    provider: siliconflow
+    context_length: 131072
+    score: 45
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "See provider page"
+  - id: "siliconflow/deepseek-ai/deepseek-r1-distill-qwen-7b"
+    display_name: "deepseek-ai/deepseek-r1-distill-qwen-7b"
+    provider: siliconflow
+    context_length: 131000
+    score: 44
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "30 RPM, 60K TPM"

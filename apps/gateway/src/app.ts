@@ -69,8 +69,11 @@ export function createApp() {
   });
 
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "1.2.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "1.3.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
+  // LB-friendly liveness/readiness probes — no auth, no version payload
+  app.get("/health", (c) => c.json({ status: "ok" }));
+  app.get("/health/ready", (c) => c.json({ ready: true }));
   app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nPOST /v1/audio/transcriptions\nPOST /v1/audio/speech\nPOST /v1/responses\nPOST /v1/messages (Anthropic)\nGET /v1/health</pre></body></html>`));
 
   // Auth middleware for /v1/* (except health) — uses virtual-keys + master

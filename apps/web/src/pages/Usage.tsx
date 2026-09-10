@@ -128,7 +128,6 @@ export default function Usage() {
       }
     })();
     return () => { controller.abort(); try { reader?.cancel().catch(() => {}); } catch { /* ignore */ } if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
 
   const usableProviders = providers.filter((p) => p.hasRealKey || isPublicProvider(p.id));

@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { pollinationsProvider } from "./pollinations.js";
 import { geminiProvider } from "./gemini.js";
@@ -55,8 +56,8 @@ describe("gemini provider", () => {
     );
     expect(seen[0].url).toContain("gemini-3.6-flash:generateContent");
     expect(seen[0].url).toContain("key=APIKEY");
-    const data: any = await res.json();
-    expect(data.choices[0].message.content).toBe("gem-hi");
+    const data = await resJson<{ choices?: Array<{ message?: { content?: string } }> }>(res);
+    expect(data.choices?.[0]?.message?.content).toBe("gem-hi");
   });
 
   it("passes non-ok upstream through", async () => {
@@ -72,8 +73,8 @@ describe("gemini provider", () => {
     const res = await geminiProvider.chat({ model: "llama-3.3-70b", messages: [] } as any, "k");
     expect(res.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
-    const data: any = await res.json();
-    expect(data.error.type).toBe("model_not_found");
+    const data = await resJson<{ error?: { type?: string } }>(res);
+    expect(data.error?.type).toBe("model_not_found");
   });
 
   it("models() without key returns default, health catches errors", async () => {

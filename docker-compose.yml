@@ -48,6 +48,12 @@ services:
       EMBEDDING_FALLBACKS: ${EMBEDDING_FALLBACKS:-nvidia-nim/nvidia/nv-embed-v1,cloudflare-workers-ai/@cf/baai/bge-large-en-v1.5}
     volumes:
       - gateway-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:7373/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

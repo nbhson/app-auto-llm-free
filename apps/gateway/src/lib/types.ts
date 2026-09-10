@@ -120,6 +120,112 @@ export interface FreellmsProviderEntry {
   [key: string]: unknown;
 }
 
+/** Helper: parse a `Response` body as typed JSON (replaces `const data: any = await res.json()`). */
+export async function resJson<T>(res: Response): Promise<T> {
+  return (await res.json()) as T;
+}
+
+// ---- Shared API response shapes (replaces `const data: any` in tests) ----
+
+export interface OpenAIErrorBody {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string;
+    param?: string;
+    provider_errors?: Array<{ provider?: string; status?: number; error?: string }>;
+  };
+  message?: string;
+  code?: string;
+}
+
+export interface OpenAIModelsResponse {
+  object?: string;
+  data?: Array<{
+    id?: string;
+    object?: string;
+    created?: number;
+    owned_by?: string;
+  }>;
+  total?: number;
+}
+
+export interface OpenAIChatResponse {
+  id?: string;
+  object?: string;
+  created?: number;
+  model?: string;
+  choices?: Array<{
+    index?: number;
+    message?: { role?: string; content?: string | null; tool_calls?: unknown };
+    finish_reason?: string | null;
+    delta?: { role?: string; content?: string | null };
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    prompt_tokens_computed?: number;
+  };
+  error?: OpenAIErrorBody["error"];
+}
+
+export interface ApiProvidersResponse {
+  providers?: string[];
+  pagination?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    total_pages?: number;
+  };
+  detailed?: Array<{
+    id?: string;
+    name?: string;
+    tier?: string;
+    tier_type?: string;
+    base_url?: string;
+    hasKey?: boolean;
+    no_card?: boolean;
+    models?: number;
+    free_models?: number;
+    health?: string;
+    addedAt?: string;
+  }>;
+}
+
+export interface ApiModelsResponse {
+  models?: string[];
+  pagination?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    total_pages?: number;
+  };
+  detailed?: Array<{
+    id?: string;
+    name?: string;
+    provider?: string;
+    tier?: string;
+    tier_type?: string;
+    context_length?: number;
+    hasKey?: boolean;
+    disabled?: boolean;
+  }>;
+}
+
+export interface HealthResponse {
+  status?: string;
+  version?: string;
+  uptime?: number;
+  providers?: number;
+  tiers?: number;
+  timestamp?: string;
+}
+
+export interface ReadyResponse {
+  ready?: boolean;
+}
+
 /** Extract message from unknown throwables (replaces `catch (e: any) => e.message`). */
 export function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message;

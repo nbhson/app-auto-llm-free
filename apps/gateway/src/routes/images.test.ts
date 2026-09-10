@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { imagesRoute } from "./v1/images.js";
 import { providers } from "../providers/registry.js";
@@ -52,8 +53,8 @@ describe("images route", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Provider")).toBe("agnes-ai");
-    const data: any = await res.json();
-    expect(data.data[0].url).toBe("https://img.test/1.png");
+    const data = await resJson<{ data?: Array<{ url?: string }> }>(res);
+    expect(data.data?.[0]?.url).toBe("https://img.test/1.png");
   });
 
   it("normalizes non-OpenAI shape to {created, data}", async () => {
@@ -67,8 +68,8 @@ describe("images route", () => {
       body: JSON.stringify({ prompt: "dog" }),
     });
     expect(res.status).toBe(200);
-    const data: any = await res.json();
-    expect(data.data[0].url).toBe("https://x/y.png");
+    const data = await resJson<{ data?: Array<{ url?: string }> }>(res);
+    expect(data.data?.[0]?.url).toBe("https://x/y.png");
   });
 
   it("returns 502 provider_error when image provider fails (test env, no dev mock)", async () => {
@@ -82,7 +83,7 @@ describe("images route", () => {
       body: JSON.stringify({ prompt: "bird" }),
     });
     expect(res.status).toBe(502);
-    const data: any = await res.json();
-    expect(data.error.type).toBe("provider_error");
+    const data = await resJson<{ error?: { type?: string } }>(res);
+    expect(data.error?.type).toBe("provider_error");
   });
 });

@@ -1,13 +1,11 @@
 import { Hono } from "hono";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { resolveDataPath, readDataJson } from "../../lib/paths.js";
+import { readDataJson } from "../../lib/paths.js";
 import { config } from "../../config.js";
 import { isPublicProvider } from "../../lib/router.js";
 import { sanitizeFreellmsName } from "../../lib/sanitize.js";
 import { loadHealthMap as loadHealthMapCached, loadLiveModels as loadLiveModelsCached } from "../../lib/model-store.js";
 import type { FreellmsModelEntry } from "../../lib/types.js";
+import { loadModelsYaml } from "../../lib/models-yaml.js";
 
 export const modelsRoute = new Hono();
 
@@ -30,80 +28,43 @@ export interface ModelListEntry {
   persisted_404?: boolean;
   [key: string]: unknown;
 }
-function parseModelsYaml(): ModelListEntry[] {
-  try {
-    const candidates = [
-      path.resolve("models.yaml"),
-      path.resolve(process.cwd(), "models.yaml"),
-      path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../../models.yaml")),
-      resolveDataPath("models.yaml"),
-      resolveDataPath("../models.yaml"),
-    ];
-    let yamlPath: string | null = null;
-    for (const p of candidates) if (fs.existsSync(p)) { yamlPath = p; break; }
-    if (!yamlPath) return [];
-    const raw = fs.readFileSync(yamlPath, "utf-8");
-    const blocks = raw.split(/\n\s*-\s+id:\s*/);
-    const out: ModelListEntry[] = [];
-    for (let i = 1; i < blocks.length; i++) {
-      const blk = blocks[i];
-      const idMatch = blk.match(/^"([^"]+)"/);
-      if (!idMatch) continue;
-      const id = idMatch[1];
-      const provider = (blk.match(/provider:\s*([^\n]+)/)?.[1] || id.split("/")[0]).trim();
-      const display_name = (blk.match(/display_name:\s*"([^"]+)"/)?.[1] || id).trim();
-      const context_length = parseInt(blk.match(/context_length:\s*(\d+)/)?.[1] || "8192", 10);
-      const score = parseInt(blk.match(/score:\s*(\d+)/)?.[1] || "50", 10);
-      const tier = (blk.match(/tier:\s*([^\n]+)/)?.[1] || "permanent").trim();
-      const verified = blk.includes("verified: true");
-      const no_card = !blk.includes("no_card: false");
-      const capsRaw = blk.match(/capabilities:\s*\[([^\]]+)\]/)?.[1] || "text";
-      const capabilities = capsRaw.split(",").map((s) => s.trim()).filter(Boolean);
-      const limit = (blk.match(/limit:\s*"([^"]+)"/)?.[1] || "").trim();
-      out.push({ id, raw_id: id, object: "model", owned_by: provider, provider, display_name, context_length, score, tier, freellms_verified: verified, no_card, capabilities, limit, created: 1715433600 });
-    }
-    if (out.length > 0) return out;
-    const ids = [...raw.matchAll(/-\s+id:\s*"([^"]+)"/g)].map((m) => m[1]);
-    return ids.map((id) => ({ id, raw_id: id, object: "model", owned_by: id.split("/")[0], provider: id.split("/")[0], display_name: id, context_length: 8192, score: 50, tier: "permanent", freellms_verified: false, no_card: true, capabilities: ["text"], limit: "", created: 1715433600 }));
-  } catch { /* ignore */ }
-  return [];
-}
- // Load freellms free models if available (316 models) — fallback to models.yaml for fresh clone (b930e6d deletes data/*.json)
- // Also merges models.yaml supplement so b-ai/tokenharbor (8 models) always visible even when freellms json stale
+
+// Load freellms free models if available (316 models) — fallback to models/ (split per-provider) for fresh clone
+// Also merges models/ supplement so b-ai/tokenharbor (8 models) always visible even when freellms json stale
 function loadFreellmsModels(): ModelListEntry[] {
-  const arr = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
-  if (arr.length > 0) {
-    const base = arr.map((m) => {
-      const sanitized = sanitizeFreellmsName(String(m.name ?? ""));
-      return {
-        id: `${m.slug}/${sanitized}`,
-        raw_id: `${m.slug}/${m.name}`,
-        object: "model",
-        owned_by: m.slug || "unknown",
-        provider: m.slug,
-        display_name: m.name,
-        context_length: parseInt(String(m.context ?? "")) || 8192,
-        score: parseInt(String(m.score ?? "")) || 0,
-        tier: m.tier_type,
-        freellms_verified: m.verified,
-        no_card: m.nocard,
-        capabilities: m.modality,
-        limit: m.limit,
-        created: 1715433600,
-      };
-    });
-    // Merge missing models from models.yaml (e.g. b-ai/tokenharbor when freellms json stale at 319)
-    try {
-      const yamlModels = parseModelsYaml();
-      if (yamlModels.length > 0) {
-        const seen = new Set(base.map((m) => m.id));
-        for (const ym of yamlModels) if (!seen.has(ym.id)) (base as ModelListEntry[]).push(ym as ModelListEntry);
-      }
-    } catch { /* ignore */ }
-    return base;
+    const arr = readDataJson<FreellmsModelEntry[]>("freellms-models-free.json", []);
+    if (arr.length > 0) {
+      const base = arr.map((m) => {
+        const sanitized = sanitizeFreellmsName(String(m.name ?? ""));
+        return {
+          id: `${m.slug}/${sanitized}`,
+          raw_id: `${m.slug}/${m.name}`,
+          object: "model",
+          owned_by: m.slug || "unknown",
+          provider: m.slug,
+          display_name: m.name,
+          context_length: parseInt(String(m.context ?? "")) || 8192,
+          score: parseInt(String(m.score ?? "")) || 0,
+          tier: m.tier_type,
+          freellms_verified: m.verified,
+          no_card: m.nocard,
+          capabilities: m.modality,
+          limit: m.limit,
+          created: 1715433600,
+        };
+      });
+      // Merge missing models from models/ (e.g. b-ai/tokenharbor when freellms json stale at 319)
+      try {
+        const yamlModels = loadModelsYaml();
+        if (yamlModels.length > 0) {
+          const seen = new Set(base.map((m) => m.id));
+          for (const ym of yamlModels) if (!seen.has(ym.id)) (base as ModelListEntry[]).push(ym as ModelListEntry);
+        }
+      } catch { /* ignore */ }
+      return base;
+    }
+    return loadModelsYaml();
   }
-  return parseModelsYaml();
-}
 
 // Models route needs full verified entry (not just status string)
 function loadVerifiedMapFull(): Map<string, Record<string, unknown>> {

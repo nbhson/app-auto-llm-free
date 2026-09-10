@@ -1,0 +1,946 @@
+# Provider: nvidia-nim — auto-split from models.yaml (97 models)
+models:
+  - id: "nvidia-nim/z-ai/glm-5.2"
+    display_name: "z-ai/glm-5.2"
+    provider: nvidia-nim
+    context_length: 1048576
+    score: 94
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/deepseek-ai/deepseek-v4-flash"
+    display_name: "deepseek-ai/deepseek-v4-flash"
+    provider: nvidia-nim
+    context_length: 1048576
+    score: 88
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/minimaxai/minimax-m3"
+    display_name: "minimaxai/minimax-m3"
+    provider: nvidia-nim
+    context_length: 1048576
+    score: 87
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/moonshotai/kimi-k2.6"
+    display_name: "moonshotai/kimi-k2.6"
+    provider: nvidia-nim
+    context_length: 262144
+    score: 82
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/stepfun-ai/step-3.7-flash"
+    display_name: "stepfun-ai/step-3.7-flash"
+    provider: nvidia-nim
+    context_length: 262144
+    score: 75
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nemotron-3-ultra-550b-a55b"
+    display_name: "nemotron-3-ultra-free"
+    provider: nvidia-nim
+    context_length: 1000000
+    score: 74
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "nvidia-nim/poolside/laguna-xs-2.1"
+    display_name: "poolside/laguna-xs-2.1"
+    provider: nvidia-nim
+    context_length: 262144
+    score: 67
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/gemma-4-31b-it"
+    display_name: "gemma-4-31b-it"
+    provider: nvidia-nim
+    context_length: 262144
+    score: 62
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, reasoning]
+  - id: "nvidia-nim/01-ai/yi-large"
+    display_name: "01-ai/yi-large"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/meta/codellama-70b"
+    display_name: "meta/codellama-70b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama3-chatqa-1.5-70b"
+    display_name: "nvidia/llama3-chatqa-1.5-70b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/writer/palmyra-fin-70b-32k"
+    display_name: "writer/palmyra-fin-70b-32k"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/writer/palmyra-med-70b"
+    display_name: "writer/palmyra-med-70b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/writer/palmyra-med-70b-32k"
+    display_name: "writer/palmyra-med-70b-32k"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nemotron-3-nano-omni-30b-a3b-reasoning"
+    display_name: "nemotron-3-nano-omni-30b-a3b-reasoning"
+    provider: nvidia-nim
+    context_length: 256000
+    score: 57
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, audio, reasoning]
+  - id: "nvidia-nim/nemotron-3-super-120b-a12b"
+    display_name: "nemotron-3-super-120b-a12b"
+    provider: nvidia-nim
+    context_length: 262144
+    score: 57
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "nvidia-nim/ibm/granite-34b-code-instruct"
+    display_name: "ibm/granite-34b-code-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 56
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    display_name: "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 56
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/bigcode/starcoder2-15b"
+    display_name: "bigcode/starcoder2-15b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/google/deplot"
+    display_name: google/deplot
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/google/gemma-2b"
+    display_name: "google/gemma-2b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/google/recurrentgemma-2b"
+    display_name: "google/recurrentgemma-2b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/microsoft/kosmos-2"
+    display_name: "microsoft/kosmos-2"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/microsoft/phi-3-vision-128k-instruct"
+    display_name: "microsoft/phi-3-vision-128k-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/microsoft/phi-3.5-moe-instruct"
+    display_name: "microsoft/phi-3.5-moe-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/mistralai/mixtral-8x22b-v0.1"
+    display_name: "mistralai/mixtral-8x22b-v0.1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-3.1-nemotron-51b-instruct"
+    display_name: "nvidia/llama-3.1-nemotron-51b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nemoretriever-parse"
+    display_name: "nvidia/nemoretriever-parse"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [rerank]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nemotron-4-340b-instruct"
+    display_name: "nvidia/nemotron-4-340b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nemotron-4-340b-reward"
+    display_name: "nvidia/nemotron-4-340b-reward"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nemotron-parse"
+    display_name: "nvidia/nemotron-parse"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/neva-22b"
+    display_name: "nvidia/neva-22b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nvclip"
+    display_name: nvidia/nvclip
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/riva-translate-4b-instruct"
+    display_name: "nvidia/riva-translate-4b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/vila"
+    display_name: nvidia/vila
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/writer/palmyra-creative-122b"
+    display_name: "writer/palmyra-creative-122b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/gpt-oss-120b"
+    display_name: "gpt-oss-120b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "nvidia-nim/adept/fuyu-8b"
+    display_name: "adept/fuyu-8b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/aisingapore/sea-lion-7b-instruct"
+    display_name: "aisingapore/sea-lion-7b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/deepseek-ai/deepseek-coder-6.7b-instruct"
+    display_name: "deepseek-ai/deepseek-coder-6.7b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/google/codegemma-1.1-7b"
+    display_name: "google/codegemma-1.1-7b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/google/codegemma-7b"
+    display_name: "google/codegemma-7b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/ibm/granite-3.0-8b-instruct"
+    display_name: "ibm/granite-3.0-8b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/ibm/granite-8b-code-instruct"
+    display_name: "ibm/granite-8b-code-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nv-mistralai/mistral-nemo-12b-instruct"
+    display_name: "nv-mistralai/mistral-nemo-12b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/mistral-nemo-minitron-8b-8k-instruct"
+    display_name: "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/zyphra/zamba2-7b-instruct"
+    display_name: "zyphra/zamba2-7b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nemotron-3.5-content-safety"
+    display_name: "nvidia/nemotron-3.5-content-safety"
+    provider: nvidia-nim
+    context_length: 128000
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/cosmos-reason2-8b"
+    display_name: "nvidia/cosmos-reason2-8b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 51
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/mistralai/mistral-large-3-675b-instruct-2512"
+    display_name: "mistralai/mistral-large-3-675b-instruct-2512"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 51
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/baai/bge-m3"
+    display_name: "baai/bge-m3"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 49
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/mistralai/codestral-22b-instruct-v0.1"
+    display_name: "mistralai/codestral-22b-instruct-v0.1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 49
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/mistralai/mistral-7b-instruct-v0.3"
+    display_name: "mistralai/mistral-7b-instruct-v0.3"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 48
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    display_name: "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 48
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/ibm/granite-3.0-3b-a800m-instruct"
+    display_name: "ibm/granite-3.0-3b-a800m-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 46
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/inkling"
+    display_name: inkling
+    provider: nvidia-nim
+    context_length: 256000
+    score: 46
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, audio, reasoning]
+  - id: "nvidia-nim/llama-3.3-nemotron-super-49b-v1"
+    display_name: "llama-3.3-nemotron-super-49b-v1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 46
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "nvidia-nim/gpt-oss-20b"
+    display_name: "gpt-oss-20b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 46
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "nvidia-nim/nvidia/nemotron-nano-3-30b-a3b"
+    display_name: "nvidia/nemotron-nano-3-30b-a3b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 46
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/mistralai/mistral-large-2-instruct"
+    display_name: "mistralai/mistral-large-2-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 45
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/meta/llama-3.1-70b-instruct"
+    display_name: "meta/llama-3.1-70b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 45
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nemotron-mini-4b-instruct"
+    display_name: "nemotron-mini-4b-instruct"
+    provider: nvidia-nim
+    context_length: 128000
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/google/diffusiongemma-26b-a4b-it"
+    display_name: "google/diffusiongemma-26b-a4b-it"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/meta/llama-3.2-90b-vision-instruct"
+    display_name: "meta/llama-3.2-90b-vision-instruct"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/mistralai/mistral-nemotron"
+    display_name: "mistralai/mistral-nemotron"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/riva-translate-4b-instruct-v1.1"
+    display_name: "nvidia/riva-translate-4b-instruct-v1.1"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/ising-calibration-1.5-31b"
+    display_name: "nvidia/ising-calibration-1.5-31b"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/riva-translate-4b-instruct-v2"
+    display_name: "nvidia/riva-translate-4b-instruct-v2"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/llama-3.1-nemotron-70b-instruct"
+    display_name: "nvidia/llama-3.1-nemotron-70b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-nemotron-embed-1b-v2"
+    display_name: "nvidia/llama-nemotron-embed-1b-v2"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding, text, image]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-nemotron-embed-vl-1b-v2"
+    display_name: "nvidia/llama-nemotron-embed-vl-1b-v2"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding, text, image]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nemotron-3-nano-30b-a3b"
+    display_name: "nemotron-3-nano-30b-a3b"
+    provider: nvidia-nim
+    context_length: 262144
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "nvidia-nim/ai21labs/jamba-1.5-large-instruct"
+    display_name: "ai21labs/jamba-1.5-large-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/meta/llama-3.2-11b-vision-instruct"
+    display_name: "meta/llama-3.2-11b-vision-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/embed-qa-4"
+    display_name: "nvidia/embed-qa-4"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1"
+    display_name: "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding, rerank]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-3.2-nv-embedqa-1b-v1"
+    display_name: "nvidia/llama-3.2-nv-embedqa-1b-v1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nemotron-3-embed-1b"
+    display_name: "nvidia/nemotron-3-embed-1b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nv-embedqa-e5-v5"
+    display_name: "nvidia/nv-embedqa-e5-v5"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nv-embedqa-mistral-7b-v2"
+    display_name: "nvidia/nv-embedqa-mistral-7b-v2"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/snowflake/arctic-embed-l"
+    display_name: "snowflake/arctic-embed-l"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nemotron-nano-12b-v2-vl"
+    display_name: "nemotron-nano-12b-v2-vl"
+    provider: nvidia-nim
+    context_length: 128000
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, reasoning]
+  - id: "nvidia-nim/meta/llama-3.2-3b-instruct"
+    display_name: "meta/llama-3.2-3b-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/databricks/dbrx-instruct"
+    display_name: "databricks/dbrx-instruct"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/meta/llama2-70b"
+    display_name: "meta/llama2-70b"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/meta/llama-3.2-1b-instruct"
+    display_name: "meta/llama-3.2-1b-instruct"
+    provider: nvidia-nim
+    context_length: 60000
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/meta/llama-guard-4-12b"
+    display_name: "meta/llama-guard-4-12b"
+    provider: nvidia-nim
+    context_length: 1048576
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    display_name: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/nvidia-nemotron-nano-9b-v2"
+    display_name: "nvidia/nvidia-nemotron-nano-9b-v2"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/llama-3.1-nemotron-nano-8b-v1"
+    display_name: "nvidia/llama-3.1-nemotron-nano-8b-v1"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/nv-embed-v1"
+    display_name: "nvidia/nv-embed-v1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding, text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/nvidia/nv-embedcode-7b-v1"
+    display_name: "nvidia/nv-embedcode-7b-v1"
+    provider: nvidia-nim
+    context_length: 131072
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [embedding, text]
+    limit: "Up to 40 RPM"
+  - id: "nvidia-nim/llama-3.3-70b-instruct"
+    display_name: "llama-3.3-70b-instruct"
+    provider: nvidia-nim
+    context_length: 128000
+    score: 36
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/llama-3.1-nemotron-safety-guard-8b-v3"
+    display_name: "llama-3.1-nemotron-safety-guard-8b-v3"
+    provider: nvidia-nim
+    context_length: 128000
+    score: 33
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "meta/llama-3.1-8b-instruct"
+    display_name: "meta/llama-3.1-8b-instruct"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 32
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/llama-3.1-nemoguard-8b-content-safety"
+    display_name: "nvidia/llama-3.1-nemoguard-8b-content-safety"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 31
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "nvidia-nim/nvidia/llama-3.1-nemoguard-8b-topic-control"
+    display_name: "nvidia/llama-3.1-nemoguard-8b-topic-control"
+    provider: nvidia-nim
+    context_length: 8192
+    score: 31
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]

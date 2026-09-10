@@ -80,10 +80,24 @@ apiRoute.get("/providers", (c) => {
   const countBySlug = new Map<string, number>();
   for (const m of freeModelsArr) if (m.slug) countBySlug.set(m.slug, (countBySlug.get(m.slug) || 0) + 1);
   try {
-    const yamlCandidates = [resolveDataPath("../models.yaml"), resolveDataPath("models.yaml"), path.resolve("models.yaml")];
+    // Prefer split models/ directory (per-provider files), fallback to legacy models.yaml
     let yamlText = "";
-    for (const p of yamlCandidates) {
-      try { if (fs.existsSync(p)) { yamlText = fs.readFileSync(p, "utf-8"); if (yamlText) break; } } catch { /* ignore */ }
+    const roots = [resolveDataPath(".."), resolveDataPath("."), path.resolve(".")];
+    for (const root of roots) {
+      try {
+        const dir = path.join(root, "models");
+        if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+          const files = fs.readdirSync(dir).filter((f) => f.endsWith(".yaml"));
+          yamlText = files.map((f) => fs.readFileSync(path.join(dir, f), "utf-8")).join("\n");
+          if (yamlText) break;
+        }
+      } catch { /* ignore */ }
+    }
+    if (!yamlText) {
+      const yamlCandidates = [resolveDataPath("../models.yaml"), resolveDataPath("models.yaml"), path.resolve("models.yaml")];
+      for (const p of yamlCandidates) {
+        try { if (fs.existsSync(p)) { yamlText = fs.readFileSync(p, "utf-8"); if (yamlText) break; } } catch { /* ignore */ }
+      }
     }
     if (yamlText) {
       const providerCounts = new Map<string, number>();

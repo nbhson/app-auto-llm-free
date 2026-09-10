@@ -254,6 +254,7 @@ curl -X POST http://localhost:7373/api/keys \
 | [API.md](docs/en/API.md) | OpenAI-compatible endpoints, aliases, streaming, error codes, pagination 25/50 |
 | [CONFIGURATION.md](docs/en/CONFIGURATION.md) | Environment variables, models.yaml, rate limit |
 | [DEPLOYMENT.md](docs/en/DEPLOYMENT.md) | Docker, Cloudflare Workers, Vercel, bare metal |
+| [PRODUCTION.md](docs/en/PRODUCTION.md) | Production guide — Postgres migration, monitoring, alerting, backup, scaling |
 | [ROADMAP.md](docs/en/ROADMAP.md) | Roadmap P1→P5, milestones |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 

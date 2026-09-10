@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { createApp } from "../app.js";
 import { config } from "../config.js";
@@ -89,8 +90,8 @@ describe("app auth middleware", () => {
       headers: { Authorization: `Bearer ${master}` },
     });
     expect(res.status).toBe(404);
-    const data: any = await res.json();
-    expect(data.error.type).toBe("not_found");
+    const data = await resJson<{ error?: { message?: string; type?: string } }>(res);
+    expect(data.error?.type).toBe("not_found");
   });
 });
 

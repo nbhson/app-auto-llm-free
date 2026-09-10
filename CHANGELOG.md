@@ -2,6 +2,25 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0] - 2026-09-11
+
+### Added
+- **LB health probes** — `GET /health` (liveness) + `GET /health/ready` (readiness) không auth cho load balancer / K8s. `docker-compose.yml` + `Dockerfile` healthcheck 10s/30s dùng `/health/ready`. `apps/gateway/src/app.ts:74`
+- **Production guide** — `docs/en/PRODUCTION.md` mới: migration SQLite→Postgres, monitoring (Promtail/Loki, `/api/stats`/`/api/analytics`), backup/restore, Caddy TLS, scaling, troubleshooting
+- **Integration tests** — `apps/gateway/src/tests/integration.test.ts` 14 tests full pipeline (auth→route→provider→normalize): public endpoints, chat fallback, x-api-key auth, scoped key + x-router, virtual key lifecycle
+- **Logger secret redaction** — Pino `redact` cho `Authorization`/`x-api-key`/`Cookie` + `err.config.headers`, export `REDACTED_PATHS`. `apps/gateway/src/middleware/logger.ts:5` + 3 tests `logger-redact.test.ts`
+- **Typed test helpers** — `resJson<T>()` + shared response interfaces (`OpenAIChatResponse`, `OpenAIErrorBody`, `HealthResponse`…) thay `const data: any`. `apps/gateway/src/lib/types.ts`
+
+### Changed
+- **Models catalog split** — `models.yaml` (3279 dòng, 338 models) → `models/` (26 files per-provider, 338 models). Loader `apps/gateway/src/lib/models-yaml.ts` mới ưu tiên `models/` → fallback legacy `models.yaml`. `apps/gateway/src/routes/v1/models.ts` DRY import. `scripts/sync-freellms.py` ghi `models/<slug>.yaml`, `scripts/validate-models.py` validate cả dir. `Dockerfile` copy `models/` thay vì `models.yaml`
+- **Health version dynamic** — `apps/gateway/src/routes/v1/health.ts` đọc từ `package.json` thay vì hardcode `1.2.0`, multi-candidate fallback cho Docker prod
+- **CI** — `.github/workflows/ci.yml` fix `npm run test` command (bỏ `||` vô nghĩa), thêm artifact upload on failure, đổi validate arg `models.yaml` → `models`
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.2.0→1.3.0`, `main.tsx` badge `v1.3.0`, `app.ts` version `1.3.0`
+
+### Fixed
+- **Typecheck clean** — `any` trong production code về 0 (chỉ còn comment), optional chaining fixes, Provider cast fixes — `tsc --noEmit` 0 errors, `eslint` 0 errors (251/251 tests)
+- **Docker build** — fix `COPY models.yaml` fail khi file bị xóa
+
 ## [1.2.0] - 2026-09-10
 
 ### Added

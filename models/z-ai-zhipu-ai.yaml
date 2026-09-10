@@ -1,0 +1,41 @@
+# Provider: z-ai-zhipu-ai — auto-split from models.yaml (4 models)
+models:
+  - id: "z-ai-zhipu-ai/glm-4.7-flash"
+    display_name: "glm-4.7-flash"
+    provider: z-ai-zhipu-ai
+    context_length: 200000
+    score: 63
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 concurrent request"
+  - id: "z-ai-zhipu-ai/glm-4.6v-flash"
+    display_name: "glm-4.6v-flash"
+    provider: z-ai-zhipu-ai
+    context_length: 128000
+    score: 59
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "1 concurrent request"
+  - id: "z-ai-zhipu-ai/glm-4.5-flash"
+    display_name: "glm-4.5-flash"
+    provider: z-ai-zhipu-ai
+    context_length: 128000
+    score: 50
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 concurrent request"
+  - id: "z-ai-zhipu-ai/glm-4.5-air"
+    display_name: "glm-4.5-air"
+    provider: z-ai-zhipu-ai
+    context_length: 131072
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]

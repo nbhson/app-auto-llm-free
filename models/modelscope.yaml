@@ -1,0 +1,380 @@
+# Provider: modelscope — auto-split from models.yaml (42 models)
+models:
+  - id: "modelscope/deepseek-ai/deepseek-v4-pro"
+    display_name: "deepseek-ai/deepseek-v4-pro"
+    provider: modelscope
+    context_length: 8192
+    score: 70
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/deepseek-ai/deepseek-v4-flash"
+    display_name: "deepseek-ai/deepseek-v4-flash"
+    provider: modelscope
+    context_length: 8192
+    score: 67
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3.5-397b-a17b"
+    display_name: "qwen/qwen3.5-397b-a17b"
+    provider: modelscope
+    context_length: 8192
+    score: 55
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3.5-122b-a10b"
+    display_name: "qwen/qwen3.5-122b-a10b"
+    provider: modelscope
+    context_length: 8192
+    score: 55
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/glm-4.7-flashx"
+    display_name: "glm-4.7-flashx"
+    provider: modelscope
+    context_length: 200000
+    score: 45
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "modelscope/glm-5.1"
+    display_name: "glm-5.1"
+    provider: modelscope
+    context_length: 1000000
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "modelscope/minimax-m3"
+    display_name: "minimax-m3"
+    provider: modelscope
+    context_length: 512000
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, reasoning]
+  - id: "modelscope/opencompass/compassjudger-1-32b-instruct"
+    display_name: "opencompass/compassjudger-1-32b-instruct"
+    provider: modelscope
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/xgenerationlab/xiyansql-qwencoder-32b-2412"
+    display_name: "xgenerationlab/xiyansql-qwencoder-32b-2412"
+    provider: modelscope
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/xgenerationlab/xiyansql-qwencoder-32b-2504"
+    display_name: "xgenerationlab/xiyansql-qwencoder-32b-2504"
+    provider: modelscope
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/stepfun-ai/step-3.5-flash"
+    display_name: "stepfun-ai/step-3.5-flash"
+    provider: modelscope
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/stepfun-ai/step-3.7-flash"
+    display_name: "stepfun-ai/step-3.7-flash"
+    provider: modelscope
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-235b-a22b-instruct-2507"
+    display_name: "qwen/qwen3-235b-a22b-instruct-2507"
+    provider: modelscope
+    context_length: 8192
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/medaibase/antangelmed"
+    display_name: medaibase/antangelmed
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/minimax/minimax-m1-80k"
+    display_name: "minimax/minimax-m1-80k"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/musepublic/qwen-image-edit"
+    display_name: "musepublic/qwen-image-edit"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/opengvlab/internvl3_5-241b-a28b"
+    display_name: "opengvlab/internvl3_5-241b-a28b"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/paddlepaddle/ernie-4.5-21b-a3b-pt"
+    display_name: "paddlepaddle/ernie-4.5-21b-a3b-pt"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/paddlepaddle/ernie-4.5-300b-a47b-pt"
+    display_name: "paddlepaddle/ernie-4.5-300b-a47b-pt"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/paddlepaddle/ernie-4.5-vl-28b-a3b-pt"
+    display_name: "paddlepaddle/ernie-4.5-vl-28b-a3b-pt"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen-image-edit"
+    display_name: "qwen/qwen-image-edit"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-4b"
+    display_name: "qwen/qwen3-4b"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/shanghai_ai_laboratory/intern-s1"
+    display_name: "shanghai_ai_laboratory/intern-s1"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/shanghai_ai_laboratory/intern-s2-preview"
+    display_name: "shanghai_ai_laboratory/intern-s2-preview"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/tencent-hunyuan/hy3"
+    display_name: "tencent-hunyuan/hy3"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3.5-27b"
+    display_name: "qwen/qwen3.5-27b"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3.5-35b-a3b"
+    display_name: "qwen/qwen3.5-35b-a3b"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-vl-235b-a22b-instruct"
+    display_name: "qwen/qwen3-vl-235b-a22b-instruct"
+    provider: modelscope
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-coder-30b-a3b-instruct"
+    display_name: "qwen/qwen3-coder-30b-a3b-instruct"
+    provider: modelscope
+    context_length: 8192
+    score: 39
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/meituan-longcat/longcat-flash-lite"
+    display_name: "meituan-longcat/longcat-flash-lite"
+    provider: modelscope
+    context_length: 8192
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/shanghai_ai_laboratory/intern-s1-mini"
+    display_name: "shanghai_ai_laboratory/intern-s1-mini"
+    provider: modelscope
+    context_length: 8192
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-next-80b-a3b-instruct"
+    display_name: "qwen/qwen3-next-80b-a3b-instruct"
+    provider: modelscope
+    context_length: 8192
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-235b-a22b"
+    display_name: "qwen/qwen3-235b-a22b"
+    provider: modelscope
+    context_length: 8192
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-vl-8b-thinking"
+    display_name: "qwen/qwen3-vl-8b-thinking"
+    provider: modelscope
+    context_length: 8192
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "modelscope/qwen/qwen3-vl-8b-instruct"
+    display_name: "qwen/qwen3-vl-8b-instruct"
+    provider: modelscope
+    context_length: 8192
+    score: 36
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-235b-a22b-thinking-2507"
+    display_name: "qwen/qwen3-235b-a22b-thinking-2507"
+    provider: modelscope
+    context_length: 8192
+    score: 36
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "modelscope/qwen/qwen3-next-80b-a3b-thinking"
+    display_name: "qwen/qwen3-next-80b-a3b-thinking"
+    provider: modelscope
+    context_length: 8192
+    score: 34
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "modelscope/qwen/qwen3-30b-a3b"
+    display_name: "qwen/qwen3-30b-a3b"
+    provider: modelscope
+    context_length: 8192
+    score: 34
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/mistralai/mistral-large-instruct-2407"
+    display_name: "mistralai/mistral-large-instruct-2407"
+    provider: modelscope
+    context_length: 8192
+    score: 34
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/paddlepaddle/ernie-4.5-0.3b-pt"
+    display_name: "paddlepaddle/ernie-4.5-0.3b-pt"
+    provider: modelscope
+    context_length: 8192
+    score: 33
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-14b"
+    display_name: "qwen/qwen3-14b"
+    provider: modelscope
+    context_length: 8192
+    score: 31
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "modelscope/qwen/qwen3-8b"
+    display_name: "qwen/qwen3-8b"
+    provider: modelscope
+    context_length: 8192
+    score: 29
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]

@@ -1,0 +1,102 @@
+# Provider: cohere — auto-split from models.yaml (10 models)
+models:
+  - id: "cohere/command-a+-218b"
+    display_name: "command-a+-218b"
+    provider: cohere
+    context_length: 436000
+    score: 47
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/command-a-111b"
+    display_name: "command-a-111b"
+    provider: cohere
+    context_length: 288000
+    score: 47
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/command-a-reasoning"
+    display_name: "command-a-reasoning"
+    provider: cohere
+    context_length: 288000
+    score: 47
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "20 RPM"
+  - id: "cohere/command-r+"
+    display_name: "command-r+"
+    provider: cohere
+    context_length: 128000
+    score: 46
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/command-r7b"
+    display_name: "command-r7b"
+    provider: cohere
+    context_length: 128000
+    score: 46
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/command-a-vision"
+    display_name: "command-a-vision"
+    provider: cohere
+    context_length: 128000
+    score: 46
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image]
+    limit: "20 RPM"
+  - id: "cohere/command-r7b-arabic"
+    display_name: "command-r7b-arabic"
+    provider: cohere
+    context_length: 128000
+    score: 46
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/aya-expanse-32b"
+    display_name: "aya-expanse-32b"
+    provider: cohere
+    context_length: 128000
+    score: 45
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/command-a-translate"
+    display_name: "command-a-translate"
+    provider: cohere
+    context_length: 9000
+    score: 44
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM"
+  - id: "cohere/aya-vision-32b"
+    display_name: "aya-vision-32b"
+    provider: cohere
+    context_length: 16000
+    score: 44
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image]
+    limit: "20 RPM"

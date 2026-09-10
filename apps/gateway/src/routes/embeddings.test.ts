@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { embeddingsRoute } from "./v1/embeddings.js";
 import { providers } from "../providers/registry.js";
@@ -51,9 +52,9 @@ describe("embeddings route", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("X-Provider")).toBe("cohere");
-    const data: any = await res.json();
+    const data = await resJson<{ object?: string; data?: Array<{ embedding?: number[] }> }>(res);
     expect(data.object).toBe("list");
-    expect(data.data[0].embedding).toEqual([0.1, 0.2, 0.3]);
+    expect(data.data?.[0]?.embedding).toEqual([0.1, 0.2, 0.3]);
   });
 
   it("accepts array input", async () => {

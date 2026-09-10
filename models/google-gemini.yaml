@@ -1,0 +1,90 @@
+# Provider: google-gemini — auto-split from models.yaml (9 models)
+models:
+  - id: "google-gemini/gemini-3.6-flash"
+    display_name: "gemini-3.6-flash"
+    provider: google-gemini
+    context_length: 1048576
+    score: 91
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, audio, pdf, reasoning]
+    limit: "15 RPM, 1,500 RPD"
+  - id: "google-gemini/gemini-3.5-flash"
+    display_name: "gemini-3.5-flash"
+    provider: google-gemini
+    context_length: 1048576
+    score: 87
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, audio, pdf, reasoning]
+    limit: "15 RPM, 1,500 RPD"
+  - id: "google-gemini/gemini-3.5-flash-lite"
+    display_name: "gemini-3.5-flash-lite"
+    provider: google-gemini
+    context_length: 1048576
+    score: 81
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, audio, pdf, reasoning]
+    limit: "30 RPM, 1,500 RPD"
+  - id: "google-gemini/gemini-3.1-flash-lite"
+    display_name: "gemini-3.1-flash-lite"
+    provider: google-gemini
+    context_length: 1048576
+    score: 59
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, audio, pdf, reasoning]
+    limit: "30 RPM, 1,500 RPD"
+  - id: "google-gemini/gemini-flash-latest"
+    display_name: "gemini-flash-latest"
+    provider: google-gemini
+    context_length: 1048576
+    score: 55
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, audio, reasoning]
+  - id: "google-gemini/gemini-3-flash-preview"
+    display_name: "gemini-3-flash-preview"
+    provider: google-gemini
+    context_length: 1048576
+    score: 54
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "Preview limits"
+  - id: "google-gemini/gemini-2.5-flash"
+    display_name: "gemini-2.5-flash"
+    provider: google-gemini
+    context_length: 1048576
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, audio, video, pdf, reasoning]
+    limit: "15 RPM, 1,500 RPD"
+  - id: "google-gemini/gemini-2.5-flash-lite"
+    display_name: "gemini-2.5-flash-lite"
+    provider: google-gemini
+    context_length: 1048576
+    score: 47
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, audio, video, pdf, reasoning]
+    limit: "30 RPM, 1,500 RPD"
+  - id: "google-gemini/gemini-flash-lite-latest"
+    display_name: "gemini-flash-lite-latest"
+    provider: google-gemini
+    context_length: 1048576
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, audio, reasoning]

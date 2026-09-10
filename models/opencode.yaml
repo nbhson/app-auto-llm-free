@@ -1,0 +1,74 @@
+# Provider: opencode — auto-split from models.yaml (8 models)
+models:
+  - id: "opencode/nemotron-3-ultra-free"
+    display_name: "nemotron-3-ultra-free"
+    provider: opencode
+    context_length: 1000000
+    score: 49
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [reasoning]
+  - id: "opencode/deepseek-v4-flash-free"
+    display_name: "deepseek-v4-flash-free"
+    provider: opencode
+    context_length: 1000000
+    score: 45
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [reasoning]
+  - id: "opencode/mimo-v2.5-free"
+    display_name: "mimo-v2.5-free"
+    provider: opencode
+    context_length: 1048576
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [vision, audio, reasoning]
+  - id: "opencode/north-mini-code-free"
+    display_name: "north-mini-code-free"
+    provider: opencode
+    context_length: 256000
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [reasoning]
+  - id: "opencode/big-pickle"
+    display_name: "big-pickle"
+    provider: opencode
+    context_length: 8192
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+  - id: "opencode/laguna-s-2.1-free"
+    display_name: "laguna-s-2.1-free"
+    provider: opencode
+    context_length: 1048576
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "opencode/longcat-2.0-free"
+    display_name: "longcat-2.0-free"
+    provider: opencode
+    context_length: 1000000
+    score: 38
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "opencode/ling-3.0-flash-free"
+    display_name: "ling-3.0-flash-free"
+    provider: opencode
+    context_length: 8192
+    score: 37
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]

@@ -1,0 +1,33 @@
+# Provider: experientiallabs — auto-split from models.yaml (3 models)
+models:
+  - id: "experientiallabs/qwen3.8-27b"
+    display_name: "qwen3.8-27b"
+    provider: experientiallabs
+    context_length: 1000000
+    score: 78
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "Promotional free via Experiential Cloud"
+  - id: "experientiallabs/deepseek-v4-flash"
+    display_name: "deepseek-v4-flash"
+    provider: experientiallabs
+    context_length: 1048576
+    score: 76
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Promotional free via Experiential Cloud"
+  - id: "experientiallabs/gpt-5.6-luna"
+    display_name: "gpt-5.6-luna"
+    provider: experientiallabs
+    context_length: 1050000
+    score: 75
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, pdf, reasoning]
+    limit: "Promotional free via Experiential Cloud"
+  # KiraAI Vietnam (https://kiraai.vn/api/v1) — OpenAI compatible, 150M free tokens/day

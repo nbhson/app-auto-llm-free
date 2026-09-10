@@ -20,6 +20,8 @@ export default tseslint.config(
       "no-console": ["error", { allow: ["warn", "error"] }],
       "no-eval": "error",
       "no-implied-eval": "error",
+      // react-hooks plugin not installed — reference to its rule fails
+      "react-hooks/exhaustive-deps": "off",
     },
   },
   // Scripts are CLI tools — console output is their interface

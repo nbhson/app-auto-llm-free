@@ -1,0 +1,52 @@
+# Provider: agnes-ai — auto-split from models.yaml (5 models)
+models:
+  - id: "agnes-ai/agnes-2.0-flash"
+    display_name: "agnes-2.0-flash"
+    provider: agnes-ai
+    context_length: 256000
+    score: 81
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, vision]
+    limit: "30 RPM"
+  - id: "agnes-ai/agnes-1.5-flash"
+    display_name: "agnes-1.5-flash"
+    provider: agnes-ai
+    context_length: 256000
+    score: 55
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, vision]
+    limit: "30 RPM"
+  - id: "agnes-ai/agnes-image-2.0-flash"
+    display_name: "agnes-image-2.0-flash"
+    provider: agnes-ai
+    context_length: 4096
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [image]
+    limit: "30 RPM (1K)"
+  - id: "agnes-ai/agnes-image-2.1-flash"
+    display_name: "agnes-image-2.1-flash"
+    provider: agnes-ai
+    context_length: 4096
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [image]
+    limit: "30 RPM (1K)"
+  - id: "agnes-ai/agnes-video-v2.0"
+    display_name: "agnes-video-v2.0"
+    provider: agnes-ai
+    context_length: 4096
+    score: 49
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [video]
+    limit: "2 RPM"

@@ -1,0 +1,22 @@
+# Provider: grok-xai — auto-split from models.yaml (2 models)
+models:
+  - id: "grok-xai/grok-2-mini"
+    display_name: "grok-2-mini"
+    provider: grok-xai
+    context_length: 131072
+    score: 39
+    tier: quota
+    verified: false
+    no_card: false
+    capabilities: [text]
+    limit: "$25/month free credits, resets monthly"
+  - id: "grok-xai/grok-2"
+    display_name: "grok-2"
+    provider: grok-xai
+    context_length: 131072
+    score: 31
+    tier: quota
+    verified: false
+    no_card: false
+    capabilities: [text]
+    limit: "$25/month free credits, resets monthly"

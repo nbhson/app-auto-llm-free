@@ -1,0 +1,42 @@
+# Provider: tokenharbor — auto-split from models.yaml (4 models)
+models:
+  - id: "tokenharbor/deepseek-v4.1-flash:free"
+    display_name: "deepseek-v4.1-flash:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 68
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Free (:free tier)"
+  - id: "tokenharbor/deepseek-v4-flash:free"
+    display_name: "deepseek-v4-flash:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 67
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Free (:free tier)"
+  - id: "tokenharbor/mimo-v2.5:free"
+    display_name: "mimo-v2.5:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 66
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image, audio, video, reasoning]
+    limit: "Free (:free tier)"
+  - id: "tokenharbor/qwen3.8-flash:free"
+    display_name: "qwen3.8-flash:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 65
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning, image, video]
+    limit: "Free (:free tier, reserved slot — pending live verification)"

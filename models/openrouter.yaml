@@ -1,0 +1,172 @@
+# Provider: openrouter — auto-split from models.yaml (17 models)
+models:
+  - id: "openrouter/nvidia/nemotron-3-ultra:free"
+    display_name: "nvidia/nemotron-3-ultra:free"
+    provider: openrouter
+    context_length: 1000000
+    score: 85
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/google/gemma-4-31b:free"
+    display_name: "google/gemma-4-31b:free"
+    provider: openrouter
+    context_length: 262144
+    score: 72
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning, video]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/cohere/north-mini-code:free"
+    display_name: "cohere/north-mini-code:free"
+    provider: openrouter
+    context_length: 256000
+    score: 71
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, code, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/poolside/laguna-s-2.1:free"
+    display_name: "poolside/laguna-s-2.1:free"
+    provider: openrouter
+    context_length: 262144
+    score: 71
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/google/gemma-4-26b-a4b:free"
+    display_name: "google/gemma-4-26b-a4b:free"
+    provider: openrouter
+    context_length: 262144
+    score: 70
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning, video]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/nvidia/nemotron-3-nano-omni:free"
+    display_name: "nvidia/nemotron-3-nano-omni:free"
+    provider: openrouter
+    context_length: 256000
+    score: 68
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, audio, video, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/nvidia/nemotron-3-super:free"
+    display_name: "nvidia/nemotron-3-super:free"
+    provider: openrouter
+    context_length: 262144
+    score: 67
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/poolside/laguna-xs-2.1:free"
+    display_name: "poolside/laguna-xs-2.1:free"
+    provider: openrouter
+    context_length: 262144
+    score: 65
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/nvidia/nemotron-3.5-content-safety:free"
+    display_name: "nvidia/nemotron-3.5-content-safety:free"
+    provider: openrouter
+    context_length: 128000
+    score: 55
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/nvidia/nemotron-3-nano-30b-a3b:free"
+    display_name: "nvidia/nemotron-3-nano-30b-a3b:free"
+    provider: openrouter
+    context_length: 256000
+    score: 53
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/google/lyria-3-pro-preview"
+    display_name: "google/lyria-3-pro-preview"
+    provider: openrouter
+    context_length: 1048576
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, audio]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/google/lyria-3-clip-preview"
+    display_name: "google/lyria-3-clip-preview"
+    provider: openrouter
+    context_length: 1048576
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, audio]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/nvidia/nemotron-nano-12b-2-vl:free"
+    display_name: "nvidia/nemotron-nano-12b-2-vl:free"
+    provider: openrouter
+    context_length: 128000
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/inclusionai/ling-3.0-tiny:free"
+    display_name: "inclusionai/ling-3.0-tiny:free"
+    provider: openrouter
+    context_length: 262144
+    score: 50
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/openai/gpt-oss-20b:free"
+    display_name: "openai/gpt-oss-20b:free"
+    provider: openrouter
+    context_length: 131072
+    score: 50
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/nvidia/nemotron-nano-9b-v2:free"
+    display_name: "nvidia/nemotron-nano-9b-v2:free"
+    provider: openrouter
+    context_length: 128000
+    score: 50
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/day (free tier)"
+  - id: "openrouter/free-models-router"
+    display_name: "free-models-router"
+    provider: openrouter
+    context_length: 200000
+    score: 45
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "200 req/day (free tier)"

@@ -1,0 +1,122 @@
+# Provider: groq — auto-split from models.yaml (12 models)
+models:
+  - id: "groq/llama-3.1-8b-instant"
+    display_name: "llama-3.1-8b-instant"
+    provider: groq
+    context_length: 131072
+    score: 72
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "30 RPM, 14.4K RPD, 6K TPM"
+  - id: "groq/llama-3.3-70b-versatile"
+    display_name: "llama-3.3-70b-versatile"
+    provider: groq
+    context_length: 131072
+    score: 75
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "30 RPM, 1K RPD, 12K TPM"
+  - id: "groq/meta-llama/llama-4-scout-17b-16e-instruct"
+    display_name: "meta-llama/llama-4-scout-17b-16e-instruct"
+    provider: groq
+    context_length: 131072
+    score: 78
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning, image]
+    limit: "30 RPM, 1K RPD, 30K TPM"
+  - id: "groq/moonshotai/kimi-k2-instruct"
+    display_name: "moonshotai/kimi-k2-instruct"
+    provider: groq
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning, code]
+    limit: "60 RPM, 1K RPD, 10K TPM"
+  - id: "groq/qwen/qwen3-32b"
+    display_name: "qwen/qwen3-32b"
+    provider: groq
+    context_length: 131072
+    score: 68
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "60 RPM, 1K RPD, 6K TPM"
+  - id: "groq/openai/gpt-oss-20b"
+    display_name: "openai/gpt-oss-20b"
+    provider: groq
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "30 RPM, 1K RPD, 8K TPM"
+  - id: "groq/openai/gpt-oss-120b"
+    display_name: "openai/gpt-oss-120b"
+    provider: groq
+    context_length: 131072
+    score: 71
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "30 RPM, 1K RPD, 8K TPM"
+  - id: "groq/compound"
+    display_name: "compound"
+    provider: groq
+    context_length: 131072
+    score: 65
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning, code]
+    limit: "30 RPM, 250 RPD, 70K TPM"
+  - id: "groq/compound-mini"
+    display_name: "compound-mini"
+    provider: groq
+    context_length: 131072
+    score: 64
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning, code]
+    limit: "30 RPM, 250 RPD, 70K TPM"
+  - id: "groq/whisper-large-v3"
+    display_name: "whisper-large-v3"
+    provider: groq
+    context_length: 8192
+    score: 50
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [audio]
+    limit: "20 RPM, 2K RPD, 7.2K ASH"
+  - id: "groq/whisper-large-v3-turbo"
+    display_name: "whisper-large-v3-turbo"
+    provider: groq
+    context_length: 8192
+    score: 50
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [audio]
+    limit: "20 RPM, 2K RPD, 7.2K ASH"
+  - id: "groq/allam-2-7b"
+    display_name: "allam-2-7b"
+    provider: groq
+    context_length: 8192
+    score: 55
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "30 RPM, 7K RPD, 6K TPM"

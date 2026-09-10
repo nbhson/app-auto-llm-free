@@ -1,0 +1,22 @@
+# Provider: chutes-ai — auto-split from models.yaml (2 models)
+models:
+  - id: "chutes-ai/deepseek-r1"
+    display_name: "deepseek-r1"
+    provider: chutes-ai
+    context_length: 131072
+    score: 45
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Community-powered, no hard cap"
+  - id: "chutes-ai/llama-3.1-70b"
+    display_name: "llama-3.1-70b"
+    provider: chutes-ai
+    context_length: 131072
+    score: 40
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "Community-powered, no hard cap"

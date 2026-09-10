@@ -1,3 +1,4 @@
+import { resJson } from "../lib/types.js";
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { audioRoute } from "./v1/audio.js";
 import { providers } from "../providers/registry.js";
@@ -29,8 +30,8 @@ describe("audio route", () => {
     fd.append("model", "groq/whisper-large-v3");
     const res = await audioRoute.request("/transcriptions", { method: "POST", body: fd });
     expect(res.status).toBe(400);
-    const data: any = await res.json();
-    expect(data.error.message).toMatch(/file is required/);
+    const data = await resJson<{ error?: { message?: string; type?: string }; text?: string }>(res);
+    expect(data.error?.message).toMatch(/file is required/);
   });
 
   it("transcriptions with string file -> 400", async () => {
@@ -111,7 +112,7 @@ describe("audio route", () => {
       body: JSON.stringify({ model: "groq/tts-1", input: "say hi" }),
     });
     expect(res.status).toBe(501);
-    const data: any = await res.json();
-    expect(data.error.type).toBe("not_supported");
+    const data = await resJson<{ error?: { message?: string; type?: string }; text?: string }>(res);
+    expect(data.error?.type).toBe("not_supported");
   });
 });

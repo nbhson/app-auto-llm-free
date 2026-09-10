@@ -1,0 +1,52 @@
+# Provider: aion-labs — auto-split from models.yaml (5 models)
+models:
+  - id: "aion-labs/aion-3.0"
+    display_name: "aion-3.0"
+    provider: aion-labs
+    context_length: 128000
+    score: 58
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 20K TPD"
+  - id: "aion-labs/aion-3.0-mini"
+    display_name: "aion-3.0-mini"
+    provider: aion-labs
+    context_length: 128000
+    score: 57
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 20K TPD"
+  - id: "aion-labs/aion-2.0"
+    display_name: "aion-2.0"
+    provider: aion-labs
+    context_length: 128000
+    score: 48
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 20K TPD"
+  - id: "aion-labs/aion-2.5"
+    display_name: "aion-2.5"
+    provider: aion-labs
+    context_length: 128000
+    score: 45
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 20K TPD"
+  - id: "aion-labs/aion-rp-1.0-8b"
+    display_name: "aion-rp-1.0-8b"
+    provider: aion-labs
+    context_length: 32000
+    score: 42
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 20K TPD"

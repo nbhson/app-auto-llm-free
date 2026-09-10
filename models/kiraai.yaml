@@ -1,0 +1,204 @@
+# Provider: kiraai — auto-split from models.yaml (20 models)
+models:
+  - id: "kiraai/kira-mini-1.0"
+    display_name: "kira-mini-1.0"
+    provider: kiraai
+    context_length: 128000
+    score: 70
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-auto"
+    display_name: "kira-auto"
+    provider: kiraai
+    context_length: 128000
+    score: 69
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-3.5-flash"
+    display_name: "kira-3.5-flash"
+    provider: kiraai
+    context_length: 1000000
+    score: 68
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision, code]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-3.5-pro"
+    display_name: "kira-3.5-pro"
+    provider: kiraai
+    context_length: 1000000
+    score: 67
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision, code]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-2.5-flash"
+    display_name: "kira-2.5-flash"
+    provider: kiraai
+    context_length: 1000000
+    score: 66
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-2.5-pro"
+    display_name: "kira-2.5-pro"
+    provider: kiraai
+    context_length: 1000000
+    score: 65
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision, code]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-3.0-image"
+    display_name: "kira-3.0-image"
+    provider: kiraai
+    context_length: 8192
+    score: 60
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [image]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-2.0-image"
+    display_name: "kira-2.0-image"
+    provider: kiraai
+    context_length: 8192
+    score: 59
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [image]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-3.0-flash-tts"
+    display_name: "kira-3.0-flash-tts"
+    provider: kiraai
+    context_length: 8192
+    score: 58
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [audio]
+    limit: "150M free tokens/day"
+  - id: "kiraai/kira-2.0-flash-tts"
+    display_name: "kira-2.0-flash-tts"
+    provider: kiraai
+    context_length: 8192
+    score: 57
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [audio]
+    limit: "150M free tokens/day"
+  # KiraAI free tier — community free models (150M tokens/day)
+  - id: "kiraai/mimo-v2.5-free"
+    display_name: "mimo-v2.5-free"
+    provider: kiraai
+    context_length: 128000
+    score: 64
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/hy3-free"
+    display_name: "hy3-free"
+    provider: kiraai
+    context_length: 128000
+    score: 63
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/glm-5.3-flash-free"
+    display_name: "glm-5.3-flash-free"
+    provider: kiraai
+    context_length: 128000
+    score: 63
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/glm-5.3-free"
+    display_name: "glm-5.3-free"
+    provider: kiraai
+    context_length: 128000
+    score: 62
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/qwen3.8-flash-free"
+    display_name: "qwen3.8-flash-free"
+    provider: kiraai
+    context_length: 128000
+    score: 62
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/qwen3.8-27b-free"
+    display_name: "qwen3.8-27b-free"
+    provider: kiraai
+    context_length: 128000
+    score: 61
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/ling-3.0-flash-sante-free"
+    display_name: "ling-3.0-flash-sante-free"
+    provider: kiraai
+    context_length: 128000
+    score: 60
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "150M free tokens/day"
+  - id: "kiraai/deepseek-v4-flash-0731"
+    display_name: "deepseek-v4-flash-0731"
+    provider: kiraai
+    context_length: 128000
+    score: 66
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/deepseek-v4-flash"
+    display_name: "deepseek-v4-flash"
+    provider: kiraai
+    context_length: 128000
+    score: 65
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  - id: "kiraai/deepseek-v4-pro"
+    display_name: "deepseek-v4-pro"
+    provider: kiraai
+    context_length: 128000
+    score: 65
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "150M free tokens/day"
+  # === B.AI — 4 free (https://chat.b.ai/key, https://docs.b.ai/llmservice/promotions-and-pricing-notices 2026-09-10, baseUrl https://api.b.ai/v1) ===

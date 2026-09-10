@@ -1,0 +1,42 @@
+# Provider: sambanova — auto-split from models.yaml (4 models)
+models:
+  - id: "sambanova/minimax-m2.7"
+    display_name: "minimax-m2.7"
+    provider: sambanova
+    context_length: 128000
+    score: 69
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "20 RPM, 20 RPD, 200K TPD"
+  - id: "sambanova/deepseek-v3.2-preview"
+    display_name: "deepseek-v3.2-preview"
+    provider: sambanova
+    context_length: 128000
+    score: 59
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "20 RPM, 20 RPD, 200K TPD"
+  - id: "sambanova/gemma-4-31b-it-preview"
+    display_name: "gemma-4-31b-it-preview"
+    provider: sambanova
+    context_length: 128000
+    score: 54
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "20 RPM, 20 RPD, 200K TPD"
+  - id: "sambanova/deepseek-v3.1"
+    display_name: "deepseek-v3.1"
+    provider: sambanova
+    context_length: 128000
+    score: 51
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "20 RPM, 20 RPD, 200K TPD"

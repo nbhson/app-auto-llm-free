@@ -1,0 +1,52 @@
+# Provider: cerebras — auto-split from models.yaml (5 models)
+models:
+  - id: "cerebras/gemma-4-31b"
+    display_name: "gemma-4-31b"
+    provider: cerebras
+    context_length: 131000
+    score: 69
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "15 RPM, 30K TPM, 1M TPD"
+  - id: "cerebras/zai-glm-4.7"
+    display_name: "zai-glm-4.7"
+    provider: cerebras
+    context_length: 128000
+    score: 61
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "10 RPM, 100 RPD, 1M TPD"
+  - id: "cerebras/zai-glm-4.7-deprecated-aug-2026"
+    display_name: "zai-glm-4.7-deprecated-aug-2026"
+    provider: cerebras
+    context_length: 131000
+    score: 60
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "5 RPM, 30K TPM, 1M TPD"
+  - id: "cerebras/gpt-oss-120b"
+    display_name: "gpt-oss-120b"
+    provider: cerebras
+    context_length: 131000
+    score: 54
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "5 RPM, 30K TPM, 1M TPD"
+  - id: "cerebras/llama-3.1-70b"
+    display_name: "llama-3.1-70b"
+    provider: cerebras
+    context_length: 131072
+    score: 42
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "See provider page"

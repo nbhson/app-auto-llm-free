@@ -1,0 +1,72 @@
+# Provider: kilo-code — auto-split from models.yaml (7 models)
+models:
+  - id: "kilo-code/stepfun/step-3.7-flash:free"
+    display_name: "stepfun/step-3.7-flash:free"
+    provider: kilo-code
+    context_length: 262000
+    score: 76
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"
+  - id: "kilo-code/poolside/laguna-s-2.1:free"
+    display_name: "poolside/laguna-s-2.1:free"
+    provider: kilo-code
+    context_length: 262000
+    score: 68
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"
+  - id: "kilo-code/poolside/laguna-xs-2.1:free"
+    display_name: "poolside/laguna-xs-2.1:free"
+    provider: kilo-code
+    context_length: 262000
+    score: 68
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"
+  - id: "kilo-code/nvidia/nemotron-3-ultra-550b-a55b:free"
+    display_name: "nvidia/nemotron-3-ultra-550b-a55b:free"
+    provider: kilo-code
+    context_length: 1000000
+    score: 65
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"
+  - id: "kilo-code/tencent/hy3:free"
+    display_name: "tencent/hy3:free"
+    provider: kilo-code
+    context_length: 262000
+    score: 70
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"
+  - id: "kilo-code/openrouter/free"
+    display_name: "openrouter/free"
+    provider: kilo-code
+    context_length: 262144
+    score: 70
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"
+  - id: "kilo-code/kilo-auto/free"
+    display_name: "kilo-auto/free"
+    provider: kilo-code
+    context_length: 262000
+    score: 72
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "200 req/hour"

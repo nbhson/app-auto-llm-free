@@ -1,0 +1,327 @@
+# Provider: cloudflare-workers-ai — auto-split from models.yaml (35 models)
+models:
+  - id: "cloudflare-workers-ai/@cf/google/gemma-4-26b-a4b-it"
+    display_name: "@cf/google/gemma-4-26b-a4b-it"
+    provider: cloudflare-workers-ai
+    context_length: 256000
+    score: 63
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.7-code"
+    display_name: "@cf/moonshotai/kimi-k2.7-code"
+    provider: cloudflare-workers-ai
+    context_length: 262000
+    score: 62
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, code, image, video, reasoning]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/@cf/openai/gpt-oss-120b"
+    display_name: "@cf/openai/gpt-oss-120b"
+    provider: cloudflare-workers-ai
+    context_length: 128000
+    score: 52
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/@cf/nvidia/nemotron-3-120b-a12b"
+    display_name: "@cf/nvidia/nemotron-3-120b-a12b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 47
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/baai/bge-large-en-v1.5"
+    display_name: "@cf/baai/bge-large-en-v1.5"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 47
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct"
+    display_name: "@cf/meta/llama-4-scout-17b-16e-instruct"
+    provider: cloudflare-workers-ai
+    context_length: 10000000
+    score: 47
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/@cf/mistralai/mistral-small-3.1-24b-instruct"
+    display_name: "@cf/mistralai/mistral-small-3.1-24b-instruct"
+    provider: cloudflare-workers-ai
+    context_length: 128000
+    score: 45
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/mistral-7b"
+    display_name: "mistral-7b"
+    provider: cloudflare-workers-ai
+    context_length: 32768
+    score: 44
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "See provider page"
+  - id: "cloudflare-workers-ai/qwen-1.5-7b"
+    display_name: "qwen-1.5-7b"
+    provider: cloudflare-workers-ai
+    context_length: 32768
+    score: 44
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "See provider page"
+  - id: "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
+    display_name: "@cf/zai-org/glm-4.7-flash"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/qwen/qwq-32b"
+    display_name: "@cf/qwen/qwq-32b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 43
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+    display_name: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+    provider: cloudflare-workers-ai
+    context_length: 32000
+    score: 41
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/@cf/baai/bge-m3"
+    display_name: "@cf/baai/bge-m3"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/google/gemma-2b-it-lora"
+    display_name: "@cf/google/gemma-2b-it-lora"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6"
+    display_name: "@cf/moonshotai/kimi-k2.6"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/ibm-granite/granite-4.0-h-micro"
+    display_name: "@cf/ibm-granite/granite-4.0-h-micro"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/baai/bge-small-en-v1.5"
+    display_name: "@cf/baai/bge-small-en-v1.5"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/zai-org/glm-5.2"
+    display_name: "@cf/zai-org/glm-5.2"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/baai/bge-base-en-v1.5"
+    display_name: "@cf/baai/bge-base-en-v1.5"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/aisingapore/gemma-sea-lion-v4-27b-it"
+    display_name: "@cf/aisingapore/gemma-sea-lion-v4-27b-it"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/openai/gpt-oss-20b"
+    display_name: "@cf/openai/gpt-oss-20b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/moondream/moondream3.1-9b-a2b"
+    display_name: "@cf/moondream/moondream3.1-9b-a2b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    display_name: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    provider: cloudflare-workers-ai
+    context_length: 131000
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text]
+    limit: "10K neurons/day (shared)"
+  - id: "cloudflare-workers-ai/@cf/mistral/mistral-7b-instruct-v0.2-lora"
+    display_name: "@cf/mistral/mistral-7b-instruct-v0.2-lora"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 39
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/meta-llama/llama-2-7b-chat-hf-lora"
+    display_name: "@cf/meta-llama/llama-2-7b-chat-hf-lora"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 39
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/google/gemma-7b-it-lora"
+    display_name: "@cf/google/gemma-7b-it-lora"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 39
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/qwen/qwen2.5-coder-32b-instruct"
+    display_name: "@cf/qwen/qwen2.5-coder-32b-instruct"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 39
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/qwen/qwen3-30b-a3b-fp8"
+    display_name: "@cf/qwen/qwen3-30b-a3b-fp8"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 34
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/meta/llama-3.2-3b-instruct"
+    display_name: "@cf/meta/llama-3.2-3b-instruct"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 29
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/meta/llama-3.1-8b-instruct-fp8"
+    display_name: "@cf/meta/llama-3.1-8b-instruct-fp8"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 28
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/meta/llama-guard-3-8b"
+    display_name: "@cf/meta/llama-guard-3-8b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 27
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "cloudflare-workers-ai/@cf/qwen/qwen3-embedding-0.6b"
+    display_name: "@cf/qwen/qwen3-embedding-0.6b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 27
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [embedding]
+  - id: "cloudflare-workers-ai/@cf/pfnet/plamo-embedding-1b"
+    display_name: "@cf/pfnet/plamo-embedding-1b"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 27
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [embedding]
+  - id: "cloudflare-workers-ai/@cf/google/embeddinggemma-300m"
+    display_name: "@cf/google/embeddinggemma-300m"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 27
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [embedding]
+  - id: "cloudflare-workers-ai/@cf/meta/llama-3.2-1b-instruct"
+    display_name: "@cf/meta/llama-3.2-1b-instruct"
+    provider: cloudflare-workers-ai
+    context_length: 8192
+    score: 27
+    tier: permanent
+    verified: true
+    no_card: false
+
+    capabilities: [text]

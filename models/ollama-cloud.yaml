@@ -1,0 +1,32 @@
+# Provider: ollama-cloud — auto-split from models.yaml (3 models)
+models:
+  - id: "ollama-cloud/minimax-m3"
+    display_name: "minimax-m3"
+    provider: ollama-cloud
+    context_length: 1000000
+    score: 88
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, image, video, reasoning]
+    limit: "Session/weekly limits (unpublished)"
+  - id: "ollama-cloud/nemotron-3-ultra"
+    display_name: "nemotron-3-ultra"
+    provider: ollama-cloud
+    context_length: 262000
+    score: 73
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Session/weekly limits (unpublished)"
+  - id: "ollama-cloud/gpt-oss/20b"
+    display_name: "gpt-oss:20b"
+    provider: ollama-cloud
+    context_length: 131000
+    score: 48
+    tier: permanent
+    verified: true
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Session/weekly limits (unpublished)"

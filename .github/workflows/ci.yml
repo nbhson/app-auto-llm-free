@@ -18,6 +18,14 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: python3 scripts/validate-models.py models.yaml
+      - run: python3 scripts/validate-models.py models
       - run: npm run build
-      - run: npm run test -w apps-gateway -- --coverage --passWithNoTests || npm run test -w apps-gateway
+      - run: npm run test -w apps-gateway
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: apps/gateway/coverage/
+          if-no-files-found: ignore
+          retention-days: 7

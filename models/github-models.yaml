@@ -1,0 +1,132 @@
+# Provider: github-models — auto-split from models.yaml (13 models)
+models:
+  - id: "github-models/o4-mini"
+    display_name: "o4-mini"
+    provider: github-models
+    context_length: 200000
+    score: 61
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "10 RPM, 50 RPD"
+  - id: "github-models/gpt-4.1"
+    display_name: "gpt-4.1"
+    provider: github-models
+    context_length: 1000000
+    score: 58
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image, pdf]
+    limit: "10 RPM, 50 RPD"
+  - id: "github-models/ai21-jamba-1.5-large"
+    display_name: "ai21-jamba-1.5-large"
+    provider: github-models
+    context_length: 256000
+    score: 54
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "See provider page"
+  - id: "github-models/llama-4-maverick-17b-128e-instruct-fp8"
+    display_name: "llama-4-maverick-17b-128e-instruct-fp8"
+    provider: github-models
+    context_length: 256000
+    score: 54
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "10 RPM, 50 RPD"
+  - id: "github-models/gpt-5"
+    display_name: "gpt-5"
+    provider: github-models
+    context_length: 200000
+    score: 54
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image, pdf, reasoning]
+    limit: "10 RPM, 50 RPD"
+  - id: "github-models/llama-4-scout-17b-16e-instruct"
+    display_name: "llama-4-scout-17b-16e-instruct"
+    provider: github-models
+    context_length: 512000
+    score: 50
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image]
+    limit: "15 RPM, 150 RPD"
+  - id: "github-models/gpt-4o"
+    display_name: "gpt-4o"
+    provider: github-models
+    context_length: 128000
+    score: 50
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image, pdf]
+    limit: "10 RPM, 50 RPD"
+  - id: "github-models/mistral-small-3.1"
+    display_name: "mistral-small-3.1"
+    provider: github-models
+    context_length: 128000
+    score: 49
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 150 RPD"
+  - id: "github-models/deepseek-r1"
+    display_name: "deepseek-r1"
+    provider: github-models
+    context_length: 64000
+    score: 49
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "15 RPM, 150 RPD"
+  - id: "github-models/gpt-4.1-mini"
+    display_name: "gpt-4.1-mini"
+    provider: github-models
+    context_length: 1000000
+    score: 49
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image, pdf]
+    limit: "15 RPM, 150 RPD"
+  - id: "github-models/llama-3.3-70b-instruct"
+    display_name: "llama-3.3-70b-instruct"
+    provider: github-models
+    context_length: 131000
+    score: 44
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "15 RPM, 150 RPD"
+  - id: "github-models/phi-4"
+    display_name: "phi-4"
+    provider: github-models
+    context_length: 131072
+    score: 43
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "See provider page"
+  - id: "github-models/mistral-large-24.11"
+    display_name: "mistral-large-24.11"
+    provider: github-models
+    context_length: 131072
+    score: 39
+    tier: quota
+    verified: false
+    no_card: true
+    capabilities: [text, image, reasoning]
+    limit: "See provider page"

@@ -1,0 +1,44 @@
+# Provider: b-ai — auto-split from models.yaml (4 models)
+models:
+  - id: "b-ai/qwen3.8-flash"
+    display_name: "qwen3.8-flash"
+    provider: b-ai
+    context_length: 131072
+    score: 72
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning, image, video]
+    limit: "0 Credits (free)"
+  - id: "b-ai/hy3"
+    display_name: "hy3"
+    provider: b-ai
+    context_length: 131072
+    score: 71
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "0 Credits (free)"
+  - id: "b-ai/mimo-v2.5"
+    display_name: "mimo-v2.5"
+    provider: b-ai
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image, audio, video, reasoning]
+    limit: "0 Credits (free)"
+  - id: "b-ai/glm-5.3-flash"
+    display_name: "glm-5.3-flash"
+    provider: b-ai
+    context_length: 131072
+    score: 69
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning, image]
+    limit: "0 Credits (free, promo 10% after Sep 12 2026)"
+  # === TokenHarbor — 3 :free tier (https://tokenharbor.ai/models?category=free 2026-09-10, baseUrl https://tokenharbor.ai/v1) ===
+  # TokenHarbor page currently lists 3 free :free IDs; a 4th free slot is reserved — add here when new :free appears.

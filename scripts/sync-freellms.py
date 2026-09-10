@@ -96,29 +96,33 @@ def main():
     pathlib.Path("data/freellms-models-free.json").write_text(json.dumps(sorted(free_models, key=lambda x: int(x["score"] or 0), reverse=True), indent=2, ensure_ascii=False))
     print("Saved data/")
 
-    # Generate models.yaml
+    # Generate models/ (split per provider)
     def q(s):
         if any(c in s for c in " :#{}[]&,*?|-<>!=@`"):
             return f'"{s}"'
         return s
-    with open("models.yaml","w") as f:
-        f.write(f"# Auto-generated from freellms.org — {len(free_models)} free models\n")
-        f.write(f"# Source: data/freellms-models-free.json\n")
-        f.write("models:\n")
-        for m in sorted(free_models, key=lambda x: int(x["score"] or 0), reverse=True):
-            caps=", ".join(m["modality"])
-            full_id=f"{m['slug']}/{m['name']}"
-            f.write(f"  - id: {q(full_id)}\n")
-            f.write(f"    display_name: {q(m['name'])}\n")
-            f.write(f"    provider: {m['slug']}\n")
-            f.write(f"    context_length: {m['context']}\n")
-            f.write(f"    score: {int(m['score']) if m['score'].isdigit() else 0}\n")
-            f.write(f"    tier: {m['tier_type']}\n")
-            f.write(f"    verified: {str(m['verified']).lower()}\n")
-            f.write(f"    no_card: {str(m['nocard']).lower()}\n")
-            if caps: f.write(f"    capabilities: [{caps}]\n")
-            if m["limit"]: f.write(f"    limit: {q(m['limit'])}\n")
-    print(f"Wrote models.yaml with {len(free_models)} models")
+    by_provider={}
+    for m in free_models:
+        by_provider.setdefault(m["slug"],[]).append(m)
+    pathlib.Path("models").mkdir(exist_ok=True)
+    for slug, group in by_provider.items():
+        with open(f"models/{slug}.yaml","w") as f:
+            f.write(f"# Provider: {slug} — auto-generated from freellms.org ({len(group)} models)\n")
+            f.write("models:\n")
+            for m in sorted(group, key=lambda x: int(x["score"] or 0), reverse=True):
+                caps=", ".join(m["modality"])
+                full_id=f"{m['slug']}/{m['name']}"
+                f.write(f"  - id: {q(full_id)}\n")
+                f.write(f"    display_name: {q(m['name'])}\n")
+                f.write(f"    provider: {m['slug']}\n")
+                f.write(f"    context_length: {m['context']}\n")
+                f.write(f"    score: {int(m['score']) if m['score'].isdigit() else 0}\n")
+                f.write(f"    tier: {m['tier_type']}\n")
+                f.write(f"    verified: {str(m['verified']).lower()}\n")
+                f.write(f"    no_card: {str(m['nocard']).lower()}\n")
+                if caps: f.write(f"    capabilities: [{caps}]\n")
+                if m["limit"]: f.write(f"    limit: {q(m['limit'])}\n")
+    print(f"Wrote models/ with {len(free_models)} models across {len(by_provider)} provider files")
 
 if __name__=="__main__":
     main()

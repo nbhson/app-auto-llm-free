@@ -1,0 +1,56 @@
+# Provider: llm7-io — auto-split from models.yaml (6 models)
+models:
+  - id: "llm7-io/minimax-m2.7"
+    display_name: "minimax-m2.7"
+    provider: llm7-io
+    context_length: 204800
+    score: 63
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
+  - id: "llm7-io/gemini-3.1-flash-lite"
+    display_name: "gemini-3.1-flash-lite"
+    provider: llm7-io
+    context_length: 1048576
+    score: 51
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, audio, reasoning]
+  - id: "llm7-io/gemma-4-31b-it"
+    display_name: "gemma-4-31b-it"
+    provider: llm7-io
+    context_length: 262144
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [vision, reasoning]
+  - id: "llm7-io/codestral-latest"
+    display_name: "codestral-latest"
+    provider: llm7-io
+    context_length: 256000
+    score: 42
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "llm7-io/mistral-nemo-instruct-2407"
+    display_name: "mistral-nemo-instruct-2407"
+    provider: llm7-io
+    context_length: 8192
+    score: 40
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [text]
+  - id: "llm7-io/gpt-oss-20b"
+    display_name: "gpt-oss-20b"
+    provider: llm7-io
+    context_length: 131072
+    score: 36
+    tier: permanent
+    verified: true
+    no_card: false
+    capabilities: [reasoning]
