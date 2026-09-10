@@ -2,6 +2,14 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.4] - 2026-09-11
+
+### Fixed
+- **Usage bị refresh hết sau restart gateway** — `apps/web/src/pages/Usage.tsx:70` `load()` trước ghi đè `usageStatsCache` bằng `d` rỗng (`allTimeTokens 0`) ngay sau restart (backend `request-log.json` chưa flush hoặc `preMs` empty) → mất toàn bộ stats/topology. Fix: `setStats(prev=> isEmptyAfterRestart ? prev : d)` giữ `prev` nếu `d.allTimeTokens 0 && prev>0`; `fetchAllProviders:134` `setProviders(prev=> all.length===0 && prev.length>0 ? prev : all)` giữ cache providers; `apps/gateway/src/lib/request-log.ts:82` thêm `SIGTERM`/`SIGINT`/`beforeExit` flush đồng bộ (trước chỉ `exit`) để `gateway-data:/app/data` volume không mất `request-log.json` khi `docker compose restart`/`pkill -9` (batch 2s trước mất 2s cuối), đảm bảo `GET /api/stats`/`/api/logs` giữ nguyên qua restart
+
+### Changed
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.5.3→1.5.4`, `main.tsx` badge `v1.5.4`, `app.ts` version `1.5.4` — typecheck + build + 278 tests pass, giữ nguyên Usage qua restart
+
 ## [1.5.3] - 2026-09-11
 
 ### Fixed

@@ -70,13 +70,23 @@ export default function Usage() {
   const load = async () => {
     const key = mk();
     // preserve existing stats/logs until new arrives — do not clear before fetch
+    // CRITICAL: never overwrite cache with empty after gateway restart (keep previous allTimeTokens)
     try {
       const r = await fetch("/api/stats", { headers: { Authorization: `Bearer ${key}` } });
       if (r.ok) {
         const d = await r.json();
         if (d) {
-          setStats(d);
-          try { localStorage.setItem("usageStatsCache", JSON.stringify(d)); } catch {}
+          setStats((prev) => {
+            const prevAll = (prev as any)?.logs?.allTimeTokens ?? 0;
+            const prevTotal = (prev as any)?.logs?.total ?? 0;
+            const dAll = (d as any)?.logs?.allTimeTokens ?? 0;
+            const dTotal = (d as any)?.logs?.total ?? 0;
+            // if gateway just restarted and returns 0, keep previous cache (don't refresh to empty)
+            const isEmptyAfterRestart = dAll === 0 && dTotal === 0 && (prevAll > 0 || prevTotal > 0);
+            const next = isEmptyAfterRestart ? prev as GatewayStats : d as GatewayStats;
+            try { localStorage.setItem("usageStatsCache", JSON.stringify(next)); } catch {}
+            return next;
+          });
         }
       }
     } catch {}
@@ -121,8 +131,12 @@ export default function Usage() {
             if (dp.detailed) all = all.concat(dp.detailed);
           }
         }
-        setProviders(all);
-        try { localStorage.setItem("usageProvidersCache", JSON.stringify(all)); } catch {}
+        setProviders((prev) => {
+          // preserve after gateway restart: if new is empty but cache had data, keep cache
+          const next = all.length === 0 && prev.length > 0 ? prev : all;
+          try { localStorage.setItem("usageProvidersCache", JSON.stringify(next)); } catch {}
+          return next;
+        });
       } catch { /* ignore */ }
     };
     await fetchAllProviders();

@@ -80,10 +80,17 @@ export function flushRequestLogs(): void {
 }
 
 // Best-effort flush on shutdown so the trailing window is not lost
+// Keep Usage stats across gateway restarts — flush immediately on SIGTERM/SIGINT (Docker/pkill)
 if (typeof process !== "undefined" && typeof process.on === "function") {
-  process.on("exit", () => {
-    try { persist(); } catch { /* ignore */ }
-  });
+  const flushSync = () => { try { persist(); } catch { /* ignore */ } };
+  process.on("exit", flushSync);
+  // SIGTERM/SIGINT are the typical Docker/k8s and pkill signals — persist before exit
+  try {
+    process.on("SIGTERM", () => { flushSync(); });
+    process.on("SIGINT", () => { flushSync(); });
+  } catch { /* ignore: not in worker */ }
+  // Also handle beforeExit for Node async flush
+  try { process.on("beforeExit", flushSync); } catch { /* ignore */ }
 }
 
 // Simple SSE listeners
