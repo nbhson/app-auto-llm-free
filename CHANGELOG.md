@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.2] - 2026-09-11
+
+### Added
+- **UT robust streaming (12 tests)** — `apps/gateway/src/lib/chat-stream-parser.test.ts:1` mới: `extractDelta` và `simulateSseParse` kiểm **12 cases** — `delta.content`/`text`/`output_text`, `reasoning_content`/`reasoning`/`thinking`, array `[{text}]`, top-level `content`, `error`, full SSE với `reasoning` + `content` aggregated, `reasoningFull` fallback khi chỉ có thinking (sửa empty refactor), ping `:`/`event:` ignore, leftover buffer không newline, JSON tách chunk (buffer split), stream error trong `data:` — đảm bảo parser không rỗng khi refactor `tryLoadPersistedFallback` 88s
+
+### Changed
+- **Docs robust Chat 1.5.1** — `README.md:60` + `README.vi.md:57` Dashboard Chat cập nhật **robust streaming 1.5.1** (`extractDelta` + `reasoningFull` + fallback `maxTokens 4096`), `docs/en/OPERATIONS.md:169` + `docs/vi/OPERATIONS.md:172` `/chat` bullet chi tiết `reasoning_content`/`thinking`/`array`/`ping`/`fallback non-stream 1×` + `maxTokens 4096` để tránh `length` rỗng, đồng bộ EN/VI
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.5.1→1.5.2`, `main.tsx` badge `v1.5.2`, `app.ts` version `1.5.2` — UT 278 (45 files) + docs EN/VI + typecheck/build pass
+
 ## [1.5.1] - 2026-09-11
 
 ### Fixed
