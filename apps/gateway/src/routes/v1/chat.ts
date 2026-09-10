@@ -135,6 +135,7 @@ chatRoute.post(
       }
     }
     const estimatedForQuota = estimateChatTokens({ messages: messagesToSend, max_tokens: body.max_tokens });
+    const preMs = Date.now() - startAll; // time spent before upstream (verified/health/router/estimate/cache/compress)
 
     // Extract session IDs for providers that require them (opencode free tier, etc.)
     const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
@@ -215,6 +216,8 @@ chatRoute.post(
               "X-Provider": pid,
               "X-Model": model,
               "X-Verified": vStatus,
+              "X-Gateway-PreMs": String(preMs),
+              "X-Gateway-Provider-Count": String(providerOrder.length),
             },
           });
         }
@@ -223,6 +226,8 @@ chatRoute.post(
         if (data.choices) {
           c.header("X-Provider", pid);
           c.header("X-Verified", vStatus);
+          c.header("X-Gateway-PreMs", String(preMs));
+          c.header("X-Gateway-Provider-Count", String(providerOrder.length));
           const usage = data.usage;
           const total = usage?.total_tokens || estimated.total;
           if (usage?.total_tokens) recordUsage(pid, key, total);

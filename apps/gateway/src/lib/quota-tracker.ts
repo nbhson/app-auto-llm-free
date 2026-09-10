@@ -138,9 +138,9 @@ function quotaDims(provider: string, keyPrefix: string, estimatedTokens: number,
 
 async function commitUsageAsync(provider: string, key: string, tokens: number): Promise<void> {
   const dims = quotaDims(provider, key.slice(0, 8), tokens, true);
-  for (const d of dims) {
-    await slidingCheck({ namespace: d.ns, limit: d.limit, tokens: d.tokens, incr: d.incr, windowMs: d.windowMs });
-  }
+  if (dims.length === 0) return;
+  // parallel fire — best-effort background, don't block
+  await Promise.all(dims.map((d) => slidingCheck({ namespace: d.ns, limit: d.limit, tokens: d.tokens, incr: d.incr, windowMs: d.windowMs }).catch(() => null)));
 }
 
 /**
@@ -148,6 +148,17 @@ async function commitUsageAsync(provider: string, key: string, tokens: number): 
  * no boundary spike), otherwise the in-memory fixed window. TPM shadows TPD
  * note: a provider with both trips TPM first by design (per-minute binds tighter).
  */
+function slidingCheckWithFallback(
+  args: Parameters<typeof slidingCheck>[0],
+): ReturnType<typeof slidingCheck> {
+  // 250ms race so slow Redis doesn't block gateway hot path (fallback to in-memory)
+  const race = new Promise<null>((resolve) => {
+    const t = setTimeout(() => resolve(null), 250);
+    (t as unknown as { unref?: () => void }).unref?.();
+  });
+  return Promise.race([slidingCheck(args).catch(() => null), race]) as ReturnType<typeof slidingCheck>;
+}
+
 export async function checkQuotaAsync(
   provider: string,
   key: string,
@@ -155,13 +166,9 @@ export async function checkQuotaAsync(
 ): Promise<{ allowed: boolean; reason?: string; retryAfterMs?: number }> {
   const dims = quotaDims(provider, key.slice(0, 8), estimatedTokens, false);
   if (dims.length === 0) return { allowed: true };
-  // Probe Redis once; wholesale fallback to in-memory when unavailable
-  const probe = await slidingCheck({ namespace: dims[0].ns, limit: dims[0].limit, tokens: dims[0].tokens, incr: 0, windowMs: dims[0].windowMs });
-  if (probe === null) return checkQuota(provider, key, estimatedTokens);
-  const results: Array<{ allowed: boolean; retryAfterMs: number } | null> = [probe];
-  for (let i = 1; i < dims.length; i++) {
-    results.push(await slidingCheck({ namespace: dims[i].ns, limit: dims[i].limit, tokens: dims[i].tokens, incr: 0, windowMs: dims[i].windowMs }));
-  }
+  // Parallel probe — single round-trip batch, fallback to in-memory if Redis unavailable/slow
+  const results = await Promise.all(dims.map((d) => slidingCheckWithFallback({ namespace: d.ns, limit: d.limit, tokens: d.tokens, incr: 0, windowMs: d.windowMs })));
+  if (results.some((r) => r === null)) return checkQuota(provider, key, estimatedTokens);
   for (let i = 0; i < dims.length; i++) {
     const r = results[i];
     if (r && !r.allowed) {

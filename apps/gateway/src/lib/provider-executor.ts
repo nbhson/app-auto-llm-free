@@ -74,7 +74,21 @@ export async function tryProviders(opts: TryProvidersOpts): Promise<TryProviders
     }
 
     try {
-      const res = await opts.call({ providerId: pid, provider, key });
+      // Per-provider fetch timeout — fail fast so next fallback is tried quickly.
+      // For streaming, this only times out the initial fetch (headers), not the SSE body.
+      const callWithTimeout = async () => {
+        const timeoutMs = 12000;
+        let timer: NodeJS.Timeout | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`provider timeout after ${timeoutMs}ms`)), timeoutMs);
+          timer.unref?.();
+        });
+        try {
+          const res = await Promise.race([opts.call({ providerId: pid, provider, key }), timeout]);
+          return res;
+        } finally { if (timer) clearTimeout(timer); }
+      };
+      const res = await callWithTimeout();
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         // 429 carries Retry-After so callers can back off precisely

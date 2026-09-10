@@ -2,6 +2,17 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.3] - 2026-09-11
+
+### Fixed
+- **Gateway chậm trước khi call upstream (đặc biệt `free-llm-gateway/auto`)** — `apps/gateway/src/lib/paths.ts:10` cache `resolveDataPath` (10 `existsSync` → 1 + TTL 10s), `readDataJson` bỏ `existsSync` thừa → giảm ~14 I/O đồng bộ/request; `apps/gateway/src/lib/quota-tracker.ts:146` `checkQuotaAsync` `Promise.all` 4 dims thay vì tuần tự 4 RTT Redis + `250ms` race fallback in-memory, `commitUsageAsync:41` parallel; `apps/gateway/src/middleware/rate-limit.ts:49` race `slidingCheck` 250ms → fallback memory; `apps/gateway/src/lib/provider-executor.ts:76` thêm per-provider `12s` timeout (fail-fast, chỉ timeout fetch headers không cắt stream) để `auto` 22 providers không treo 88s, keep sequential fallback nhưng nhanh
+
+### Added
+- **Observability** — `apps/gateway/src/routes/v1/chat.ts:100` `preMs` + header `X-Gateway-PreMs`/`X-Gateway-Provider-Count` cho cả stream/non-stream để đo pre-call latency (verified/health/router/estimate)
+
+### Changed
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.5.2→1.5.3`, `main.tsx` badge `v1.5.3`, `app.ts` version `1.5.3` — typecheck + build + 278 tests pass, không break function hiện tại
+
 ## [1.5.2] - 2026-09-11
 
 ### Added

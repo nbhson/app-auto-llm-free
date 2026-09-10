@@ -46,14 +46,18 @@ export const virtualKeyRateLimit: MiddlewareHandler = async (c, next) => {
 
   // Distributed sliding-window-counter when Redis is up (atomic check+commit,
   // no boundary spike, shared across instances); else in-memory fixed window.
-  const sliding = await slidingCheck({
-    namespace: `vkrl:${key}`,
-    limit: effectiveLimit,
-    tokens: 1,
-    incr: 1,
-    windowMs: 60000,
-    nowMs: now,
-  });
+  // Race with 250ms timeout so slow Redis doesn't block gateway hot path.
+  const sliding = await Promise.race([
+    slidingCheck({
+      namespace: `vkrl:${key}`,
+      limit: effectiveLimit,
+      tokens: 1,
+      incr: 1,
+      windowMs: 60000,
+      nowMs: now,
+    }),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 250).unref?.() ?? setTimeout(() => resolve(null), 250)),
+  ]).catch(() => null) as Awaited<ReturnType<typeof slidingCheck>>;
   if (sliding !== null) {
     if (!sliding.allowed) {
       return c.json({ error: { message: `Virtual key RPM limit ${effectiveLimit} exceeded`, type: "rate_limit_exceeded", retryAfter: Math.max(1, Math.ceil(sliding.retryAfterMs / 1000)) } }, 429);
