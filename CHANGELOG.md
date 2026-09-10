@@ -2,7 +2,7 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.10.0] - 2026-09-10
+## [1.1.0] - 2026-09-10
 
 ### Added
 - **B.AI provider** (`https://chat.b.ai/key` → `https://api.b.ai/v1`, OpenAI-compatible): `b-ai` + alias `bai`/`chat-b-ai` trong `registry.ts:36,39-40`, `providerMeta` Permanent Free, `BAI_API_KEYS` (`config.ts`, `.env.example`, `docker-compose`), 4 models free `b-ai/qwen3.8-flash` (72), `b-ai/hy3` (71), `b-ai/mimo-v2.5` (70), `b-ai/glm-5.3-flash` (69) trong `models.yaml:3186-3218`, alias `qwen3.8-flash`/`hy3`/`mimo-v2.5`/`glm-5.3-flash` → `b-ai`, `FALLBACK_TIERS` thêm `b-ai`
@@ -12,7 +12,7 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 
 ### Changed
 - **Dashboard/Logs refactor (6 pages)**: `Dashboard.tsx:225` bỏ `tokens_by_provider` BarChart (chuyển sang Usage), `Logs.tsx:1,24` bỏ 3 charts (`byProvider`, `tokensByProvider`, `statusDistribution`) và summary tokens, chỉ giữ bảng request log + SSE stream với `AbortController` safe (`controller.abort()` + `reader.cancel()` + cleanup timer) — charts và stats giờ ở `/usage`
-- **Version bump**: `package.json` `apps/gateway` `apps/web` `0.9.0→0.10.0`, `main.tsx` badge `v0.10.0`, `app.ts:72` + `health.ts:10` `version 0.10.0`
+- **Version bump**: `package.json` `apps/gateway` `apps/web` `0.9.0→1.1.0`, `main.tsx` badge `v1.1.0`, `app.ts:72` + `health.ts:10` `version 1.1.0`
 - **Docs**: `README.md`/`README.vi.md` badges `41→51 Providers`, `324→338 Models`, dashboard 5→6 pages, provider table thêm B.AI/TokenHarbor; `docs/en|vi/PROVIDERS.md` 41→51 IDs, 316→338 models, thêm rows B.AI/TokenHarbor; `docs/en|vi/ARCHITECTURE.md` 41→51 ids, 324→338 models
 - **Models catalog**: `models.yaml:1` header `316→338` (316 freellms + 14 KiraAI + 8 B.AI/TokenHarbor), `models.yaml:3186` 8 models mới
 - **Env**: `.env.example:93,95` + `.env:91,93` thêm `BAI_API_KEYS`/`TOKENHARBOR_API_KEYS`, `FALLBACK_TIERS` thêm `b-ai`/`tokenharbor`

@@ -99,7 +99,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                   <Zap className="w-4 h-4 fill-white stroke-white" />
                 </div>
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors">Free LLM Gateway</span>
-                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.10.0</span>
+                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v1.1.0</span>
               </NavLink>
 
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs ${health === "ok" ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" : health === "down" ? "bg-rose-50 text-rose-700 border-rose-200/80" : "bg-slate-100 text-slate-600 border-slate-200/80"}`}>
