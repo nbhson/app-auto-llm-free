@@ -78,7 +78,7 @@ save to data/live-models.json { total, providers, free_only, total_fetched, mode
 - `GET /v1/models?hasKey=1` — when live cache exists serves **live 2190 total** instead of freellms 324
 - `GET /api/providers?hasKey=1` — filter real keys, highlight green
  - **Models UI**: 4 toggles in Filters dropdown `hasKey` (default OFF `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (default ON, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` now stores both `404/410` and `200 usable` (usable overrides 404 so reload stays non-red, `v1/models.ts:153` + `isRowDisabled`), hidden when hide toggles checked. `Refresh` clears `q`/`provider`/`verified` and resets `hasKeyOnly:false` + `hide*` true. `Check Live` requires filter `q` or `provider` (tooltip otherwise).
- - **Sync Live Now** on both `/providers` and `/models` (same `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx:37`/`Models.tsx:99`) only pulls free models — filtered by Permanent Free tier or `:free` suffix or freellms free list, writes `data/live-models.json`, then `POST /api/verify`. Changing `.env` keys **requires restarting the gateway** `config.ts:22` (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) to reload `hasRealKey` before sync.
+  - **Sync Live Now** on both `/providers` and `/models` (same `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx`/`Models.tsx`) only pulls free models — filtered by Permanent Free tier or `:free` suffix or freellms free list, writes `data/live-models.json`, then `POST /api/verify`. **Auto boot-sync** sau khi update `.env` + restart gateway thì tự chạy không cần bấm (sync 1 lần duy nhất khi reload trang, không poll liên tục). Changing `.env` keys **requires restarting the gateway** `config.ts:22` (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) to reload `hasRealKey` before sync.
 
 **Rate limit fix**: Frontend debounces `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` increases limit for list endpoints to 4x (min 200) to avoid 429 while typing/pagination.
 
@@ -106,7 +106,7 @@ DISABLE_SCHEDULER=0   # set to 1 to disable
 | `GET` | `/v1/models?verified=unverified` | Only unverified |
 | `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter by provider + hasKey (real keys) |
 | `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, 400ms debounce) |
-| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `isNewest`/`addedAt`, `Get Key` URL, `status` + `sync.lastAdded` — pagination 25/50 sticky bottom, `q` 400ms debounce, **auto poll 8s + `/api/sync/status`** |
+| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `isNewest`/`addedAt`, `Get Key` URL, `status` + `sync.lastAdded` — pagination 25/50 sticky bottom, `q` 400ms debounce, **fetch once on reload via `/api/sync/status` (không poll liên tục)** |
 | `GET` | `/api/providers/health` | Live ping of 51 providers in 5s |
 | `GET` | `/api/sync/status` | **New 1.2.0**: fingerprint (`providers` `hasKey`/`addedAt`, `lastAdded`, `bootSync`, `liveModels`, `newestProviders`) — dùng cho auto highlight newest |
 | `POST` | `/api/sync/boot` | **New 1.2.0**: manual trigger `runBootSync({force})` |

@@ -43,23 +43,6 @@ export default function Usage() {
         }
       }
     }).catch(() => {});
-    // fetch sync status để biết provider mới nhất (sau khi update .env + restart gateway)
-    fetch("/api/sync/status", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.ok ? r.json() : null).then((d) => {
-      if (d?.newestProviders) setNewestProviders(d.newestProviders);
-      else if (d?.lastAdded) setNewestProviders(d.lastAdded);
-      if (d) setSyncInfo({ lastAdded: d.lastAdded, lastAddedAt: d.lastAddedAt, bootSync: d.bootSync });
-      // nếu có provider mới nhất mà chưa có activeProvider (idle), highlight newest làm active tạm thời
-      if (d?.lastAdded?.length && !activeProvider) {
-        const newest = d.lastAdded[0];
-        // chỉ highlight nếu newest thực sự có key và chưa có log active
-        if (newest) {
-          // set activeProvider briefly to show topology line animation cho provider mới nhất
-          setActiveProvider((prev) => prev || newest);
-          if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
-          activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
-        }
-      }
-    }).catch(() => {});
     // API chỉ cho limit 25/50 => phải fetch đủ 2 trang để lấy hết ~48 providers (bug cũ: limit=100 bị fallback về 25 nên chỉ hiện 7/13)
     const fetchAllProviders = async () => {
       try {
@@ -85,6 +68,24 @@ export default function Usage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Sync 1 lần duy nhất khi reload: lấy newest provider để highlight topology sau khi update .env + restart
+  useEffect(() => {
+    const key = mk();
+    fetch("/api/sync/status", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.ok ? r.json() : null).then((d) => {
+      if (d?.newestProviders) setNewestProviders(d.newestProviders);
+      else if (d?.lastAdded) setNewestProviders(d.lastAdded);
+      if (d) setSyncInfo({ lastAdded: d.lastAdded, lastAddedAt: d.lastAddedAt, bootSync: d.bootSync });
+      if (d?.lastAdded?.length) {
+        const newest = d.lastAdded[0];
+        if (newest) {
+          setActiveProvider((prev) => prev || newest);
+          if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
+          activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!live) return;
@@ -126,8 +127,7 @@ export default function Usage() {
         /* ignore */
       }
     })();
-    const timer = setInterval(load, 3000);
-    return () => { controller.abort(); try { reader?.cancel().catch(() => {}); } catch { /* ignore */ } clearInterval(timer); if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current); };
+    return () => { controller.abort(); try { reader?.cancel().catch(() => {}); } catch { /* ignore */ } if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
 

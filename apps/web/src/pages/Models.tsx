@@ -89,31 +89,17 @@ export default function Models() {
   };
   useEffect(() => { fetchModels(); fetchUsage(); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
 
-  // Auto-sync: poll sync status để tự reload models khi boot-sync vừa thêm provider mới (sau khi update .env + restart)
+  // Sync 1 lần duy nhất khi reload: lấy /api/sync/status để hiển thị NEW provider, không poll liên tục
   useEffect(() => {
     const fetchSync = async () => {
       try {
         const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
         if (!r.ok) return;
         const j = await r.json();
-        const prev = syncStatus?.liveModels?.generated_at;
         setSyncStatus(j);
-        // nếu liveModels mới hơn lần trước thì tự fetchModels
-        if (j.liveModels?.generated_at && prev && j.liveModels.generated_at !== prev) {
-          fetchModels();
-        } else if (!prev && j.liveModels?.generated_at) {
-          // first load, if has lastAdded, reload to show new models
-          if (j.lastAdded?.length) fetchModels();
-        }
       } catch { /* ignore */ }
     };
     fetchSync();
-    const id = setInterval(fetchSync, 6000);
-    // cũng poll models định kỳ để bắt provider mới (khi tab visible)
-    const id2 = setInterval(() => { if (document.visibilityState === "visible") fetchModels(); }, 10000);
-    const onVis = () => { if (document.visibilityState === "visible") { fetchSync(); fetchModels(); } };
-    document.addEventListener("visibilitychange", onVis);
-    return () => { clearInterval(id); clearInterval(id2); document.removeEventListener("visibilitychange", onVis); };
   }, []);
   useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);

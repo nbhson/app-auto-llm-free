@@ -88,7 +88,7 @@ export default function Providers() {
   useEffect(() => { load(); }, [qDebounced, hasKeyOnly]);
   useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
 
-  // Auto-sync: poll /api/sync/status và tự reload providers khi gateway vừa restart + boot-sync xong
+  // Sync 1 lần duy nhất khi reload: lấy /api/sync/status để hiển thị NEW provider sau khi update .env + restart gateway
   useEffect(() => {
     const fetchSync = async () => {
       try {
@@ -98,27 +98,10 @@ export default function Providers() {
         setSyncStatus(j);
         if (j.bootSync?.status === "running") setAutoSyncing(true);
         else setAutoSyncing(false);
-        // nếu có lastAdded mới, tự reload danh sách providers
-        if (j.lastAdded && j.lastAdded.length > 0) {
-          // trigger reload nếu chưa có hoặc khác
-        }
       } catch { /* ignore */ }
     };
     fetchSync();
-    const id = setInterval(fetchSync, 5000);
-    return () => clearInterval(id);
   }, []);
-
-  // Tự động poll providers để bắt provider mới sau khi update .env + restart gateway (không cần F5)
-  useEffect(() => {
-    const id = setInterval(() => {
-      // chỉ poll khi tab visible để tránh spam
-      if (document.visibilityState === "visible") load();
-    }, 8000);
-    const onVis = () => { if (document.visibilityState === "visible") load(); };
-    document.addEventListener("visibilitychange", onVis);
-    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
-  }, [qDebounced, hasKeyOnly]);
 
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "provider" ? "asc" : "desc" }));
 
