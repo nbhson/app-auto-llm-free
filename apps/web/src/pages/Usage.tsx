@@ -17,41 +17,101 @@ interface ProvidersPayload {
 
 export default function Usage() {
   const { t } = useLang();
-  const [stats, setStats] = useState<GatewayStats | null>(null);
-  const [logs, setLogs] = useState<ApiLog[]>([]);
-  const [providers, setProviders] = useState<ApiProvider[]>([]);
+  const [stats, setStats] = useState<GatewayStats | null>(() => {
+    try { const raw = localStorage.getItem("usageStatsCache"); if (raw) return JSON.parse(raw) as GatewayStats; } catch {}
+    return null;
+  });
+  const [logs, setLogs] = useState<ApiLog[]>(() => {
+    try { const raw = localStorage.getItem("usageLogsCache"); if (raw) return JSON.parse(raw) as ApiLog[]; } catch {}
+    return [];
+  });
+  const [providers, setProviders] = useState<ApiProvider[]>(() => {
+    try { const raw = localStorage.getItem("usageProvidersCache"); if (raw) return JSON.parse(raw) as ApiProvider[]; } catch {}
+    return [];
+  });
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
-  const [live, setLive] = useState(true);
-  const [newestProviders, setNewestProviders] = useState<string[]>([]);
-  const [syncInfo, setSyncInfo] = useState<{ lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string } } | null>(null);
+  const [live, setLive] = useState(false);
+  const [newestProviders, setNewestProviders] = useState<string[]>(() => {
+    try { const raw = localStorage.getItem("usageNewestCache"); if (raw) return JSON.parse(raw) as string[]; } catch {}
+    return [];
+  });
+  const [syncInfo, setSyncInfo] = useState<{ lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string } } | null>(() => {
+    try { const raw = localStorage.getItem("usageSyncCache"); if (raw) return JSON.parse(raw); } catch {}
+    return null;
+  });
+  const [hasRefreshed, setHasRefreshed] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const activeTimerRef = useRef<number | null>(null);
   const prevLogIdRef = useRef<string | null>(null);
 
-  const load = () => {
+  const fetchSync = async () => {
     const key = mk();
-    fetch("/api/stats", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setStats(d); }).catch(() => {});
-    fetch("/api/logs?limit=20", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.ok ? r.json() : { data: [] }).then((d) => {
-      const data: ApiLog[] = d.data || [];
-      setLogs(data);
-      if (data.length > 0) {
-        const latest = data[0];
-        if (latest.provider && latest.id !== prevLogIdRef.current) {
-          prevLogIdRef.current = latest.id;
-          setActiveProvider(latest.provider);
-          if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
-          activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
+    try {
+      const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${key}` } });
+      const d = r.ok ? await r.json() : null;
+      if (d) {
+        if (d?.newestProviders) setNewestProviders(d.newestProviders);
+        else if (d?.lastAdded) setNewestProviders(d.lastAdded);
+        setSyncInfo({ lastAdded: d.lastAdded, lastAddedAt: d.lastAddedAt, bootSync: d.bootSync });
+        try { localStorage.setItem("usageSyncCache", JSON.stringify({ lastAdded: d.lastAdded, lastAddedAt: d.lastAddedAt, bootSync: d.bootSync })); localStorage.setItem("usageNewestCache", JSON.stringify(d.newestProviders || d.lastAdded || [])); } catch {}
+        // usage will be loaded based on latest provider — highlight newest
+        if (d?.lastAdded?.length) {
+          const newest = d.lastAdded[0];
+          if (newest) {
+            setActiveProvider(newest);
+            if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
+            activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
+          }
         }
       }
-    }).catch(() => {});
+    } catch {}
+  };
+
+  const load = async () => {
+    const key = mk();
+    // preserve existing stats/logs until new arrives — do not clear before fetch
+    try {
+      const r = await fetch("/api/stats", { headers: { Authorization: `Bearer ${key}` } });
+      if (r.ok) {
+        const d = await r.json();
+        if (d) {
+          setStats(d);
+          try { localStorage.setItem("usageStatsCache", JSON.stringify(d)); } catch {}
+        }
+      }
+    } catch {}
+    try {
+      const r2 = await fetch("/api/logs?limit=20", { headers: { Authorization: `Bearer ${key}` } });
+      const d2 = r2.ok ? await r2.json() : { data: [] };
+      const data: ApiLog[] = d2.data || [];
+      // keep previous logs if fetch empty to preserve totals
+      if (data.length > 0 || logs.length === 0) {
+        setLogs(data);
+        try { localStorage.setItem("usageLogsCache", JSON.stringify(data)); } catch {}
+        if (data.length > 0) {
+          const latest = data[0];
+          if (latest.provider && latest.id !== prevLogIdRef.current) {
+            prevLogIdRef.current = latest.id;
+            setActiveProvider(latest.provider);
+            if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
+            activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
+          }
+        }
+      }
+    } catch {}
     // API chỉ cho limit 25/50 => phải fetch đủ 2 trang để lấy hết ~48 providers (bug cũ: limit=100 bị fallback về 25 nên chỉ hiện 7/13)
+    // providers loaded based on env model (hasKey via providerKeys)
     const fetchAllProviders = async () => {
       try {
         const r1 = await fetch("/api/providers?limit=50&page=1", { headers: { Authorization: `Bearer ${key}` } });
         if (!r1.ok) return;
         const d1 = (await r1.json()) as ProvidersPayload & { pagination?: { total_pages: number; total: number }; sync?: { lastAdded?: string[]; lastAddedAt?: string | null } };
         let all: ApiProvider[] = d1.detailed || [];
-        // capture sync info from providers payload nếu có
-        if (d1.sync?.lastAdded) { setNewestProviders(d1.sync.lastAdded); setSyncInfo((prev) => prev || { lastAdded: d1.sync!.lastAdded, lastAddedAt: d1.sync!.lastAddedAt || null }); }
+        if (d1.sync?.lastAdded) {
+          setNewestProviders(d1.sync.lastAdded);
+          setSyncInfo((prev) => prev || { lastAdded: d1.sync!.lastAdded, lastAddedAt: d1.sync!.lastAddedAt || null });
+          try { localStorage.setItem("usageNewestCache", JSON.stringify(d1.sync.lastAdded)); } catch {}
+        }
         const totalPages = d1.pagination?.total_pages || 1;
         if (totalPages > 1) {
           for (let p = 2; p <= totalPages; p++) {
@@ -62,29 +122,31 @@ export default function Usage() {
           }
         }
         setProviders(all);
+        try { localStorage.setItem("usageProvidersCache", JSON.stringify(all)); } catch {}
       } catch { /* ignore */ }
     };
-    fetchAllProviders();
+    await fetchAllProviders();
   };
 
-  useEffect(() => { load(); }, []);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setHasRefreshed(true);
+    try {
+      await load();
+      await fetchSync();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-  // Sync 1 lần duy nhất khi reload: lấy newest provider để highlight topology sau khi update .env + restart
+  // Initial display fix: if no cache, fetch once so page not empty (then manual Refresh for newest)
   useEffect(() => {
-    const key = mk();
-    fetch("/api/sync/status", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.ok ? r.json() : null).then((d) => {
-      if (d?.newestProviders) setNewestProviders(d.newestProviders);
-      else if (d?.lastAdded) setNewestProviders(d.lastAdded);
-      if (d) setSyncInfo({ lastAdded: d.lastAdded, lastAddedAt: d.lastAddedAt, bootSync: d.bootSync });
-      if (d?.lastAdded?.length) {
-        const newest = d.lastAdded[0];
-        if (newest) {
-          setActiveProvider((prev) => prev || newest);
-          if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
-          activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
-        }
-      }
-    }).catch(() => {});
+    const hasCache = (() => { try { return !!localStorage.getItem("usageStatsCache"); } catch { return false; } })();
+    if (!hasCache) {
+      setHasRefreshed(true);
+      load();
+      fetchSync();
+    }
   }, []);
 
   useEffect(() => {
@@ -161,7 +223,7 @@ export default function Usage() {
           <p className="text-sm text-slate-500 mt-0.5">{t("usage.subtitle") || "Token analytics, request distribution and live provider topology."}</p>
         </div>
         <div className="flex items-center gap-2.5">
-          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs"><RefreshCw className="w-3.5 h-3.5" />{t("logs.refresh")}</button>
+          <button onClick={handleRefresh} disabled={refreshing} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs disabled:opacity-60">{refreshing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}{refreshing ? t("providers.syncing") : t("logs.refresh")}</button>
           <button onClick={() => setLive(!live)} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold shadow-xs border ${live ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-700 border-slate-200"}`}>{live ? <Radio className="w-3.5 h-3.5 animate-pulse" /> : null}{live ? t("logs.live_on") : t("logs.live_off")}</button>
         </div>
       </div>

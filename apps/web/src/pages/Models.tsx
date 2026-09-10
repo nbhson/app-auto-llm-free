@@ -56,18 +56,36 @@ export default function Models() {
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [allProviders, setAllProviders] = useState<ApiProvider[]>([]);
-  const [syncStatus, setSyncStatus] = useState<{ lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string; total?: number }; liveModels?: { total?: number; generated_at?: string | null } } | null>(null);
+  const [allProviders, setAllProviders] = useState<ApiProvider[]>(() => {
+    try {
+      const raw = localStorage.getItem("modelsAllProvidersCache");
+      if (raw) return JSON.parse(raw) as ApiProvider[];
+    } catch {}
+    return [];
+  });
+  const [syncStatus, setSyncStatus] = useState<{ lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string; total?: number }; liveModels?: { total?: number; generated_at?: string | null } } | null>(() => {
+    try {
+      const raw = localStorage.getItem("modelsSyncCache");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  });
+  const [hasRefreshed, setHasRefreshed] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
   useEffect(() => { const id = setTimeout(() => setProviderDebounced(provider.trim()), 400); return () => clearTimeout(id); }, [provider]);
-  useEffect(() => {
-    fetch(`/api/providers?limit=100`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
+
+  const fetchAllProviders = async () => {
+    try {
+      const r = await fetch(`/api/providers?limit=100`, { headers: { Authorization: `Bearer ${mk()}` } });
+      const d = await r.json();
       const list = (d.detailed || []) as ApiProvider[];
       list.sort((a, b) => a.id.localeCompare(b.id));
       setAllProviders(list);
-    }).catch(() => {});
-  }, []);
+      try { localStorage.setItem("modelsAllProvidersCache", JSON.stringify(list)); } catch {}
+    } catch {}
+  };
 
   const fetchModels = () => {
     const params = new URLSearchParams();
@@ -78,28 +96,66 @@ export default function Models() {
     params.set("limit", "1000");
     params.set("page", "1");
     fetch(`/v1/models?${params.toString()}`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
-      setModels(d.data || []);
-      setTotal(d.total ?? d.data?.length ?? 0);
-    }).catch(() => setModels([]));
+      const data = d.data || [];
+      setModels(data);
+      setTotal(d.total ?? data.length ?? 0);
+      try { localStorage.setItem("modelsCache", JSON.stringify(data)); localStorage.setItem("modelsTotalCache", String(d.total ?? data.length)); } catch {}
+    }).catch(() => {});
   };
   const fetchUsage = () => {
     fetch(`/api/logs?limit=200`, { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then((d) => {
-      const map: Record<string, number> = {}; for (const l of d.data || []) { const id = l.model || ""; map[id] = (map[id] || 0) + 1; } setUsage(map);
+      const map: Record<string, number> = {}; for (const l of d.data || []) { const id = l.model || ""; map[id] = (map[id] || 0) + 1; }
+      // preserve previous usage until new arrives is already handled by not clearing; just update
+      setUsage(map);
+      try { localStorage.setItem("modelsUsageCache", JSON.stringify(map)); } catch {}
     }).catch(() => {});
   };
-  useEffect(() => { fetchModels(); fetchUsage(); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
+  const fetchSync = async () => {
+    try {
+      const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
+      if (!r.ok) return;
+      const j = await r.json();
+      setSyncStatus(j);
+      try { localStorage.setItem("modelsSyncCache", JSON.stringify(j)); } catch {}
+    } catch { /* ignore */ }
+  };
 
-  // Sync 1 lần duy nhất khi reload: lấy /api/sync/status để hiển thị NEW provider, không poll liên tục
+  // No auto-sync on reload — manual Refresh will trigger (env-based hasKey filter preserved, usage kept)
   useEffect(() => {
-    const fetchSync = async () => {
-      try {
-        const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
-        if (!r.ok) return;
-        const j = await r.json();
-        setSyncStatus(j);
-      } catch { /* ignore */ }
-    };
+    if (!hasRefreshed) return;
+    fetchModels();
+    fetchUsage();
+  }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid, hasRefreshed]);
+  useEffect(() => {
+    if (!hasRefreshed) return;
     fetchSync();
+    fetchAllProviders();
+  }, [hasRefreshed]);
+
+  // Load cached models/usage on first mount if exists (preserve apiKey/logs/totals without network)
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("modelsCache");
+      const cachedTotal = localStorage.getItem("modelsTotalCache");
+      const cachedUsage = localStorage.getItem("modelsUsageCache");
+      if (cached) {
+        const data = JSON.parse(cached);
+        setModels(data);
+        if (cachedTotal) setTotal(parseInt(cachedTotal, 10));
+      }
+      if (cachedUsage) setUsage(JSON.parse(cachedUsage));
+    } catch {}
+  }, []);
+  // Initial display fix: fetch once on mount if no cache so page not empty (then manual Refresh for newest)
+  useEffect(() => {
+    const hasCache = (() => { try { return !!localStorage.getItem("modelsCache"); } catch { return false; } })();
+    if (!hasCache) {
+      setHasRefreshed(true);
+      fetchModels();
+      fetchUsage();
+      fetchSync();
+      fetchAllProviders();
+    }
   }, []);
   useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
@@ -107,17 +163,25 @@ export default function Models() {
   useEffect(() => { localStorage.setItem("hideInvalid", hideInvalid ? "1" : "0"); }, [hideInvalid]);
   useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setHasRefreshed(true);
+    try {
+      // manual sync per-page: env-based providers (hasKey respects current toggle, not reset), latest usage preserved
+      await Promise.all([fetchModels(), fetchUsage(), fetchSync(), fetchAllProviders()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  const handleResetFilters = () => {
     setQ("");
     setProvider("");
     setVerified("all");
-    setHasKeyOnly(false);
+    // keep hasKeyOnly as-is to preserve env-based filter; user can toggle manually
     setHide404(true);
     setHidePayment(true);
     setHideInvalid(true);
     setSelected(new Set());
-    // fetchModels will be triggered by useEffect on dependency change, but also call directly to ensure
-    setTimeout(fetchModels, 100);
   };
 
   const syncLive = async () => {
@@ -338,7 +402,7 @@ export default function Models() {
               <button onClick={syncLive} disabled={syncing} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${syncing ? "bg-slate-100 text-slate-500 border border-slate-200" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>{syncing ? t("models.syncing") : t("models.sync")}</button>
               <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 hidden group-hover:block bg-slate-900 text-white text-[11px] px-2 py-1 rounded whitespace-nowrap z-10 max-w-[220px] text-center">{t("models.sync_hint")}</span>
             </div>
-            <button onClick={handleRefresh} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50"><RefreshCw className="w-3.5 h-3.5" /> {t("models.refresh")}</button>
+            <button onClick={handleRefresh} disabled={refreshing} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60">{refreshing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} {refreshing ? t("models.syncing") : t("models.refresh")}</button>
           </div>
         </div>
         {(qDebounced || providerDebounced || verified !== "all" || hasKeyOnly || hide404 || hidePayment || hideInvalid) && (

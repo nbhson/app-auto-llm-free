@@ -28,7 +28,13 @@ interface HealthPayload {
 
 export default function Providers() {
   const { t } = useLang();
-  const [data, setData] = useState<ProvidersPayload | null>(null);
+  const [data, setData] = useState<ProvidersPayload | null>(() => {
+    try {
+      const raw = localStorage.getItem("providersCache");
+      if (raw) return JSON.parse(raw) as ProvidersPayload;
+    } catch {}
+    return null;
+  });
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [loadingHealth, setLoadingHealth] = useState(false);
   const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "free", dir: "desc" });
@@ -41,8 +47,16 @@ export default function Providers() {
   });
   const [syncing, setSyncing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(() => {
+    try {
+      const raw = localStorage.getItem("providersSyncCache");
+      if (raw) return JSON.parse(raw) as SyncStatus;
+    } catch {}
+    return null;
+  });
   const [autoSyncing, setAutoSyncing] = useState(false);
+  const [hasRefreshed, setHasRefreshed] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q), 400);
@@ -52,6 +66,7 @@ export default function Providers() {
   const load = async () => {
     try {
       // fetch all providers without pagination UI – aggregate pages with limit=50 (backend now also supports 100)
+      // env-based: hasKey uses providerKeys from .env
       const fetchPage = async (page: number) => {
         const params = new URLSearchParams({ page: String(page), limit: "50" });
         if (qDebounced) params.set("q", qDebounced);
@@ -66,7 +81,20 @@ export default function Providers() {
         const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(i + 2)));
         for (const p of rest) all = all.concat(p.detailed || []);
       }
-      setData({ ...first, detailed: all, pagination: first.pagination ? { ...first.pagination, total: all.length } : undefined });
+      const merged = { ...first, detailed: all, pagination: first.pagination ? { ...first.pagination, total: all.length } : undefined };
+      setData(merged);
+      try { localStorage.setItem("providersCache", JSON.stringify(merged)); localStorage.setItem("providersCacheAt", new Date().toISOString()); } catch {}
+    } catch { /* ignore */ }
+  };
+  const fetchSync = async () => {
+    try {
+      const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
+      if (!r.ok) return;
+      const j = (await r.json()) as SyncStatus;
+      setSyncStatus(j);
+      try { localStorage.setItem("providersSyncCache", JSON.stringify(j)); } catch {}
+      if (j.bootSync?.status === "running") setAutoSyncing(true);
+      else setAutoSyncing(false);
     } catch { /* ignore */ }
   };
   const syncLive = async () => {
@@ -85,23 +113,35 @@ export default function Providers() {
     fetch("/api/providers/health", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => r.json()).then(setHealth).finally(() => setLoadingHealth(false));
   };
 
-  useEffect(() => { load(); }, [qDebounced, hasKeyOnly]);
   useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
 
-  // Sync 1 lần duy nhất khi reload: lấy /api/sync/status để hiển thị NEW provider sau khi update .env + restart gateway
+  // Initial display: if no cache, fetch once so page is not empty. Subsequent filter changes require manual Refresh to sync newest.
   useEffect(() => {
-    const fetchSync = async () => {
-      try {
-        const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
-        if (!r.ok) return;
-        const j = (await r.json()) as SyncStatus;
-        setSyncStatus(j);
-        if (j.bootSync?.status === "running") setAutoSyncing(true);
-        else setAutoSyncing(false);
-      } catch { /* ignore */ }
-    };
-    fetchSync();
+    if (!data) {
+      load();
+      fetchSync();
+      setHasRefreshed(true);
+    }
   }, []);
+
+  // After initial display, filter changes trigger load only after manual Refresh was done
+  useEffect(() => {
+    if (!hasRefreshed) return;
+    // avoid double-load on mount when data was null (handled above)
+    if (!data) return;
+    load();
+  }, [qDebounced, hasKeyOnly, hasRefreshed]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setHasRefreshed(true);
+    try {
+      await load();
+      await fetchSync();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "provider" ? "asc" : "desc" }));
 
@@ -156,6 +196,9 @@ export default function Providers() {
               </label>
             </div>
             <div className="flex items-center gap-2.5">
+              <button onClick={handleRefresh} disabled={refreshing} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60 shadow-xs">
+                {refreshing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} {refreshing ? t("providers.syncing") : t("models.refresh")}
+              </button>
               <button onClick={syncLive} disabled={syncing} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-75 shadow-xs active:scale-[0.98] transition-all">
                 {syncing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}{syncing ? t("providers.syncing") : t("providers.sync")}
               </button>

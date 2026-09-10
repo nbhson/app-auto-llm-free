@@ -2,6 +2,43 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.0] - 2026-09-11
+
+### Added
+- **Chat VI/EN full i18n** — `apps/web/src/lib/i18n.tsx` thêm 40+ keys `chat.*` VI/EN (title, subtitle, model, provider, tokens, breakdown, contextWindow, placeholder, welcome/refreshed, errors, tips, etc.), `Chat.tsx` (`apps/web/src/pages/Chat.tsx:190`) chuyển toàn bộ hard-coded sang `t("chat.*")` (`useLang`), welcome/refreshed dùng `t("chat.welcome")`/`t("chat.refreshed")`, placeholder/thinking/sendHint/systemPrompt/temperature/maxTokens/streaming đều i18n, 8 pages kiểm tra `useLang`+`t()`
+- **8 pages review VI/EN** — rà soát Dashboard/Providers/Models/Keys/Logs/Usage/Settings/Chat, bổ sung `nav.chat` + `chat.*`, đảm bảo 8 pages đều `t()` đầy đủ
+- **Chat breakdown clickable** đã có `scrollToMessage` + `highlightedId` (đã thêm ở 1.4.0) giữ nguyên
+- **Display fix** đã có `hasRefreshed:true` + initial fetch nếu chưa có cache (đã thêm ở 1.4.0) giữ nguyên
+
+### Changed
+- **Docs 8 pages & i18n** — `README.md`/`README.vi.md` Dashboard 7→8 Pages (VI/EN full) với `t("dashboard.*")`/`t("chat.*")` v.v., `docs/en|vi/OPERATIONS.md` cập nhật 6 models + breakdown clickable + initial fetch, `Chat` mô tả VI/EN
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.4.0→1.5.0`, `main.tsx` badge `v1.5.0`, `app.ts` version `1.5.0`
+
+### Fixed
+- **i18n missing for Chat** — trước Chat hard-code tiếng Việt/Anh lẫn lộn, nay 100% `t("chat.*")` VI/EN
+- **UT i18n coverage** — `chat-allowed.test.ts` thêm 3 tests cho VI/EN (chat keys count, `t("chat.*")` usage, 8 pages `useLang`)
+
+
+## [1.4.0] - 2026-09-11
+
+### Added
+- **Chat page** (`apps/web/src/pages/Chat.tsx:1`): tab `/chat` nằm trái Settings (`main.tsx:89`), 6 model được phép duy nhất `free-llm-gateway/auto`, `kilo-code/kilo-auto/free`, `kilo-code/auto`, `openrouter/auto`, `kiraai/kira-auto`, `agnes-ai/agnes-2.5-flash` (`ALLOWED_CHAT_MODELS`, `FALLBACK_CONTEXT` + `free-llm-gateway/auto:128000`), selector strict + search, streaming SSE (`/v1/chat/completions` `stream:true`, `X-Provider`/`X-Model`), markdown `react-markdown` + `remark-gfm` + `rehype-highlight` (`CodeBlock` copy), auto-scroll bottom, upload ảnh (vision `image_url`) + `.md`/`.txt` (inject `File: name` + 50k truncate), paste Ctrl+V, drag & drop, system prompt/temperature/max_tokens, context-window phải (tokens bar `ctxPercent`, **breakdown clickable → `scrollToMessage` + `highlightedId` ring**, provider/latency/usage, `Refresh` clear session, cached `chatMessages`), 7 pages dashboard
+- **Manual Refresh per-page (no auto-sync on reload, initial fetch if no cache so not empty)** — 3 trang Providers/Models/Usage không còn `fetch once on reload` trống:
+  - `Providers.tsx`: `providersCache`/`providersSyncCache` + `hasRefreshed` (initial `true` + `if (!data)` guard) + `handleRefresh` load env-based `GET /api/providers?hasKey=1` + `GET /api/sync/status`, `Refresh` button cạnh `Sync Live`/`Live Check`, `hasKeyOnly` preserved, **initial fetch nếu chưa có cache**
+  - `Models.tsx`: `modelsCache`/`modelsTotalCache`/`modelsUsageCache`/`modelsAllProvidersCache`/`modelsSyncCache`, `handleRefresh` (env-based `hasKey` + latest usage, không reset `hasKeyOnly`), `refreshing` spinner, filter debounced chỉ fetch sau `hasRefreshed`, **initial cache fallback + fetch nếu chưa có cache**
+  - `Usage.tsx`: `usageStatsCache`/`usageLogsCache`/`usageProvidersCache`/`usageSyncCache`/`usageNewestCache`, `handleRefresh` loads `stats` + `logs` + `providers` + `fetchSync` highlight latest provider (`★ NEW`), `live` default `false` (manual toggle), `refreshing` state, **initial fetch nếu chưa có cache**
+  - `Logs.tsx`: `logsCache`/`logsStatsCache` preserve `masterKey`/logs/totals, `load()` không xóa trước khi fetch, `masterKey` giữ qua `localStorage`
+
+### Changed
+- **Refresh preserves essential keys** — `masterKey` (`localStorage.masterKey`), `endpoint`/`logs`/`total request`/`total token` được cache (`*Cache` + `*At`) và không bị clear khi Refresh hoặc reload; `Logs.tsx`/`Usage.tsx` giữ `allTimeTokens`/`total` cũ nếu fetch mới rỗng
+- **Docs**: `README.md`/`README.vi.md` Dashboard 6→7 pages, warning sau `.env` restart thành manual Refresh (Providers env-based, Usage latest provider), `docs/en|vi/OPERATIONS.md` Models/Providers/Scheduler/Endpoints cập nhật manual Refresh, cached, boot-sync 1 lần sau restart
+- **Version bump**: `package.json` `apps/gateway` `apps/web` `1.3.0→1.4.0`, `main.tsx` badge `v1.4.0`, `app.ts` version `1.4.0`
+
+### Fixed
+- **Providers/Models/Usage không hiển thị data**: do `hasRefreshed=false` ban đầu + `if (!hasRefreshed) return` chặn load, cache trống → trang trắng. Fix: khởi `hasRefreshed:true` + `if (!data)/hasCache` thì `load()+fetchSync()` ngay mount để không trống, vẫn giữ cache + manual Refresh để sync newest (env-based providers, latest provider cho Usage)
+- **Typecheck Usage**: `r` → `r2` trong `fetch logs` (`Usage.tsx:85`)
+- **better-sqlite3 Node 26**: upgrade `better-sqlite3` `^9.2.2` → `^13.0.3` (`apps/gateway/package.json:34`) với prebuild Node 20–26 (ABI 147). Fix `npm i` lỗi `node-gyp` / `v8-internal.h: concept/requires` trên Node 26 + Apple clang 21. Docs thêm troubleshooting Node 20–26 ở `docs/GETTING_STARTED.md:8`, `docs/en/GETTING_STARTED.md:8`, `docs/vi/GETTING_STARTED.md:8` — Docker (`node:20-alpine`) không ảnh hưởng.
+
 ## [1.3.0] - 2026-09-11
 
 ### Added
@@ -190,10 +227,8 @@ Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [
 ### Added
 - **Auto-bind MASTER_KEY bootstrap** (`8f1b3b7`): gateway public `GET /api/bootstrap` + `/api/config/master` (`app.ts:23`, bypass `/api/*` auth, disable via `EXPOSE_BOOTSTRAP=false`), web header Master input editable (password/text toggle, `main.tsx:40`) auto-fetch bootstrap nếu `localStorage` placeholder (`fgk-master-dev-key`/`change-me`/len<16) và re-bootstrap khi `401` — docs `GETTING_STARTED.md:36`, `ARCHITECTURE.md:27`, `CONFIGURATION.md:23`, `API.md:155`.
 
-## [Unreleased]
 
-### Fixed
-- **better-sqlite3 Node 26**: upgrade `better-sqlite3` `^9.2.2` → `^13.0.3` (`apps/gateway/package.json:34`) với prebuild Node 20–26 (ABI 147). Fix `npm i` lỗi `node-gyp` / `v8-internal.h: concept/requires` trên Node 26 + Apple clang 21. Docs thêm troubleshooting Node 20–26 ở `docs/GETTING_STARTED.md:8`, `docs/en/GETTING_STARTED.md:8`, `docs/vi/GETTING_STARTED.md:8` — Docker (`node:20-alpine`) không ảnh hưởng.
+## [Unreleased]
 
 ### Added
 - **P1 Scaffold**: Hono 4.x + Vite React, Drizzle SQLite, Docker Compose, `.env.example` 30 providers, `GET /v1/health` + `GET /v1/models` (316 free)

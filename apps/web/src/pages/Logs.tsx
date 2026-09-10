@@ -6,15 +6,41 @@ function mk() { return localStorage.getItem("masterKey") || "fgk-master-dev-key"
 
 export default function Logs() {
   const { t } = useLang();
-  const [logs, setLogs] = useState<ApiLog[]>([]);
+  const [logs, setLogs] = useState<ApiLog[]>(() => {
+    try { const raw = localStorage.getItem("logsCache"); if (raw) return JSON.parse(raw) as ApiLog[]; } catch {}
+    return [];
+  });
   const [live, setLive] = useState(false);
-  const [stats, setStats] = useState<GatewayStats | null>(null);
+  const [stats, setStats] = useState<GatewayStats | null>(() => {
+    try { const raw = localStorage.getItem("logsStatsCache"); if (raw) return JSON.parse(raw) as GatewayStats; } catch {}
+    return null;
+  });
 
   const DISPLAY_LIMIT = 50;
   const [authError, setAuthError] = useState<string | null>(null);
   const load = () => {
-    fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { setAuthError(r.status === 401 ? t("logs.auth_error") : `Error ${r.status}`); return { data: [] }; } setAuthError(null); return r.json(); }).then((d) => setLogs(d.data || [])).catch(() => {});
-    fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { if (r.status === 401) setAuthError(t("logs.auth_error")); return null; } return r.json(); }).then((d) => { if (d?.logs) setStats(d); else if (d && !d.logs) setStats(null); }).catch(() => {});
+    // preserve existing logs/stats until new arrives — do not clear on error
+    fetch("/api/logs?limit=100", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { setAuthError(r.status === 401 ? t("logs.auth_error") : `Error ${r.status}`); return null; } setAuthError(null); return r.json(); }).then((d) => {
+      if (d?.data) {
+        setLogs(d.data);
+        try { localStorage.setItem("logsCache", JSON.stringify(d.data)); } catch {}
+      }
+    }).catch(() => {});
+    fetch("/api/stats", { headers: { Authorization: `Bearer ${mk()}` } }).then((r) => { if (!r.ok) { if (r.status === 401) setAuthError(t("logs.auth_error")); return null; } return r.json(); }).then((d) => {
+      if (d) {
+        // preserve total request/total token if new has 0 but old has value? Keep latest non-zero
+        setStats((prev) => {
+          if (!prev) return d;
+          // if new logs missing, keep prev logs
+          if (d?.logs && (!d.logs.total || d.logs.total === 0) && prev.logs?.total) {
+            // keep prev total if new is empty (preserve)
+            return { ...d, logs: { ...prev.logs, ...d.logs, total: d.logs.total || prev.logs.total, allTimeTokens: d.logs.allTimeTokens || prev.logs.allTimeTokens } };
+          }
+          return d;
+        });
+        try { localStorage.setItem("logsStatsCache", JSON.stringify(d)); } catch {}
+      }
+    }).catch(() => {});
   };
   const visibleLogs = logs.slice(0, DISPLAY_LIMIT);
   const totalCount = stats?.logs?.total ?? logs.length;

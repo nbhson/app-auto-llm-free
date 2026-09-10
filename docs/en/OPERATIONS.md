@@ -77,16 +77,16 @@ save to data/live-models.json { total, providers, free_only, total_fetched, mode
 - `GET /api/models/live` — get cache
 - `GET /v1/models?hasKey=1` — when live cache exists serves **live 2190 total** instead of freellms 324
 - `GET /api/providers?hasKey=1` — filter real keys, highlight green
- - **Models UI**: 4 toggles in Filters dropdown `hasKey` (default OFF `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (default ON, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` now stores both `404/410` and `200 usable` (usable overrides 404 so reload stays non-red, `v1/models.ts:153` + `isRowDisabled`), hidden when hide toggles checked. `Refresh` clears `q`/`provider`/`verified` and resets `hasKeyOnly:false` + `hide*` true. `Check Live` requires filter `q` or `provider` (tooltip otherwise).
-  - **Sync Live Now** on both `/providers` and `/models` (same `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx`/`Models.tsx`) only pulls free models — filtered by Permanent Free tier or `:free` suffix or freellms free list, writes `data/live-models.json`, then `POST /api/verify`. **Auto boot-sync** sau khi update `.env` + restart gateway thì tự chạy không cần bấm (sync 1 lần duy nhất khi reload trang, không poll liên tục). Changing `.env` keys **requires restarting the gateway** `config.ts:22` (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) to reload `hasRealKey` before sync.
+  - **Models UI**: 4 toggles in Filters dropdown `hasKey` (default OFF `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (default ON, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` now stores both `404/410` and `200 usable` (usable overrides 404 so reload stays non-red, `v1/models.ts:153` + `isRowDisabled`), hidden when hide toggles checked. **Refresh** (manual, no auto on reload, **initial fetch if no cache so not empty**) loads `v1/models` + `GET /api/sync/status` + `logs` (env-based `hasKeyOnly` preserved, usage cached `modelsCache`/`modelsUsageCache`, does not clear `masterKey`/logs/totals) and shows `★ NEW`. `Check Live` requires filter `q` or `provider` (tooltip otherwise).
+  - **Sync Live Now** on both `/providers` and `/models` (same `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx`/`Models.tsx`) only pulls free models — filtered by Permanent Free tier or `:free` suffix or freellms free list, writes `data/live-models.json`, then `POST /api/verify`. **Manual Refresh** (not auto) loads Providers from env `providerKeys` (`GET /api/providers?hasKey=1`, cached `providersCache`/`providersSyncCache`) and Usage highlights latest provider. Changing `.env` keys **requires restarting the gateway** `config.ts:22` (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) to reload `hasRealKey`, then press **Refresh** on each page to see newest.
 
 **Rate limit fix**: Frontend debounces `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` increases limit for list endpoints to 4x (min 200) to avoid 429 while typing/pagination.
 
-## Automatic Scheduler (24h — verify + live sync + **auto boot-sync on `.env` update**)
+## Automatic Scheduler (24h — verify + live sync + **boot-sync on `.env` update, no auto UI sync**)
 
 `apps/gateway/src/jobs/scheduler.ts` + `jobs/boot-sync.ts` run inside the gateway:
 
-- On startup (**auto boot-sync** `boot-sync.ts:76 runBootSync()`): compare current `config.providerKeys` vs `data/.provider-fingerprint.json` (`hasKey` `false→true`); if **new providers** (`newlyAdded`) exist → `syncLiveModels({freeOnly:false})` + `verifyFreeModels()` after ~3s, persist `addedAt`/`lastAdded`/`lastAddedAt`/`bootSync`/`liveSync`, reset model-store cache. If no new provider but `verified-models.json` stale (> `SYNC_INTERVAL_MS`) → fallback verify. **Tự động sau khi update `.env` + restart gateway**: Providers page có ngay, Models tự sync, Usage topology highlight provider mới nhất (violet `★ NEW`) — không cần bấm `Sync Live`.
+- On startup (**boot-sync** `boot-sync.ts:76 runBootSync()`): compare current `config.providerKeys` vs `data/.provider-fingerprint.json` (`hasKey` `false→true`); if **new providers** (`newlyAdded`) exist → `syncLiveModels({freeOnly:false})` + `verifyFreeModels()` after ~3s, persist `addedAt`/`lastAdded`/`lastAddedAt`/`bootSync`/`liveSync`, reset model-store cache. If no new provider but `verified-models.json` stale (> `SYNC_INTERVAL_MS`) → fallback verify. **Sau khi update `.env` + restart gateway**: boot-sync tự chạy 1 lần; UI **Providers / Models / Usage không auto-sync khi reload** — nhấn **Refresh** trên từng page để load mới nhất (Providers: env-based, Usage: latest provider violet `★ NEW`, đều cached). `Sync Live` vẫn cần bấm thủ công nếu muốn force.
 - Then `setInterval` every 24h → `verifyFreeModels()` + `saveVerifyReport()` + `syncLiveModels({freeOnly:true})`
 
 Configuration:
@@ -106,9 +106,9 @@ DISABLE_SCHEDULER=0   # set to 1 to disable
 | `GET` | `/v1/models?verified=unverified` | Only unverified |
 | `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter by provider + hasKey (real keys) |
 | `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, 400ms debounce) |
-| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `isNewest`/`addedAt`, `Get Key` URL, `status` + `sync.lastAdded` — pagination 25/50 sticky bottom, `q` 400ms debounce, **fetch once on reload via `/api/sync/status` (không poll liên tục)** |
+| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `isNewest`/`addedAt`, `Get Key` URL, `status` + `sync.lastAdded` — pagination 25/50 sticky bottom, `q` 400ms debounce, **manual Refresh per-page** (env-based, cached `providersCache`, no auto on reload) |
 | `GET` | `/api/providers/health` | Live ping of 51 providers in 5s |
-| `GET` | `/api/sync/status` | **New 1.2.0**: fingerprint (`providers` `hasKey`/`addedAt`, `lastAdded`, `bootSync`, `liveModels`, `newestProviders`) — dùng cho auto highlight newest |
+| `GET` | `/api/sync/status` | **New 1.2.0**: fingerprint (`providers` `hasKey`/`addedAt`, `lastAdded`, `bootSync`, `liveModels`, `newestProviders`) — dùng cho **manual Refresh** highlight newest (Providers: env-based, Usage: latest provider) — cached |
 | `POST` | `/api/sync/boot` | **New 1.2.0**: manual trigger `runBootSync({force})` |
 | `POST` | `/api/models/live/sync` | Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
 | `GET` | `/api/models/live` | Get live cache |
@@ -166,11 +166,12 @@ Currently recommended: add secrets `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA
 
 - **Dev**: live data via `POST /api/models/live/sync` with 1–2 real keys or freellms snapshot is sufficient; no full verify needed (dry-run <1s)
 - **Prod**: configure at least 5 P0 keys (NVIDIA, Groq, Cerebras, Gemini, GitHub) for live sync of 882 free (853 hasKey) every 24h; scheduler auto-calls both verify and syncLiveModels. Remaining providers will stay `unverified_no_key` but still serve with a warning
- - **Dashboard**:
-   - `/models`: single filter row `q` + `provider` + `verified` + **Filters** dropdown (4 toggles: `hasKey` default OFF + `hide404`/`hidePayment`/`hideInvalid` default ON) + top-right 3 buttons `Check Live (n)` — `Sync Live Now` — `Refresh` (clears `hasKeyOnly:false`); sticky bottom pagination `Page X/Y` + `LOV 25/50`; table `isRowDisabled` prioritizes `live usable 200`/`usage>0` over `deprecated`, per-row `Check` persists `200 usable` to `data/model-health.json` so reload stays non-red; `hide*` hides
-   - `/providers`: filter `q` 400ms debounce + pill `hasKey` (default OFF) + `hasRealKey` green highlight; sticky bottom `LOV 25/50`; **Sync Live Now** same endpoint as Models, writes `data/live-models.json`
-  - `/logs`: only **Live ON** (SSE + 2s poll), duplicate `Auto sync 5s` removed
-  - Rate limit for list endpoints increased to 4x (200) to prevent 429 while typing/pagination
+  - **Dashboard**:
+    - `/models`: single filter row `q` + `provider` + `verified` + **Filters** dropdown (4 toggles: `hasKey` default OFF + `hide404`/`hidePayment`/`hideInvalid` default ON) + top-right 3 buttons `Check Live (n)` — `Sync Live Now` — **Manual Refresh** (env-based `hasKey` preserved, cached `modelsCache`/`modelsUsageCache`, preserves `masterKey`/logs/totals); sticky bottom pagination `Page X/Y` + `LOV 25/50`; table `isRowDisabled` prioritizes `live usable 200`/`usage>0` over `deprecated`, per-row `Check` persists `200 usable` to `data/model-health.json` so reload stays non-red; `hide*` hides
+    - `/providers`: filter `q` 400ms debounce + pill `hasKey` (default OFF) + `hasRealKey` green highlight; sticky bottom `LOV 25/50`; **Manual Refresh** (env-based, cached `providersCache`/`providersSyncCache`, initial fetch if no cache so not empty) + **Sync Live Now** same endpoint as Models, writes `data/live-models.json`
+    - `/chat`: 6 allowed models only (`free-llm-gateway/auto`, `kilo-code/kilo-auto/free`, `kilo-code/auto`, `openrouter/auto`, `kiraai/kira-auto`, `agnes-ai/agnes-2.5-flash`), strict selector, streaming, markdown/code-block, right context-window with **breakdown (est.) clickable → scroll to message** (`highlightedId` + `scrollIntoView`), upload image/`.md`/`.txt`, Refresh clears session, cache preserved
+   - `/logs` + `/usage`: `logsCache`/`logsStatsCache`/`usage*Cache` cached, **Manual Refresh** per-page (Usage: latest provider highlight, env-based providers), **Live ON** SSE manual toggle (no auto), duplicate `Auto sync 5s` removed
+   - Rate limit for list endpoints increased to 4x (200) to prevent 429 while typing/pagination
 
 ## What Happens When a Model Is Deprecated?
 
