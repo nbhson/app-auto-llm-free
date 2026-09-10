@@ -22,10 +22,28 @@ describe("registry resolveProvidersForModel", () => {
 
   it("free-llm-gateway/auto covers many providers", () => {
     expect(modelAliases["free-llm-gateway/auto"].length).toBeGreaterThan(10);
+    expect(modelAliases["free-llm-gateway/auto"]).toContain("b-ai");
+    expect(modelAliases["free-llm-gateway/auto"]).toContain("tokenharbor");
     expect(resolveProvidersForModel("auto")).toEqual(providerIds); // bare auto has no alias -> all
   });
 
   it("lookup is case-insensitive for aliases", () => {
     expect(resolveProvidersForModel("KIRA-MINI-1.0")).toEqual(["kiraai"]);
+  });
+
+  it("B.AI and TokenHarbor alias routing", () => {
+    expect(resolveProvidersForModel("b-ai/qwen3.8-flash")).toEqual(["b-ai"]);
+    expect(resolveProvidersForModel("b-ai/hy3")).toEqual(["b-ai"]);
+    expect(resolveProvidersForModel("qwen3.8-flash")).toEqual(["b-ai"]);
+    expect(resolveProvidersForModel("hy3")).toEqual(["b-ai"]);
+    expect(resolveProvidersForModel("QWEN3.8-FLASH")).toEqual(["b-ai"]);
+    expect(resolveProvidersForModel("tokenharbor/deepseek-v4.1-flash:free")).toEqual(["tokenharbor"]);
+    expect(resolveProvidersForModel("deepseek-v4.1-flash:free")).toEqual(["tokenharbor"]);
+    expect(resolveProvidersForModel("mimo-v2.5:free")).toContain("tokenharbor");
+    expect(resolveProvidersForModel("glm-5.3-flash")).toContain("b-ai");
+    expect(providerIds).toContain("b-ai");
+    expect(providerIds).toContain("tokenharbor");
+    expect(providerIds).toContain("bai");
+    expect(providerIds).toContain("chat-b-ai");
   });
 });

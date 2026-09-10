@@ -29,5 +29,13 @@ describe("provider-keys", () => {
     // pollinations has no real key requirement — function should not throw
     expect(typeof hasRealKey("pollinations")).toBe("boolean");
     expect(typeof hasRealKey("groq")).toBe("boolean");
+    expect(typeof hasRealKey("b-ai")).toBe("boolean");
+    expect(typeof hasRealKey("tokenharbor")).toBe("boolean");
+  });
+
+  it("B.AI and TokenHarbor are not public providers", () => {
+    expect(isPublicProvider("b-ai")).toBe(false);
+    expect(isPublicProvider("tokenharbor")).toBe(false);
+    expect(isPublicProvider("bai")).toBe(false);
   });
 });
