@@ -5,12 +5,12 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stack: Hono + Node](https://img.shields.io/badge/Stack-Hono%20%2B%20Node-green)](https://hono.dev)
 [![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/vi/API.md)
-[![MIỄN PHÍ](https://img.shields.io/badge/MIỄN_PHÍ-41_Provider-00c853?style=flat-square)](docs/vi/PROVIDERS.md)
-[![MIỄN PHÍ](https://img.shields.io/badge/MIỄN_PHÍ-324_Model-00c853?style=flat-square)](models.yaml)
+[![MIỄN PHÍ](https://img.shields.io/badge/MIỄN_PHÍ-51_Provider-00c853?style=flat-square)](docs/vi/PROVIDERS.md)
+[![MIỄN PHÍ](https://img.shields.io/badge/MIỄN_PHÍ-338_Model-00c853?style=flat-square)](models.yaml)
 [![Không Cần Thẻ](https://img.shields.io/badge/Không_Cần_Thẻ-29%2F30-3b82f6?style=flat-square)](docs/vi/FREELLMS_FREE_TIER.md)
 
 > ### 🆓 **100% MIỄN PHÍ — Không Cần Thẻ • Không Trial • Mãi Mãi**
-> **41 Provider • 324 Model (316 free freellms + 8 alias) • Một Endpoint OpenAI-Compatible** — Tự host, BYOK, chi phí `$0`.
+> **51 Provider • 338 Model (316 freellms + 14 KiraAI + 8 B.AI/TokenHarbor) • Một Endpoint OpenAI-Compatible** — Tự host, BYOK, chi phí `$0`.
 >
 > | Nhóm | Provider | Model | Không cần thẻ |
 > |------|----------|-------|--------------|
@@ -37,11 +37,11 @@
 
 ---
 
-## 📸 Screenshots — Dashboard Live (30 provider • 316 free verify 24h)
+## 📸 Screenshots — Dashboard Live (51 provider • 338 free verify 24h)
 
-| Providers — 41 IDs, tier, live health, `Get Key ↗` | Models — 324 (316 free + 8 alias), live probe `Check Live`, `Hide 404` |
+| Providers — 51 IDs, tier, live health, `Get Key ↗` | Models — 338 (316 freellms + 14 KiraAI + 8 B.AI/TokenHarbor), live probe `Check Live`, `Hide 404` |
 |:---:|:---:|
-| ![Providers — 41 live, health 5s](docs/images/providers.png) | ![Models — 324 live verify](docs/images/models.png) |
+| ![Providers — 51 live, health 5s](docs/images/providers.png) | ![Models — 338 live verify](docs/images/models.png) |
 
 ---
 
@@ -50,11 +50,11 @@
 | Danh mục | Tính năng |
 |----------|----------|
 | **API Thống nhất (OpenAI-Compatible)** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/responses`, `/v1/conversations`, `/v1/messages` (Anthropic) — dùng ngay với OpenAI SDK, Vercel AI, LangChain |
-| **41 Provider Miễn Phí (324 Model)** | **Permanent Free (26)**: NVIDIA NIM (81+), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), OpenRouter (17), SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf…<br>**Quota Free (4)**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4)<br>**Scraped/Unlimited (3)**: Pollinations, LLM7.io, Ollama Cloud<br>**Custom Free (3)**: OrcaRouter, FreeAI, Cline |
+| **51 Provider Miễn Phí (338 Model)** | **Permanent Free (28)**: NVIDIA NIM (81+), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), OpenRouter (17), SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf, **B.AI (4, 0 Credits)**, **TokenHarbor (3 :free + 1 reserved)**…<br>**Quota Free (4)**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4)<br>**Scraped/Unlimited (3)**: Pollinations, LLM7.io, Ollama Cloud<br>**Custom Free (3)**: OrcaRouter, FreeAI, Cline |
 | **Routing Thông Minh & Fallback** | Fallback theo tier (key thật → public free), alias model (`auto`, `gpt-4`, `glm`, `qwen`, `code` → free tốt nhất), header `x-router` pin, bỏ qua `deprecated`/`quota`/`breaker`, filter `hasKey` |
 | **Resilience v2 (0.9.0)** | Executor `tryProviders` chung (6 routes), Redis Lua sliding-window quota/rate-limit (không spike biên), circuit breaker 5/30s half-open (chỉ 5xx/429/exception), quota TPM/RPM (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
 | **Quản Lý Key An Toàn** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM), `fgk-master-...` admin, script xoay key |
-| **Dashboard (5 Trang)** | **Dashboard**: 4 stat cards + 3 biểu đồ + token overview<br>**Providers**: phân trang 25/50, sticky header, filter `hasKey` (mặc định TẮT), `Sync Live Now`, `Get Key ↗`, live health<br>**Models**: phân trang 25/50, Filters dropdown (`hasKey` TẮT, `Hide 404`/`credits`/`invalid` BẬT), `Check Live (n)`, `Sync Live Now`, `Refresh`, `Used/Limit`, strikethrough persisted qua `POST /api/models/health/mark`<br>**Keys**: `fgk-...` CRUD + Generator + Quick Test<br>**Logs**: biểu đồ + SSE stream |
+| **Dashboard (6 Trang)** | **Dashboard**: 4 stat cards + token overview (biểu đồ chuyển sang Usage)<br>**Providers**: phân trang 25/50, sticky header, filter `hasKey` (mặc định TẮT), `Sync Live Now`, `Get Key ↗`, live health<br>**Models**: phân trang 25/50, Filters dropdown (`hasKey` TẮT, `Hide 404`/`credits`/`invalid` BẬT), `Check Live (n)`, `Sync Live Now`, `Refresh`, `Used/Limit`, strikethrough persisted qua `POST /api/models/health/mark`<br>**Keys**: `fgk-...` CRUD + Generator + Quick Test<br>**Usage**: Topology provider (App giữa + line xanh animated), tokens/requests theo provider, pie status, SSE live, fetch-all pagination<br>**Logs**: bảng request + SSE stream (AbortController an toàn) |
 | **Vector 1+2 (2026-09-08)** | **Audio**: `POST /v1/audio/transcriptions|translations|speech` (Groq/Cerebras/OpenAI, multipart)<br>**Responses**: `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API)<br>**Anthropic**: `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls` giữ nguyên)<br>**Semantic Cache**: `SEMANTIC_CACHE_ENABLED=0`, ngưỡng 0.92, TTL 3600s, Cohere embeddings, cosine, Redis/in-memory, parallel embedding fallbacks<br>**Compression**: `COMPRESSION_ENABLED=0`, `relevanceKeep` query-aware (BM25-lite), tools minify, code dedup chuẩn hóa<br>**Cost Routing**: `COST_ROUTING_ENABLED=0`, score = cost×5 + latency×0.0005 − headroom×0.3 − success×2, `SUCCESS_WEIGHT=2`<br>**Analytics**: `ANALYTICS_RETENTION_DAYS=30`, `costByProvider`, `cacheHitRate`, `p95`, `errorsByProvider`, `GET /api/analytics/*` |
 | **Observability** | Pino pretty logs, OpenTelemetry GenAI (`gen_ai.*`), token estimator, request log (1000 entries + `X-Verified`), provider benchmark `PROVIDER_TEST_RESULTS` |
 
@@ -256,8 +256,8 @@ curl -X POST http://localhost:7373/api/keys \
 - [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (30 providers, 316 models registry)
 - [x] **Freellms Sync** — Scan freellms.org, `data/*.json` + `models.yaml` (316 free) + `scripts/sync-freellms.py`
 - [x] **P2 Gateway Core** ✅ Done 2026-09-06 — 30 adapters, streaming SSE (Gemini `alt=sse` → OpenAI), tool calling, `auto` 15-tier → pollinations live, `x-router` pin
-- [x] **P3 Resilience** ✅ Done 2026-09-06 — key-manager AES-GCM, quota RPM/TPM (NVIDIA 40/Groq 30/Cerebras 15/1M), breaker 5/30s, `GET /api/providers/health` live 41, `X-Verified` + deprecated skip
-- [x] **P4 Auth + Dashboard** ✅ Done 2026-09-06 — `fgk-...` CRUD (hash SHA256, scopes, RPM), `rate-limit` virtual key, `request-log` SSE, Dashboard 5 routes (Dashboard verify, Models badges, Providers health, Keys CRUD, Logs live)
+- [x] **P3 Resilience** ✅ Done 2026-09-06 — key-manager AES-GCM, quota RPM/TPM (NVIDIA 40/Groq 30/Cerebras 15/1M), breaker 5/30s, `GET /api/providers/health` live 51, `X-Verified` + deprecated skip
+- [x] **P4 Auth + Dashboard** ✅ Done 2026-09-06 — `fgk-...` CRUD (hash SHA256, scopes, RPM), `rate-limit` virtual key, `request-log` SSE, Dashboard 6 routes (Dashboard verify, Models badges, Providers health, Keys CRUD, Logs live)
 - [x] **P5 Hardening** ✅ Done 2026-09-06 — `wrangler.jsonc` Cloudflare, Dockerfile prod non-root + HEALTHCHECK, `otel.ts` GenAI, `secureHeaders` + `bodyLimit`, `benchmark.ts` + `PROVIDER_TEST_RESULTS.md` (online 13/40, chat 1539ms), `rotate-keys.ts` AES rotation, `SECURITY.md` hardening checklist
 - [x] **P6 Vector 1+2** ✅ Done 2026-09-08 — `/v1/audio/*` (transcriptions/translations/speech) + `/responses`/`/conversations` (Hebo) + `/v1/messages` (Anthropic) + semantic cache (`SEMANTIC_CACHE_ENABLED`/`SEMANTIC_THRESHOLD=0.92`/`CACHE_TTL_S=3600`/`cohere/embed-english-v3.0`) + compression (`COMPRESSION_ENABLED`) + cost routing (`COST_ROUTING_ENABLED`) + analytics (`costByProvider`/`cacheHitRate`/`p95`, `ANALYTICS_RETENTION_DAYS=30`)
 - [x] **P7 Resilience v2 (0.9.0)** ✅ Done 2026-09-09 — executor `tryProviders` chung, sliding-window quota/rate-limit Redis, compression query-aware, cost routing theo success-rate, giữ `tool_use`, 232 tests

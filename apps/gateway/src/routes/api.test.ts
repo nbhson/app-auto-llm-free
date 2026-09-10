@@ -21,7 +21,7 @@ describe("api /providers", () => {
     expect(bad.pagination.limit).toBe(25);
     const fifty: any = await (await apiRoute.request("/providers?limit=50")).json();
     expect(fifty.pagination.limit).toBe(50);
-    expect(fifty.detailed).toHaveLength(fifty.pagination.total); // 47 providers < 50
+    expect(fifty.detailed).toHaveLength(Math.min(50, fifty.pagination.total)); // total may exceed 50 after new providers
     const q: any = await (await apiRoute.request("/providers?q=groq")).json();
     expect(q.filters.q).toBe("groq");
     expect(q.detailed.length).toBeGreaterThan(0);

@@ -107,7 +107,7 @@ DISABLE_SCHEDULER=0   # set to 1 to disable
 | `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter by provider + hasKey (real keys) |
 | `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, 400ms debounce) |
 | `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `Get Key` URL, `status` — pagination 25/50 sticky bottom, `q` 400ms debounce |
-| `GET` | `/api/providers/health` | Live ping of 41 providers in 5s |
+| `GET` | `/api/providers/health` | Live ping of 51 providers in 5s |
 | `POST` | `/api/models/live/sync` | **New**: Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
 | `GET` | `/api/models/live` | **New**: Get live cache |
 | `GET` | `/api/models/health?model=` | Probe 1 model with chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |

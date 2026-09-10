@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 import { RefreshCw, Radio } from "lucide-react";
 import { useLang } from "../lib/i18n.tsx";
 import type { ApiLog, GatewayStats } from "../lib/api-types.ts";
@@ -24,20 +23,22 @@ export default function Logs() {
   useEffect(() => {
     if (!live) return;
     const key = mk();
+    const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     (async () => {
       try {
-        const res = await fetch("/api/logs/stream", { headers: { Authorization: `Bearer ${key}` } });
+        const res = await fetch("/api/logs/stream", { headers: { Authorization: `Bearer ${key}` }, signal: controller.signal });
         if (!res.body) return;
-        const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = "";
-        while (true) {
+        reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = "";
+        while (!controller.signal.aborted) {
           const { done, value } = await reader.read(); if (done) break;
           buf += decoder.decode(value, { stream: true }); const parts = buf.split("\n\n"); buf = parts.pop() || "";
           for (const p of parts) { const line = p.split("\n").find((l) => l.startsWith("data: ")); if (line) { try { const obj = JSON.parse(line.slice(6)); if (obj.id) setLogs((prev) => [obj, ...prev].slice(0, 100)); } catch { /* ignore */ } } }
         }
-      } catch { /* ignore */ }
+      } catch (e) { if ((e as Error).name === "AbortError") return; /* ignore */ }
     })();
     const timer = setInterval(load, 2000);
-    return () => clearInterval(timer);
+    return () => { controller.abort(); try { reader?.cancel().catch(() => {}); } catch { /* ignore */ } clearInterval(timer); };
   }, [live]);
 
   return (
@@ -64,34 +65,6 @@ export default function Logs() {
         </div>
         <span className="text-sky-300 font-mono">{Object.keys(stats?.logs?.byProvider||{}).length} providers</span>
       </div>
-
-      {stats?.logs && (
-        <>
-          <div className="grid md:grid-cols-3 gap-5">
-            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
-              <div className="flex items-center gap-2 mb-3"><div className="p-1.5 bg-blue-50 rounded-lg"><BarChart width={14} height={14} /></div><h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.requests_by_provider")}</h3></div>
-              {stats?.logs?.byProvider && Object.keys(stats.logs.byProvider).length > 0 ? (
-                <ResponsiveContainer width="100%" height={160}><BarChart data={Object.entries(stats.logs.byProvider).map(([name, v]) => ({ name, count: v as number }))}><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="count" fill="#2563eb" radius={[4,4,0,0]} /></BarChart></ResponsiveContainer>
-              ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
-            </div>
-            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
-              <div className="flex items-center gap-2 mb-3"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("dashboard.tokens_by_provider")}</h3></div>
-              {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
-                <ResponsiveContainer width="100%" height={160}><BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="tokens" fill="#9333ea" radius={[4,4,0,0]} /></BarChart></ResponsiveContainer>
-              ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
-            </div>
-            <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">{t("logs.status_distribution")}</h3>
-              {(stats?.logs?.total || 0) > 0 ? (
-                <ResponsiveContainer width="100%" height={160}><PieChart><Pie data={[{ name: "success", value: 100 - Math.round((stats.logs.errorRate || 0) * 100) }, { name: "error", value: Math.round((stats.logs.errorRate || 0) * 100) }]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label><Cell fill="#10b981" /><Cell fill="#ef4444" /></Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
-              ) : <p className="text-xs text-slate-400">{t("dashboard.no_data")}</p>}
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs text-xs">
-            <b>{t("logs.tokens")}</b> {(stats?.logs?.totalTokens ?? 0).toLocaleString()} last 100 ({(stats?.logs?.promptTokens ?? 0).toLocaleString()} prompt + {(stats?.logs?.completionTokens ?? 0).toLocaleString()} completion, avg {stats?.logs?.avgTokens ?? 0}/req) • <b>{t("logs.all_time")}</b> {(stats?.logs?.allTimeTokens ?? 0).toLocaleString()} • <b>{t("logs.by_provider")}</b> {Object.entries(stats?.logs?.tokensByProvider || {}).map(([k, v]) => `${k}:${(v as number).toLocaleString()}`).join(" • ") || "—"}
-          </div>
-        </>
-      )}
 
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">

@@ -1,12 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
-import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown, Settings as SettingsIcon } from "lucide-react";
+import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown, Settings as SettingsIcon, BarChart3 } from "lucide-react";
 import Dashboard from "./pages/Dashboard.tsx";
 import Models from "./pages/Models.tsx";
 import Providers from "./pages/Providers.tsx";
 import Keys from "./pages/Keys.tsx";
 import Logs from "./pages/Logs.tsx";
+import Usage from "./pages/Usage.tsx";
 import Settings from "./pages/Settings.tsx";
 import "./index.css";
 import { LangProvider, useLang } from "./lib/i18n.tsx";
@@ -82,6 +83,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     { to: "/providers", label: t("nav.providers"), icon: <Server className="w-4 h-4" />, badge: providersBadge },
     { to: "/models", label: t("nav.models"), icon: <Cpu className="w-4 h-4" />, badge: modelsBadge },
     { to: "/keys", label: t("nav.keys"), icon: <Key className="w-4 h-4" /> },
+    { to: "/usage", label: t("nav.usage"), icon: <BarChart3 className="w-4 h-4" /> },
     { to: "/logs", label: t("nav.logs"), icon: <ScrollText className="w-4 h-4" /> },
   ];
   const settingsNav = { to: "/settings", label: t("nav.settings"), icon: <SettingsIcon className="w-4 h-4" /> };
@@ -97,7 +99,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                   <Zap className="w-4 h-4 fill-white stroke-white" />
                 </div>
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors">Free LLM Gateway</span>
-                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.9.0</span>
+                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v0.10.0</span>
               </NavLink>
 
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs ${health === "ok" ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" : health === "down" ? "bg-rose-50 text-rose-700 border-rose-200/80" : "bg-slate-100 text-slate-600 border-slate-200/80"}`}>
@@ -240,6 +242,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/providers" element={<Providers />} />
           <Route path="/models" element={<Models />} />
           <Route path="/keys" element={<Keys />} />
+          <Route path="/usage" element={<Usage />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

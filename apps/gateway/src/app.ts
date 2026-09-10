@@ -69,7 +69,7 @@ export function createApp() {
   });
 
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.9.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "0.10.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
   app.get("/docs", (c) => c.html(`<!doctype html><html><head><title>Gateway Docs</title></head><body><h1>Gateway Docs</h1><p>See <a href="/README.md">README</a> and docs/API.md</p><pre>GET /v1/models\nPOST /v1/chat/completions\nPOST /v1/embeddings\nPOST /v1/images/generations\nPOST /v1/audio/transcriptions\nPOST /v1/audio/speech\nPOST /v1/responses\nPOST /v1/messages (Anthropic)\nGET /v1/health</pre></body></html>`));
 

@@ -2,10 +2,10 @@
 
 # Providers
 
-> **Historical source: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 41 IDs — live sync is now source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total).**  
-> Dashboard nav has **Providers (30) before Models (316)**. The **Get Key ↗** column (direct console + freellms ↗) lives in `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (30 URLs). Table **highlights hasRealKey**: `background #f0fdf4` + `borderLeft 3px #16a34a` + badge `● has key` green + `Keys` `✓ real` green + `Get Key` green when hasRealKey. **Top filter** debounce 400ms `q` + pill `hasKey`, **sticky bottom pagination** LOV 25/50 (no longer on top).  
+> **Historical source: freellms.org (scan 2026-09-06) — 30 providers, 316 free models, 41 IDs — live sync is now source of truth (2185 total / 882 free / 853 hasKey, `?hasKey=1` 2190 total) + 2 new providers B.AI/TokenHarbor → 51 IDs, 338 models (2026-09-10).**  
+> Dashboard nav has **Providers (51) before Models (338)**. The **Get Key ↗** column (direct console + freellms ↗) lives in `apps/web/src/pages/Providers.tsx:1` + `lib/getKeyUrls.ts:1` (32 URLs). Table **highlights hasRealKey**: `background #f0fdf4` + `borderLeft 3px #16a34a` + badge `● has key` green + `Keys` `✓ real` green + `Get Key` green when hasRealKey. **Top filter** debounce 400ms `q` + pill `hasKey`, **sticky bottom pagination** LOV 25/50 (no longer on top).  
 > Historical details: [`docs/FREELLMS_FREE_TIER.md`](FREELLMS_FREE_TIER.md) + `data/freellms-providers.json:1` / `data/freellms-models-free.json:1`; **live**: `data/live-models.json:1` / `GET /api/models/live` / `POST /api/models/live/sync`  
-> Gateway `apps/gateway/src/providers/registry.ts:1` holds 41 IDs (30 slugs + aliases), `models.yaml:1` has 316 free (snapshot), and `lib/paths.ts:1` fixes the 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
+> Gateway `apps/gateway/src/providers/registry.ts:1` holds 51 IDs (30 freellms slugs + 14 alias + 2 new + 2 B.AI alias + 1 TokenHarbor + 2 b-ai alias), `models.yaml:1` has 338 models (316 freellms + 14 KiraAI + 8 B.AI/TokenHarbor), and `lib/paths.ts:1` fixes the 7→316 bug, `middleware/rate-limit.ts:1` 4x list limit 200.
 
 ## 1. freellms.org Overview (historical) + live current
 
@@ -42,6 +42,8 @@
 | **Groq** | `groq` | `https://api.groq.com/openai/v1` | 7 / 23 total | live | 30 RPM/250 RPD primary, 14.4K RPD large | text,reasoning | `GROQ_API_KEYS` |
 | **OpenCode Zen** | `opencode` | `https://opencode.ai/zen/v1` | 8 | live | — | reasoning,vision | `OPENCODE_API_KEYS` |
 | **Ollama Cloud** | `ollama-cloud` | `https://api.ollama.com` | 3 / 8 total | live public | Session/weekly limits | text,reasoning | `OLLAMA_CLOUD_API_KEYS` |
+| **B.AI** | `b-ai` / `bai` / `chat-b-ai` | `https://api.b.ai/v1` | 4 (qwen3.8-flash, hy3, mimo-v2.5, glm-5.3-flash) | live 0 Credits (free) | 0 Credits, promo 10% after 2026-09-12 | text,reasoning,image,video | `BAI_API_KEYS` |
+| **TokenHarbor** | `tokenharbor` | `https://tokenharbor.ai/v1` | 3 + 1 reserved (`:free` tier: deepseek-v4.1-flash:free, deepseek-v4-flash:free, mimo-v2.5:free) | live Free (:free) | Free | text,reasoning,image,video | `TOKENHARBOR_API_KEYS` |
 | **Groq xAI** | `grok-xai` / `xai` | `https://api.x.ai/v1` | 2 | live | — | text | `GROK_API_KEYS` / `XAI_API_KEYS` |
 
 ### Quota / Trial (P1 — used after Permanent)

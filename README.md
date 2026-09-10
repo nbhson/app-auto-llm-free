@@ -5,12 +5,12 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Stack: Hono + Node](https://img.shields.io/badge/Stack-Hono%20%2B%20Node-green)](https://hono.dev)
 [![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-00c853)](docs/en/API.md)
-[![FREE](https://img.shields.io/badge/FREE-41_Providers-00c853?style=flat-square)](docs/en/PROVIDERS.md)
-[![FREE](https://img.shields.io/badge/FREE-324_Models-00c853?style=flat-square)](models.yaml)
+[![FREE](https://img.shields.io/badge/FREE-51_Providers-00c853?style=flat-square)](docs/en/PROVIDERS.md)
+[![FREE](https://img.shields.io/badge/FREE-338_Models-00c853?style=flat-square)](models.yaml)
 [![No Card](https://img.shields.io/badge/No_Card-29%2F30-3b82f6?style=flat-square)](docs/en/FREELLMS_FREE_TIER.md)
 
 > ### 🆓 **100% FREE — No Credit Card • No Trial • Forever**
-> **41 Providers • 324 Models (316 freellms free + 8 aliases) • One OpenAI-Compatible Endpoint** — Self-hosted, BYOK, costs you `$0`.
+> **51 Providers • 338 Models (316 freellms free + 8 aliases) • One OpenAI-Compatible Endpoint** — Self-hosted, BYOK, costs you `$0`.
 >
 > | Tier | Providers | Models | No Card |
 > |------|-----------|--------|---------|
@@ -37,13 +37,13 @@
 
 ---
 
-## 📸 Screenshots — Live Dashboard (30 providers • 316 free verified 24h)
+## 📸 Screenshots — Live Dashboard (30 freellms + 2 • 338 free verified 24h)
 
-| Providers — 41 IDs, tier, live health, `Get Key ↗` | Models — 324 (316 free + 8 aliases), live probe `Check Live`, `Hide 404` |
+| Providers — 51 IDs, tier, live health, `Get Key ↗` | Models — 338 (316 freellms + 14 KiraAI + 8 B.AI/TokenHarbor), live probe `Check Live`, `Hide 404` |
 |:---:|:---:|
-| ![Providers — 41 live, health 5s](docs/images/providers.png) | ![Models — 324 live verify](docs/images/models.png) |
+| ![Providers — 51 live, health 5s](docs/images/providers.png) | ![Models — 338 live verify](docs/images/models.png) |
 
-| Dashboard — 4 cards + 3 charts + tokens overview | Logs — request log with charts + SSE stream |
+| Dashboard — 4 cards + tokens overview | Logs — request log + SSE stream (charts moved to Usage) |
 |:---:|:---:|
 | ![Dashboard — 4 cards + 3 charts + tokens](docs/images/dashboard.png) | ![Logs — charts + SSE](docs/images/logs.png) |
 
@@ -54,11 +54,11 @@
 | Category | Features |
 |----------|----------|
 | **Unified OpenAI-Compatible API** | `POST /v1/chat/completions` (stream + non-stream), `/v1/models`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/responses`, `/v1/conversations`, `/v1/messages` (Anthropic) — drop-in for OpenAI SDK, Vercel AI, LangChain |
-| **41 Free Providers (324 Models)** | **Permanent Free (26)**: NVIDIA NIM (81+), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), OpenRouter (17), SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf…<br>**Quota Free (4)**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4)<br>**Scraped/Unlimited (3)**: Pollinations, LLM7.io, Ollama Cloud<br>**Custom Free (3)**: OrcaRouter, FreeAI, Cline |
+| **51 Free Providers (338 Models)** | **Permanent Free (28)**: NVIDIA NIM (81+), ModelScope (43), Cloudflare (35), Gemini (15), OVH (10), Cohere (10), OpenRouter (17), SambaNova, SiliconFlow, Groq, Cerebras, Z AI, Agnes, Aion, LLM7, Chutes, Glhf, **B.AI (4, 0 Credits)**, **TokenHarbor (3 :free + 1 reserved)**…<br>**Quota Free (4)**: GitHub Models (13), Mistral (9), Kilo Code (8), HuggingFace (4)<br>**Scraped/Unlimited (3)**: Pollinations, LLM7.io, Ollama Cloud<br>**Custom Free (3)**: OrcaRouter, FreeAI, Cline |
 | **Smart Routing & Fallback** | Tiered fallback (real key → public free), model aliases (`auto`, `gpt-4`, `glm`, `qwen`, `code` → best free), header `x-router` pin, skips `deprecated`/`quota`/`breaker`, `hasKey` filter |
 | **Resilience v2 (0.9.0)** | Shared `tryProviders` executor (6 routes), Redis Lua sliding-window quota/rate-limit (no boundary spikes), circuit breaker 5/30s half-open (5xx/429/exceptions only), TPM/RPM quotas (NVIDIA 40, Groq 30), mid-stream SSE, token pre-flight, persisted 404 strikethrough |
 | **Secure Key Management** | AES-256-GCM at-rest, BYOK, virtual keys `fgk-...` (scopes, RPM limits), `fgk-master-...` admin, key rotation script |
-| **Dashboard (5 Pages)** | **Dashboard**: 4 stat cards + 3 charts + token overview<br>**Providers**: pagination 25/50, sticky header, `hasKey` filter (default OFF), `Sync Live Now`, `Get Key ↗`, live health<br>**Models**: pagination 25/50, Filters dropdown (`hasKey` OFF, `Hide 404`/`credits`/`invalid` ON), `Check Live (n)`, `Sync Live Now`, `Refresh`, `Used/Limit`, persisted strikethrough via `POST /api/models/health/mark`<br>**Keys**: `fgk-...` CRUD + Generator + Quick Test<br>**Logs**: charts + SSE stream |
+| **Dashboard (6 Pages)** | **Dashboard**: 4 stat cards + token overview (charts moved to Usage)<br>**Providers**: pagination 25/50, sticky header, `hasKey` filter (default OFF), `Sync Live Now`, `Get Key ↗`, live health<br>**Models**: pagination 25/50, Filters dropdown (`hasKey` OFF, `Hide 404`/`credits`/`invalid` ON), `Check Live (n)`, `Sync Live Now`, `Refresh`, `Used/Limit`, persisted strikethrough via `POST /api/models/health/mark`<br>**Keys**: `fgk-...` CRUD + Generator + Quick Test<br>**Usage**: Provider topology (App centre + green animated line), tokens/requests by provider, status pie, SSE live, fetch-all pagination<br>**Logs**: request table + SSE stream (AbortController safe) |
 | **Vector 1+2 (2026-09-08)** | **Audio**: `POST /v1/audio/transcriptions|translations|speech` (Groq/Cerebras/OpenAI, multipart)<br>**Responses**: `POST /v1/responses` + `/v1/conversations` (Hebo, Open Responses API)<br>**Anthropic**: `POST /v1/messages` (Anthropic ↔ OpenAI, streaming, `tool_use` ↔ `tool_calls` preserved)<br>**Semantic Cache**: `SEMANTIC_CACHE_ENABLED=0`, threshold 0.92, TTL 3600s, Cohere embeddings, cosine similarity, Redis/in-memory, parallel embedding fallbacks<br>**Compression**: `COMPRESSION_ENABLED=0`, query-aware `relevanceKeep` (BM25-lite), tools minify, normalized code dedup<br>**Cost Routing**: `COST_ROUTING_ENABLED=0`, score = cost×5 + latency×0.0005 − headroom×0.3 − success×2, `SUCCESS_WEIGHT=2`<br>**Analytics**: `ANALYTICS_RETENTION_DAYS=30`, `costByProvider`, `cacheHitRate`, `p95`, `errorsByProvider`, `GET /api/analytics/*` |
 | **Observability** | Pino pretty logs, OpenTelemetry GenAI (`gen_ai.*`), token estimator, request log (1000 entries + `X-Verified`), provider benchmark `PROVIDER_TEST_RESULTS` |
 
@@ -259,12 +259,12 @@ curl -X POST http://localhost:7373/api/keys \
 
 ## 🗺️ Roadmap
 
-- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (41 ids, live models, pagination 25/50)
+- [x] **P1 Scaffold** — Hono + Vite + Drizzle + Docker (51 ids, live models, pagination 25/50)
 - [x] **Freellms Sync** — Historical snapshot (now disabled, live is source)
 - [x] **P2 Gateway Core** ✅ Done — 30 adapters, streaming SSE, `auto` 15-tier, `x-router` pin, sanitize spaces
 - [x] **P3 Resilience** ✅ Done — key-manager AES-GCM, quota RPM/TPM, breaker 5/30s, health 41, persisted 404 strikethrough + disable
 - [x] **P7 Resilience v2 (0.9.0)** ✅ Done 2026-09-09 — shared `tryProviders` executor, Redis sliding-window quota/rate-limit, query-aware compression, cost routing by success-rate, tool_use preserved, 232 tests
-- [x] **P4 Auth + Dashboard** ✅ Done — `fgk-...` CRUD, rate-limit, request-log SSE, Dashboard 5 routes with hasKey + Hide 404 + Sync Live
+- [x] **P4 Auth + Dashboard** ✅ Done — `fgk-...` CRUD, rate-limit, request-log SSE, Dashboard 6 routes with hasKey + Hide 404 + Sync Live
 - [x] **P5 Hardening** ✅ Done — `wrangler.jsonc`, Dockerfile prod, OTel, i18n VI/EN (UI + docs/vi docs/en)
 - [x] **P6 Vector 1+2** ✅ Done 2026-09-08 — `/v1/audio/*` (transcriptions/translations/speech) + `/responses`/`/conversations` (Hebo) + `/v1/messages` (Anthropic) + semantic cache (`SEMANTIC_CACHE_ENABLED`/`SEMANTIC_THRESHOLD=0.92`/`CACHE_TTL_S=3600`/`cohere/embed-english-v3.0`) + compression (`COMPRESSION_ENABLED`) + cost routing (`COST_ROUTING_ENABLED`) + analytics (`costByProvider`/`cacheHitRate`/`p95`, `ANALYTICS_RETENTION_DAYS=30`)
 

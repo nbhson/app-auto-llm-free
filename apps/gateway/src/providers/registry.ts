@@ -33,7 +33,11 @@ export const providers: Record<string, Provider> = {
   "llm7-io": OPENAI({ id: "llm7-io", baseUrl: "https://api.llm7.io/v1" }), // 6
   "agnes-ai": OPENAI({ id: "agnes-ai", baseUrl: "https://apihub.agnes-ai.com/v1" }), // 5, 30 RPM
   "aion-labs": OPENAI({ id: "aion-labs", baseUrl: "https://api.aionlabs.ai/v1" }), // 5
+  "b-ai": OPENAI({ id: "b-ai", baseUrl: "https://api.b.ai/v1" }), // 4 free: qwen3.8-flash, hy3, mimo-v2.5, glm-5.3-flash (https://chat.b.ai/key, https://docs.b.ai/llmservice/promotions-and-pricing-notices 2026-09)
+  tokenharbor: OPENAI({ id: "tokenharbor", baseUrl: "https://tokenharbor.ai/v1" }), // 3 free :free tier — deepseek-v4.1-flash:free, deepseek-v4-flash:free, mimo-v2.5:free (https://tokenharbor.ai/models?category=free 2026-09, 4th slot reserved for future free)
   "z-ai-zhipu-ai": OPENAI({ id: "z-ai-zhipu-ai", baseUrl: "https://open.bigmodel.cn/api/paas/v4" }), // 4 GLM
+  bai: OPENAI({ id: "b-ai", baseUrl: "https://api.b.ai/v1" }), // alias without hyphen for chat.b.ai
+  "chat-b-ai": OPENAI({ id: "b-ai", baseUrl: "https://api.b.ai/v1" }), // alias full domain
   "experientiallabs": OPENAI({ id: "experientiallabs", baseUrl: "https://api.experientiallabs.ai/v1" }), // 3 free promotional (qwen3.8-27b, deepseek-v4-flash, gpt-5.6-luna) — OpenAI compatible
   kiraai: OPENAI({ id: "kiraai", baseUrl: "https://kiraai.vn/api/v1" }), // KiraAI Vietnam — OpenAI compatible, 150M free tokens/day (kira-mini-1.0 + Kira family)
   kira: OPENAI({ id: "kiraai", baseUrl: "https://kiraai.vn/api/v1" }), // alias
@@ -90,6 +94,10 @@ export const providerMeta: Record<string, { name: string; tier: string; tier_typ
   "agnes-ai": { name: "Agnes AI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","vision"], noCard: true },
   "aion-labs": { name: "Aion Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text"], noCard: true },
   "z-ai-zhipu-ai": { name: "Z AI (Zhipu AI)", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning"], noCard: true },
+  "b-ai": { name: "B.AI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  bai: { name: "B.AI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  "chat-b-ai": { name: "B.AI", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
+  tokenharbor: { name: "TokenHarbor", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   experientiallabs: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   experiential: { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
   "experiential-cloud": { name: "Experiential Labs", tier: "Permanent Free", tier_type: "permanent", caps: ["text","reasoning","image","video"], noCard: true },
@@ -134,6 +142,8 @@ export const modelAliases: Record<string, string[]> = {
     "modelscope",
     "freeai",
     "cline",
+    "b-ai",
+    "tokenharbor",
   ],
   // Experiential Labs — promotional free (https://platform.experientiallabs.ai/models)
   "qwen3.8-27b": ["experientiallabs", "orcarouter", "modelscope"],
@@ -184,6 +194,23 @@ export const modelAliases: Record<string, string[]> = {
   "kiraai/kira-2.5-flash": ["kiraai"],
   kira: ["kiraai"],
   kiraai: ["kiraai"],
+  // B.AI — 4 free (https://chat.b.ai/key, https://docs.b.ai/llmservice/promotions-and-pricing-notices)
+  "qwen3.8-flash": ["b-ai"],
+  "qwen3-8-flash": ["b-ai"],
+  "hy3": ["b-ai"],
+  "mimo-v2.5": ["b-ai", "tokenharbor"],
+  "b-ai/qwen3.8-flash": ["b-ai"],
+  "b-ai/qwen3-8-flash": ["b-ai"],
+  "b-ai/hy3": ["b-ai"],
+  "b-ai/mimo-v2.5": ["b-ai"],
+  "b-ai/glm-5.3-flash": ["b-ai"],
+  // TokenHarbor — 3 :free tier (https://tokenharbor.ai/models?category=free)
+  "deepseek-v4.1-flash:free": ["tokenharbor"],
+  "deepseek-v4-flash:free": ["tokenharbor"],
+  "mimo-v2.5:free": ["tokenharbor", "b-ai"],
+  "tokenharbor/deepseek-v4.1-flash:free": ["tokenharbor"],
+  "tokenharbor/deepseek-v4-flash:free": ["tokenharbor"],
+  "tokenharbor/mimo-v2.5:free": ["tokenharbor"],
   // Opencode custom — agnes
   "agnes-2.5-flash": ["agnes-ai"],
   // Opencode custom — openrouter free tier
@@ -216,7 +243,7 @@ export const modelAliases: Record<string, string[]> = {
   "nemotron-3-ultra-free": ["opencode", "nvidia-nim"],
   "mimo-v2.5-free": ["opencode", "kiraai"],
   "ling-3.0-flash-fin-free": ["opencode", "kilo-code"],
-  "glm-5.3-flash": ["cline", "z-ai-zhipu-ai"],
+  "glm-5.3-flash": ["b-ai", "cline", "z-ai-zhipu-ai"],
   // Google custom gemini
   "gemini-3.5-flash-lite": ["google-gemini"],
   "gemini-3.1-flash-lite-preview": ["google-gemini", "llm7-io"],

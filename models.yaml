@@ -1,4 +1,4 @@
-# Auto-generated from freellms.org — 316 free models + 3 Experiential Labs promotional free (https://platform.experientiallabs.ai/models) + 20 KiraAI Vietnam (https://kiraai.vn/api/v1) (2026-09-06)
+# Auto-generated from freellms.org — 316 free models + 3 Experiential Labs promotional free (https://platform.experientiallabs.ai/models) + 20 KiraAI Vietnam (https://kiraai.vn/api/v1) + 4 B.AI (https://chat.b.ai/key, https://api.b.ai/v1) + 4 TokenHarbor (https://tokenharbor.ai/v1, https://tokenharbor.ai/models?category=free) (2026-09-10)
 # Source: data/freellms-models-free.json
 models:
   - id: "nvidia-nim/z-ai/glm-5.2"
@@ -3193,4 +3193,87 @@ models:
     no_card: true
     capabilities: [text, reasoning]
     limit: "150M free tokens/day"
+  # === B.AI — 4 free (https://chat.b.ai/key, https://docs.b.ai/llmservice/promotions-and-pricing-notices 2026-09-10, baseUrl https://api.b.ai/v1) ===
+  - id: "b-ai/qwen3.8-flash"
+    display_name: "qwen3.8-flash"
+    provider: b-ai
+    context_length: 131072
+    score: 72
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning, image, video]
+    limit: "0 Credits (free)"
+  - id: "b-ai/hy3"
+    display_name: "hy3"
+    provider: b-ai
+    context_length: 131072
+    score: 71
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "0 Credits (free)"
+  - id: "b-ai/mimo-v2.5"
+    display_name: "mimo-v2.5"
+    provider: b-ai
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image, audio, video, reasoning]
+    limit: "0 Credits (free)"
+  - id: "b-ai/glm-5.3-flash"
+    display_name: "glm-5.3-flash"
+    provider: b-ai
+    context_length: 131072
+    score: 69
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning, image]
+    limit: "0 Credits (free, promo 10% after Sep 12 2026)"
+  # === TokenHarbor — 3 :free tier (https://tokenharbor.ai/models?category=free 2026-09-10, baseUrl https://tokenharbor.ai/v1) ===
+  # TokenHarbor page currently lists 3 free :free IDs; a 4th free slot is reserved — add here when new :free appears.
+  - id: "tokenharbor/deepseek-v4.1-flash:free"
+    display_name: "deepseek-v4.1-flash:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 68
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Free (:free tier)"
+  - id: "tokenharbor/deepseek-v4-flash:free"
+    display_name: "deepseek-v4-flash:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 67
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "Free (:free tier)"
+  - id: "tokenharbor/mimo-v2.5:free"
+    display_name: "mimo-v2.5:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 66
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, image, audio, video, reasoning]
+    limit: "Free (:free tier)"
+  - id: "tokenharbor/qwen3.8-flash:free"
+    display_name: "qwen3.8-flash:free"
+    provider: tokenharbor
+    context_length: 131072
+    score: 65
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning, image, video]
+    limit: "Free (:free tier, reserved slot — pending live verification)"
 

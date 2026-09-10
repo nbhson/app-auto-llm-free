@@ -225,24 +225,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /><h3 className="text-sm font-bold text-slate-900">{t("dashboard.tokens_by_provider")}</h3></div>
-          <span className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/70">{Object.keys(stats?.logs?.tokensByProvider||{}).length} providers</span>
-        </div>
-        {stats?.logs?.tokensByProvider && Object.keys(stats.logs.tokensByProvider).length > 0 ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={Object.entries(stats.logs.tokensByProvider).map(([name, v]) => ({ name, tokens: v as number }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="tokens" fill="#9333ea" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : <p className="text-xs text-slate-400">{t("dashboard.no_tokens")}</p>}
-      </div>
-
       {showSidebar && (
         <>
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40" onClick={() => setShowSidebar(false)} />
