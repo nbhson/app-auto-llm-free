@@ -39,6 +39,36 @@ function loadProvidersJson(): FreellmsProviderEntry[] {
 
 export const apiRoute = new Hono();
 
+apiRoute.get("/sync/status", async (c) => {
+  try {
+    const { getFingerprintState, getNewestProviders } = await import("../jobs/boot-sync.js");
+    const state = getFingerprintState();
+    const live = readDataJson<{ total?: number; providers?: number; generated_at?: string | null; models?: unknown[] } | null>("live-models.json", null);
+    const newest = getNewestProviders(5);
+    return c.json({
+      fingerprint: state,
+      newestProviders: newest,
+      lastAdded: state?.lastAdded || [],
+      lastAddedAt: state?.lastAddedAt || null,
+      bootSync: state?.bootSync || null,
+      liveModels: live ? { total: live.total || 0, providers: live.providers || 0, generated_at: live.generated_at || null } : null,
+      hasRealKeyCount: Object.values(state?.providers || {}).filter((v) => (v as { hasKey: boolean }).hasKey).length,
+    });
+  } catch (e) {
+    return c.json({ error: errMessage(e) }, 500);
+  }
+});
+apiRoute.post("/sync/boot", async (c) => {
+  try {
+    const { runBootSync } = await import("../jobs/boot-sync.js");
+    const body = await c.req.json().catch(() => ({} as { force?: boolean }));
+    const res = await runBootSync({ force: !!body.force, reason: body.force ? "manual_force" : "manual" });
+    return c.json(res);
+  } catch (e) {
+    return c.json({ error: errMessage(e) }, 500);
+  }
+});
+
 apiRoute.get("/providers", (c) => {
   const freellms = loadProvidersJson();
   const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
@@ -64,6 +94,14 @@ apiRoute.get("/providers", (c) => {
       for (const [k, v] of providerCounts) if (!freellms.find((x) => x.slug === k)) countBySlug.set(k, v);
     }
   } catch { /* ignore */ }
+  // fingerprint for newest provider tracking (sau khi update .env và restart)
+  let fingerprint: Record<string, { hasKey: boolean; addedAt?: string }> = {};
+  let newestSet = new Set<string>();
+  try {
+    const data = readDataJson<{ providers?: Record<string, { hasKey: boolean; addedAt?: string }>; lastAdded?: string[] } | null>(".provider-fingerprint.json", null);
+    if (data?.providers) fingerprint = data.providers;
+    if (data?.lastAdded) newestSet = new Set(data.lastAdded);
+  } catch { /* ignore */ }
   let detailed = providerIds.map((id) => {
     const meta = providerMeta[id] || { name: id, tier: "", tier_type: "", caps: [], noCard: true };
     const fre = freellms.find((x: { slug?: string; name?: string; tier?: string; tier_type?: string; caps?: string[]; noCard?: boolean; baseUrl?: string; free_models?: number; total_models?: number }) => x.slug === id);
@@ -76,6 +114,7 @@ apiRoute.get("/providers", (c) => {
     const fallbackBaseUrl = (fre as { baseUrl?: string } | undefined)?.baseUrl || registryBase || "";
     const fallbackFree = fre?.free_models ?? (countBySlug.get(id) ?? 0);
     const fallbackTotal = fre?.total_models ?? fallbackFree;
+    const fp = fingerprint[id];
     return {
       id,
       name: meta.name || fre?.name || id,
@@ -89,6 +128,8 @@ apiRoute.get("/providers", (c) => {
       keys: keys.length > 0 ? `${keys.length} keys` : "none",
       hasRealKey: hasReal,
       status: keys.length > 0 || id === "pollinations" ? "ready" : "no-key",
+      addedAt: fp?.addedAt || null,
+      isNewest: newestSet.has(id),
     };
   });
   const hasKeyOnly = c.req.query("hasKey") === "1" || c.req.query("has_key") === "1";
@@ -102,6 +143,12 @@ apiRoute.get("/providers", (c) => {
   const offset = (curPage - 1) * limit;
   const paginated = detailed.slice(offset, offset + limit);
 
+  // expose newest for Usage chart auto-highlight
+  let syncInfo: { lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: unknown } | null = null;
+  try {
+    const fpRaw = readDataJson<{ lastAdded?: string[]; lastAddedAt?: string; bootSync?: unknown } | null>(".provider-fingerprint.json", null);
+    if (fpRaw) syncInfo = { lastAdded: fpRaw.lastAdded, lastAddedAt: fpRaw.lastAddedAt || null, bootSync: fpRaw.bootSync };
+  } catch { /* ignore */ }
   return c.json({
     providers: providerIds,
     count: providerIds.length,
@@ -114,6 +161,7 @@ apiRoute.get("/providers", (c) => {
     detailed: paginated,
     pagination: { page: curPage, limit, total, total_pages: totalPages, has_next: curPage < totalPages, has_prev: curPage > 1 },
     filters: { q: q || null, hasKey: hasKeyOnly || false },
+    sync: syncInfo,
   });
 });
 

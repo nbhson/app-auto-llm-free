@@ -5,6 +5,7 @@ import { config } from "../config.js";
 import fs from "node:fs";
 import { resolveDataPath } from "../lib/paths.js";
 import { errMessage } from "../lib/types.js";
+import { runBootSync } from "./boot-sync.js";
 
 const INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS || "86400000", 10); // 24h
 const VERIFIED_PATH = resolveDataPath("verified-models.json");
@@ -39,22 +40,43 @@ export function startScheduler() {
       } catch { /* ignore */ }
     }, 6 * 60 * 60 * 1000);
   }
-  // Run once at startup if stale
-  if (isStale()) {
-    logger.info({ interval: INTERVAL_MS }, "scheduler: verified-models.json stale, running verify in 5s");
-    setTimeout(async () => {
-      try {
+  // Boot-sync: always check for new providers added via .env and auto-sync live models
+  // This ensures sau khi update .env và restart gateway thì Providers/Models/Usage tự động cập nhật
+  setTimeout(async () => {
+    try {
+      const res = await runBootSync();
+      if (res.synced) {
+        logger.info({ total: res.total, providers: res.providers, newlyAdded: res.newlyAdded }, "scheduler: boot-sync live done");
+      } else if (res.newlyAdded.length === 0 && isStale()) {
+        // fallback: stale verify path when no new provider but data old
+        logger.info({ interval: INTERVAL_MS }, "scheduler: verified-models.json stale, running verify (boot-sync skipped, no new provider)");
         const report = await verifyFreeModels({ dryRun: false });
         await saveVerifyReport(report);
         try { await syncLiveModels(); } catch { /* ignore */ }
-        logger.info("scheduler: initial verify done");
-      } catch (e) {
-        logger.error({ err: errMessage(e) }, "scheduler: initial verify failed");
+        logger.info("scheduler: initial verify done (stale fallback)");
+      } else {
+        logger.info({ reason: res.reason }, "scheduler: boot-sync skipped");
+        if (isStale()) {
+          logger.info("scheduler: verified-models.json stale but boot-sync says no change — running verify anyway");
+          const report = await verifyFreeModels({ dryRun: false });
+          await saveVerifyReport(report);
+          logger.info("scheduler: stale verify done");
+        } else {
+          logger.info("scheduler: verified-models.json fresh, skipping verify");
+        }
       }
-    }, 5000);
-  } else {
-    logger.info("scheduler: verified-models.json fresh, skipping initial verify");
-  }
+    } catch (e) {
+      logger.error({ err: errMessage(e) }, "scheduler: boot-sync failed");
+      // fallback to old behavior
+      if (isStale()) {
+        try {
+          const report = await verifyFreeModels({ dryRun: false });
+          await saveVerifyReport(report);
+          try { await syncLiveModels(); } catch { /* ignore */ }
+        } catch (ee) { logger.error({ err: errMessage(ee) }, "scheduler: fallback verify failed"); }
+      }
+    }
+  }, 3000);
 
   // Then every 24h
   setInterval(async () => {

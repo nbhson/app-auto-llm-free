@@ -11,6 +11,14 @@ interface ProvidersPayload {
   pagination?: { page: number; limit: number; total: number; total_pages: number; has_next?: boolean; has_prev?: boolean };
   count?: number;
   tiers?: unknown;
+  sync?: { lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string; at?: string; total?: number; providers?: number } };
+}
+interface SyncStatus {
+  newestProviders?: string[];
+  lastAdded?: string[];
+  lastAddedAt?: string | null;
+  bootSync?: { status?: string; at?: string; total?: number; providers?: number; error?: string };
+  liveModels?: { total?: number; providers?: number; generated_at?: string | null } | null;
 }
 
 interface HealthPayload {
@@ -33,6 +41,8 @@ export default function Providers() {
   });
   const [syncing, setSyncing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [autoSyncing, setAutoSyncing] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q), 400);
@@ -78,6 +88,38 @@ export default function Providers() {
   useEffect(() => { load(); }, [qDebounced, hasKeyOnly]);
   useEffect(() => { localStorage.setItem("hasKeyOnly", hasKeyOnly ? "1" : "0"); }, [hasKeyOnly]);
 
+  // Auto-sync: poll /api/sync/status và tự reload providers khi gateway vừa restart + boot-sync xong
+  useEffect(() => {
+    const fetchSync = async () => {
+      try {
+        const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
+        if (!r.ok) return;
+        const j = (await r.json()) as SyncStatus;
+        setSyncStatus(j);
+        if (j.bootSync?.status === "running") setAutoSyncing(true);
+        else setAutoSyncing(false);
+        // nếu có lastAdded mới, tự reload danh sách providers
+        if (j.lastAdded && j.lastAdded.length > 0) {
+          // trigger reload nếu chưa có hoặc khác
+        }
+      } catch { /* ignore */ }
+    };
+    fetchSync();
+    const id = setInterval(fetchSync, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Tự động poll providers để bắt provider mới sau khi update .env + restart gateway (không cần F5)
+  useEffect(() => {
+    const id = setInterval(() => {
+      // chỉ poll khi tab visible để tránh spam
+      if (document.visibilityState === "visible") load();
+    }, 8000);
+    const onVis = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
+  }, [qDebounced, hasKeyOnly]);
+
   const toggleSort = (col: string) => setSort((prev) => (prev.col === col ? { col, dir: prev.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "provider" ? "asc" : "desc" }));
 
   const sorted = [...(data?.detailed || [])].sort((a, b) => {
@@ -98,7 +140,8 @@ export default function Providers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("providers.title")} <span className="text-slate-500 font-mono text-lg">({data?.pagination?.total ?? data?.count ?? sorted.length})</span></h1>
-          <p className="text-sm text-slate-500 mt-0.5">{t("providers.subtitle")}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("providers.subtitle")} {syncStatus?.lastAdded?.length ? <span className="ml-2 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">NEW: {syncStatus.lastAdded.join(", ")}</span> : null} {autoSyncing && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 animate-spin" /> boot-sync…</span>}</p>
+          {syncStatus?.liveModels && <p className="text-[11px] font-mono text-slate-400 mt-1">live-models: {syncStatus.liveModels.total ?? 0} models • {syncStatus.liveModels.providers ?? 0} providers • {syncStatus.liveModels.generated_at ? new Date(syncStatus.liveModels.generated_at).toLocaleString() : "—"} {syncStatus.bootSync?.status ? `• bootSync: ${syncStatus.bootSync.status}` : ""}</p>}
         </div>
       </div>
 
@@ -178,8 +221,9 @@ export default function Providers() {
               const h = health?.providers?.find((x) => (x as unknown as Record<string, unknown>).id === p.id) as unknown as ApiHealth & { status?: string; latency_ms?: number; breaker?: string } | undefined;
               const baseUrl = p.baseUrl || getBaseUrl(p.id);
               const hasKey = p.hasRealKey;
+              const isNewest = Boolean((p as unknown as { isNewest?: boolean }).isNewest) || Boolean(syncStatus?.lastAdded?.includes(p.id));
               return (
-                <div key={p.id} className={`bg-white rounded-xl border shadow-2xs overflow-hidden flex flex-col transition-colors ${hasKey ? "border-emerald-200 bg-emerald-50/20" : "border-slate-200/90"}`} style={hasKey ? { borderLeft: "3px solid #10b981" } : {}}>
+                <div key={p.id} className={`bg-white rounded-xl border shadow-2xs overflow-hidden flex flex-col transition-colors ${isNewest ? "border-violet-300 bg-violet-50/30 ring-1 ring-violet-200" : hasKey ? "border-emerald-200 bg-emerald-50/20" : "border-slate-200/90"}`} style={isNewest ? { borderLeft: "3px solid #8b5cf6" } : hasKey ? { borderLeft: "3px solid #10b981" } : {}}>
                   {/* header */}
                   <div className="px-4 pt-4 pb-3">
                     <div className="flex items-start justify-between gap-2">
@@ -189,7 +233,11 @@ export default function Providers() {
                       </div>
                       <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border ${p.tier_type === "permanent" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>{p.tier || p.tier_type || "—"}</span>
                     </div>
-                    {hasKey && <span className="mt-2 inline-block text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">● has key</span>}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {hasKey && <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">● has key</span>}
+                      {isNewest && <span className="inline-block text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full border border-violet-200 animate-pulse">★ NEW</span>}
+                      {(p as unknown as { addedAt?: string }).addedAt && <span className="text-[10px] font-mono text-slate-400">{new Date((p as unknown as { addedAt: string }).addedAt).toLocaleDateString()}</span>}
+                    </div>
                   </div>
 
                   <div className="px-4 pb-4 space-y-3 flex-1 flex flex-col">

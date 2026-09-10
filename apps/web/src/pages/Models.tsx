@@ -57,6 +57,7 @@ export default function Models() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [allProviders, setAllProviders] = useState<ApiProvider[]>([]);
+  const [syncStatus, setSyncStatus] = useState<{ lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string; total?: number }; liveModels?: { total?: number; generated_at?: string | null } } | null>(null);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 400); return () => clearTimeout(id); }, [q]);
   useEffect(() => { const id = setTimeout(() => setProviderDebounced(provider.trim()), 400); return () => clearTimeout(id); }, [provider]);
@@ -87,6 +88,33 @@ export default function Models() {
     }).catch(() => {});
   };
   useEffect(() => { fetchModels(); fetchUsage(); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
+
+  // Auto-sync: poll sync status để tự reload models khi boot-sync vừa thêm provider mới (sau khi update .env + restart)
+  useEffect(() => {
+    const fetchSync = async () => {
+      try {
+        const r = await fetch("/api/sync/status", { headers: { Authorization: `Bearer ${mk()}` } });
+        if (!r.ok) return;
+        const j = await r.json();
+        const prev = syncStatus?.liveModels?.generated_at;
+        setSyncStatus(j);
+        // nếu liveModels mới hơn lần trước thì tự fetchModels
+        if (j.liveModels?.generated_at && prev && j.liveModels.generated_at !== prev) {
+          fetchModels();
+        } else if (!prev && j.liveModels?.generated_at) {
+          // first load, if has lastAdded, reload to show new models
+          if (j.lastAdded?.length) fetchModels();
+        }
+      } catch { /* ignore */ }
+    };
+    fetchSync();
+    const id = setInterval(fetchSync, 6000);
+    // cũng poll models định kỳ để bắt provider mới (khi tab visible)
+    const id2 = setInterval(() => { if (document.visibilityState === "visible") fetchModels(); }, 10000);
+    const onVis = () => { if (document.visibilityState === "visible") { fetchSync(); fetchModels(); } };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(id); clearInterval(id2); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
   useEffect(() => { setSelected(new Set()); }, [verified, qDebounced, providerDebounced, hasKeyOnly, hide404, hidePayment, hideInvalid]);
   useEffect(() => { localStorage.setItem("hide404", hide404 ? "1" : "0"); }, [hide404]);
   useEffect(() => { localStorage.setItem("hidePayment", hidePayment ? "1" : "0"); }, [hidePayment]);
@@ -252,6 +280,9 @@ export default function Models() {
       <div className="flex items-baseline gap-3 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("models.title")} <span className="text-sm font-mono font-semibold bg-white border border-slate-200 px-2.5 py-0.5 rounded-full">{visible.length}</span></h1>
         <span className="text-xs text-slate-500 font-mono">{visible.length} models</span>
+        {syncStatus?.lastAdded?.length ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">NEW provider: {syncStatus.lastAdded.join(", ")}</span> : null}
+        {syncStatus?.bootSync?.status === "running" && <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-1 rounded-full"><RefreshCw className="w-3 h-3 animate-spin" /> auto syncing…</span>}
+        {syncStatus?.liveModels && <span className="text-[11px] font-mono text-slate-400">live: {syncStatus.liveModels.total ?? 0} • {syncStatus.liveModels.generated_at ? new Date(syncStatus.liveModels.generated_at).toLocaleTimeString() : ""}</span>}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3">

@@ -22,6 +22,8 @@ export default function Usage() {
   const [providers, setProviders] = useState<ApiProvider[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [live, setLive] = useState(true);
+  const [newestProviders, setNewestProviders] = useState<string[]>([]);
+  const [syncInfo, setSyncInfo] = useState<{ lastAdded?: string[]; lastAddedAt?: string | null; bootSync?: { status?: string } } | null>(null);
   const activeTimerRef = useRef<number | null>(null);
   const prevLogIdRef = useRef<string | null>(null);
 
@@ -41,13 +43,32 @@ export default function Usage() {
         }
       }
     }).catch(() => {});
+    // fetch sync status để biết provider mới nhất (sau khi update .env + restart gateway)
+    fetch("/api/sync/status", { headers: { Authorization: `Bearer ${key}` } }).then((r) => r.ok ? r.json() : null).then((d) => {
+      if (d?.newestProviders) setNewestProviders(d.newestProviders);
+      else if (d?.lastAdded) setNewestProviders(d.lastAdded);
+      if (d) setSyncInfo({ lastAdded: d.lastAdded, lastAddedAt: d.lastAddedAt, bootSync: d.bootSync });
+      // nếu có provider mới nhất mà chưa có activeProvider (idle), highlight newest làm active tạm thời
+      if (d?.lastAdded?.length && !activeProvider) {
+        const newest = d.lastAdded[0];
+        // chỉ highlight nếu newest thực sự có key và chưa có log active
+        if (newest) {
+          // set activeProvider briefly to show topology line animation cho provider mới nhất
+          setActiveProvider((prev) => prev || newest);
+          if (activeTimerRef.current) window.clearTimeout(activeTimerRef.current);
+          activeTimerRef.current = window.setTimeout(() => setActiveProvider(null), 4000);
+        }
+      }
+    }).catch(() => {});
     // API chỉ cho limit 25/50 => phải fetch đủ 2 trang để lấy hết ~48 providers (bug cũ: limit=100 bị fallback về 25 nên chỉ hiện 7/13)
     const fetchAllProviders = async () => {
       try {
         const r1 = await fetch("/api/providers?limit=50&page=1", { headers: { Authorization: `Bearer ${key}` } });
         if (!r1.ok) return;
-        const d1 = (await r1.json()) as ProvidersPayload & { pagination?: { total_pages: number; total: number } };
+        const d1 = (await r1.json()) as ProvidersPayload & { pagination?: { total_pages: number; total: number }; sync?: { lastAdded?: string[]; lastAddedAt?: string | null } };
         let all: ApiProvider[] = d1.detailed || [];
+        // capture sync info from providers payload nếu có
+        if (d1.sync?.lastAdded) { setNewestProviders(d1.sync.lastAdded); setSyncInfo((prev) => prev || { lastAdded: d1.sync!.lastAdded, lastAddedAt: d1.sync!.lastAddedAt || null }); }
         const totalPages = d1.pagination?.total_pages || 1;
         if (totalPages > 1) {
           for (let p = 2; p <= totalPages; p++) {
@@ -112,8 +133,18 @@ export default function Usage() {
 
   const usableProviders = providers.filter((p) => p.hasRealKey || isPublicProvider(p.id));
   const displayProviders = usableProviders.length > 0 ? usableProviders : providers.slice(0, 12);
-  // sort: hasRealKey first, then public, then alphabetical
+  // sort: newestProviders first (provider vừa được cấp key mới nhất), rồi hasRealKey, rồi public, rồi alphabetical
+  const newestSet = new Set(newestProviders);
   const sortedProviders = [...displayProviders].sort((a, b) => {
+    const aNew = newestSet.has(a.id) ? 1 : 0;
+    const bNew = newestSet.has(b.id) ? 1 : 0;
+    if (aNew !== bNew) return bNew - aNew;
+    // nếu cùng newest, sort theo thời gian addedAt mới nhất trước
+    if (aNew && bNew) {
+      const aIdx = newestProviders.indexOf(a.id);
+      const bIdx = newestProviders.indexOf(b.id);
+      if (aIdx !== bIdx) return aIdx - bIdx;
+    }
     const aScore = a.hasRealKey ? 2 : isPublicProvider(a.id) ? 1 : 0;
     const bScore = b.hasRealKey ? 2 : isPublicProvider(b.id) ? 1 : 0;
     if (aScore !== bScore) return bScore - aScore;
@@ -167,14 +198,16 @@ export default function Usage() {
         </div>
 
         <div className="p-4 sm:p-6">
+          {syncInfo?.lastAdded?.length ? <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-full"><Sparkles className="w-3.5 h-3.5" /> NEW provider: {syncInfo.lastAdded.join(", ")} {syncInfo.lastAddedAt ? `• ${new Date(syncInfo.lastAddedAt).toLocaleString()}` : ""} {syncInfo.bootSync?.status ? `• bootSync: ${syncInfo.bootSync.status}` : ""}</div> : null}
           {topologyProviders.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-12">{t("dashboard.no_data")}</p>
           ) : (
-            <ProviderTopology providers={topologyProviders} activeProvider={activeProvider} logs={logs} />
+            <ProviderTopology providers={topologyProviders} activeProvider={activeProvider} newestProviders={newestProviders} logs={logs} />
           )}
           <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-medium">
             <span className="text-slate-500">Showing {topologyProviders.length} providers ({usableProviders.length} usable) • total {providers.length}</span>
             {topologyProviders.length < sortedProviders.length && <span className="text-amber-600">• showing top 16</span>}
+            {newestProviders.length > 0 && <span className="text-violet-600">• newest: {newestProviders.join(", ")}</span>}
           </div>
         </div>
       </div>
@@ -211,7 +244,7 @@ export default function Usage() {
   );
 }
 
-function ProviderTopology({ providers, activeProvider, logs }: { providers: ApiProvider[]; activeProvider: string | null; logs: ApiLog[] }) {
+function ProviderTopology({ providers, activeProvider, newestProviders, logs }: { providers: ApiProvider[]; activeProvider: string | null; newestProviders?: string[]; logs: ApiLog[] }) {
   const n = providers.length;
   const width = 800;
   const height = 400;
@@ -253,8 +286,9 @@ function ProviderTopology({ providers, activeProvider, logs }: { providers: ApiP
           const isActive = activeProvider === p.id;
           const isPublic = isPublicProvider(p.id);
           const hasKey = !!p.hasRealKey;
-          // determine line color: active green, else based on availability?
-          const idleColor = hasKey ? "#cbd5e1" : isPublic ? "#bae6fd" : "#e2e8f0";
+          const isNewest = newestProviders?.includes(p.id);
+          // determine line color: active green, newest violet, else based on availability
+          const idleColor = isActive ? "#22c55e" : isNewest ? "#c4b5fd" : hasKey ? "#cbd5e1" : isPublic ? "#bae6fd" : "#e2e8f0";
           return (
             <g key={`line-${p.id}`}>
               {/* idle line */}
@@ -263,11 +297,11 @@ function ProviderTopology({ providers, activeProvider, logs }: { providers: ApiP
                 y1={cy}
                 x2={x}
                 y2={y}
-                stroke={isActive ? "#22c55e" : idleColor}
-                strokeWidth={isActive ? 3 : 1.8}
+                stroke={idleColor}
+                strokeWidth={isActive ? 3 : isNewest ? 2.6 : 1.8}
                 strokeLinecap="round"
-                opacity={isActive ? 1 : 0.85}
-                style={isActive ? { filter: "url(#glow)" } : undefined}
+                opacity={isActive || isNewest ? 1 : 0.85}
+                style={isActive || isNewest ? { filter: "url(#glow)" } : undefined}
               />
               {/* animated dash overlay for active */}
               {isActive && (
@@ -311,10 +345,11 @@ function ProviderTopology({ providers, activeProvider, logs }: { providers: ApiP
           const isActive = activeProvider === p.id;
           const isPublic = isPublicProvider(p.id);
           const hasKey = !!p.hasRealKey;
+          const isNewest = newestProviders?.includes(p.id);
           const count = requestCountByProvider[p.id] || 0;
-          const bg = hasKey ? "#ecfdf5" : isPublic ? "#f0f9ff" : "#ffffff";
-          const border = isActive ? "#22c55e" : hasKey ? "#6ee7b7" : isPublic ? "#7dd3fc" : "#e2e8f0";
-          const textColor = hasKey ? "#065f46" : isPublic ? "#0c4a6e" : "#334155";
+          const bg = isNewest ? "#f5f3ff" : hasKey ? "#ecfdf5" : isPublic ? "#f0f9ff" : "#ffffff";
+          const border = isActive ? "#22c55e" : isNewest ? "#8b5cf6" : hasKey ? "#6ee7b7" : isPublic ? "#7dd3fc" : "#e2e8f0";
+          const textColor = isNewest ? "#5b21b6" : hasKey ? "#065f46" : isPublic ? "#0c4a6e" : "#334155";
           return (
             <g key={`node-${p.id}`} className="cursor-pointer">
               {/* node rect centered at x,y */}
@@ -327,9 +362,10 @@ function ProviderTopology({ providers, activeProvider, logs }: { providers: ApiP
                   rx={10}
                   fill={bg}
                   stroke={border}
-                  strokeWidth={isActive ? 2.5 : 1.4}
-                  style={isActive ? { filter: "url(#glow)" } : undefined}
+                  strokeWidth={isActive || isNewest ? 2.5 : 1.4}
+                  style={isActive || isNewest ? { filter: "url(#glow)" } : undefined}
                 />
+                {isNewest && !isActive && <circle r={6} cx={46} cy={-14} fill="#8b5cf6" opacity={0.9} stroke="white" strokeWidth={1.2} />}
                 {/* provider icon circle */}
                 <g transform={`translate(-36, 0)`}>
                   <circle r={12} fill={hasKey ? "#10b981" : isPublic ? "#0ea5e9" : "#94a3b8"} />
@@ -350,13 +386,13 @@ function ProviderTopology({ providers, activeProvider, logs }: { providers: ApiP
                 >
                   {p.id.length > 13 ? p.id.slice(0, 13) + "…" : p.id}
                 </text>
-                <text x={-18} y={10} textAnchor="start" fontSize="8.5" fontWeight="600" fill={isActive ? "#15803d" : "#64748b"}>
-                  {hasKey ? "● has key" : isPublic ? "no key needed" : "no key"} {count > 0 ? `• ${count}` : ""}
+                <text x={-18} y={10} textAnchor="start" fontSize="8.5" fontWeight="600" fill={isActive ? "#15803d" : isNewest ? "#7c3aed" : "#64748b"}>
+                  {isNewest ? "★ NEW" : hasKey ? "● has key" : isPublic ? "no key needed" : "no key"} {count > 0 ? `• ${count}` : ""}
                 </text>
-                {isActive && (
+                {(isActive || isNewest) && (
                   <g transform={`translate(42, -14)`}>
-                    <circle r={7} fill="#22c55e" />
-                    <circle r={7} fill="none" stroke="#22c55e" strokeWidth={2} opacity={0.4}>
+                    <circle r={7} fill={isActive ? "#22c55e" : "#8b5cf6"} />
+                    <circle r={7} fill="none" stroke={isActive ? "#22c55e" : "#8b5cf6"} strokeWidth={2} opacity={0.4}>
                       <animate attributeName="r" values="7;13;7" dur="1.2s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.4;0;0.4" dur="1.2s" repeatCount="indefinite" />
                     </circle>
