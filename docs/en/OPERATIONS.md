@@ -82,11 +82,11 @@ save to data/live-models.json { total, providers, free_only, total_fetched, mode
 
 **Rate limit fix**: Frontend debounces `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` increases limit for list endpoints to 4x (min 200) to avoid 429 while typing/pagination.
 
-## Automatic Scheduler (24h — verify + live sync)
+## Automatic Scheduler (24h — verify + live sync + **auto boot-sync on `.env` update**)
 
-`apps/gateway/src/jobs/scheduler.ts` runs inside the gateway:
+`apps/gateway/src/jobs/scheduler.ts` + `jobs/boot-sync.ts` run inside the gateway:
 
-- On startup: if `data/verified-models.json` is older than `SYNC_INTERVAL_MS` (default 86400000 = 24h) → verify + syncLiveModels after 5s
+- On startup (**auto boot-sync** `boot-sync.ts:76 runBootSync()`): compare current `config.providerKeys` vs `data/.provider-fingerprint.json` (`hasKey` `false→true`); if **new providers** (`newlyAdded`) exist → `syncLiveModels({freeOnly:false})` + `verifyFreeModels()` after ~3s, persist `addedAt`/`lastAdded`/`lastAddedAt`/`bootSync`/`liveSync`, reset model-store cache. If no new provider but `verified-models.json` stale (> `SYNC_INTERVAL_MS`) → fallback verify. **Tự động sau khi update `.env` + restart gateway**: Providers page có ngay, Models tự sync, Usage topology highlight provider mới nhất (violet `★ NEW`) — không cần bấm `Sync Live`.
 - Then `setInterval` every 24h → `verifyFreeModels()` + `saveVerifyReport()` + `syncLiveModels({freeOnly:true})`
 
 Configuration:
@@ -106,10 +106,12 @@ DISABLE_SCHEDULER=0   # set to 1 to disable
 | `GET` | `/v1/models?verified=unverified` | Only unverified |
 | `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter by provider + hasKey (real keys) |
 | `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, 400ms debounce) |
-| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `Get Key` URL, `status` — pagination 25/50 sticky bottom, `q` 400ms debounce |
+| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `isNewest`/`addedAt`, `Get Key` URL, `status` + `sync.lastAdded` — pagination 25/50 sticky bottom, `q` 400ms debounce, **auto poll 8s + `/api/sync/status`** |
 | `GET` | `/api/providers/health` | Live ping of 51 providers in 5s |
-| `POST` | `/api/models/live/sync` | **New**: Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
-| `GET` | `/api/models/live` | **New**: Get live cache |
+| `GET` | `/api/sync/status` | **New 1.2.0**: fingerprint (`providers` `hasKey`/`addedAt`, `lastAdded`, `bootSync`, `liveModels`, `newestProviders`) — dùng cho auto highlight newest |
+| `POST` | `/api/sync/boot` | **New 1.2.0**: manual trigger `runBootSync({force})` |
+| `POST` | `/api/models/live/sync` | Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
+| `GET` | `/api/models/live` | Get live cache |
 | `GET` | `/api/models/health?model=` | Probe 1 model with chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
 | `GET` | `/api/models/health/persisted` | Persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` keeps non-red after reload, `hide404`/others default `hasKey OFF` |

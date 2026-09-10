@@ -1,8 +1,8 @@
-# Kiến trúc (Architecture)
+# Architecture
 
-Tài liệu này mô tả kiến trúc chi tiết của `app-auto-llm-free` — gateway thống nhất cho LLM free (30 freellms + 11 alias + 2 new (B.AI/TokenHarbor) = 51 ids, 338 models từ freellms.org + alias).
+This document describes the detailed architecture of `app-auto-llm-free` — unified gateway for free LLMs (30 freellms + 11 alias + 2 new (B.AI/TokenHarbor) = 51 ids, 338 models from freellms.org + alias).
 
-## 1. Tổng quan
+## 1. Overview
 
 ```mermaid
 flowchart LR
@@ -24,34 +24,34 @@ flowchart LR
   Gateway --> Libs[lib/redis<br/>lib/semantic-cache<br/>lib/compression<br/>lib/cost-router<br/>lib/analytics]
 ```
 
-* **Gateway**: Hono app chạy trên Bun/Node/Cloudflare Workers (WinterCG). Multi-runtime, ultrafast RegExpRouter. Vector 1+2 routes: `/v1/chat/completions`, `/v1/embeddings`, `/v1/images/generations`, **mới** `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/responses` (+ alias `/v1/conversations`), `/v1/messages` (Anthropic) — xem `app.ts:14` + `routes/v1/audio.ts`, `routes/v1/responses.ts`, `routes/v1/anthropic.ts`. Middleware: `secureHeaders` + `cors` + `bodyLimit` 10MB **skip cho `multipart/form-data` audio** (`app.ts:29` `if path startsWith /v1/audio`) + `traceparent` propagation qua `requestLogger`/`otel` + `virtualKeyRateLimit`.
-* **Router**: Chọn provider pool dựa trên `model`, alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`), header `x-router`, tier fallback 4-tier freellms, sanitize `gemini 3.6 flash`/`nvidia: nemotron` (`openai-compatible.ts:31`). Khi `COST_ROUTING_ENABLED=1` sẽ re-rank qua `rankProvidersByCostAndLatency` (`lib/cost-router.ts:99`).
-* **Adapters**: Mỗi provider implement `Provider` interface. 51 ids (30 freellms NVIDIA 97, ModelScope 43, Cloudflare 35... + 11 alias + 4 B.AI/TokenHarbor alias) qua `createOpenAICompatibleProvider`, Gemini `gemini-3.6-flash` (`gemini.ts:5`), Pollinations scraped, **Anthropic** (`providers/anthropic.ts`) qua `anthropic-translator`. `nvidia-nim auto: nvidia/nemotron-3-ultra-550b-a55b` (đã fix 410).
-* **Vector 2 libs**: `lib/redis.ts` singleton lazy `initRedis()`/`getRedis()` (ioredis, fallback in-memory), `lib/semantic-cache.ts` SHA256 `semantic:{model}:{hash}` + Redis + mem + `hitRate`, `lib/compression.ts` (`toolsMinify`/`relevanceKeep` query-aware/`historySummarize`/`codeDedup` chuẩn hóa + `compressMessages` trả `savedTokens`/`ratio`), `lib/cost-router.ts` (`FREELLMS_COST` $/1M + `rankProvidersByCostAndLatency` + `syncPricing` CDN LiteLLM + `successRate` rolling từ request-log), `lib/provider-executor.ts` (`tryProviders()` fallback chung cho cả 6 routes v1: breaker → key → quota → skip → call), `lib/sliding-window.ts` (Redis Lua sliding-window-counter cho quota + rate-limit, fallback in-memory), `lib/analytics.ts` (`getAnalytics` interval/groupBy + `calculateSavings` + `costBreakdown`), `lib/anthropic-translator.ts` (giữ `tool_use` → `tool_calls`) + `lib/responses-translator.ts`.
-* **Dashboard**: Vite + React (recharts), 5 routes `Dashboard→Providers→Models→Keys→Logs` (header 2 hàng `max-w-[1440px]` + Master **input chỉnh sửa** hàng 1 (password/text toggle, auto-fill từ `GET /api/bootstrap`), nav giữa hàng 2), `Dashboard` 4 cards + 3 charts + tokens, `Models` **filter bar 1 hàng**: `q` + `provider` + `verified` + **Filters** dropdown (4 toggles `hasKey` **mặc định tắt** + `hide404`/`Hide credits`/`Hide invalid ID` mặc định bật) + **top-right 3 nút** `Check Live (n)`/`Sync Live Now`/`Refresh` (`Refresh` reset `hasKeyOnly:false`, `Check` yêu cầu filter `q`/`provider`), pagination 25/50 sticky bottom + checkbox (`isRowDisabled` ưu tiên `live usable 200`/`usage>0` trước `deprecated`/`404/410`) + `Used/Limit` + strikethrough persist (`200 usable` giữ không đỏ sau reload), `Providers` pagination 25/50 + `Get Key ↗` + health + **Sync Live Now** (chung `POST /api/models/live/sync`), `Keys` Generator (collapsed) + CRUD `fgk-...`, `Logs` charts + SSE.
-* **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify), `data/model-health.json` (persisted `404/410` + `200 usable` — `POST /api/models/health/mark` `200` override `404`, `GET /v1/models` `verified_free` sau `Check`), `data/live-models.json` (live sync 882 free, `POST /api/models/live/sync {freeOnly:true}` ở cả 2 pages), `data/request-log.json` (1000 logs), **mới** `data/provider-stats.json` (latency EMA per provider cho cost-router), **Redis semantic cache** (`semantic:*` keys, TTL `CACHE_TTL_S`), **cost pricing** sync từ LiteLLM CDN (`model_prices_and_context_window.json` → `FREELLMS_COST`), `lib/paths.ts` resolve `data/` cho cả `cwd=root` và `cwd=apps/gateway`.
-* **Scheduler**: `jobs/scheduler.ts` 24h (`SYNC_INTERVAL_MS`), so sánh freellms FREE vs live `/models` + `jobs/probe-models.ts` chat probe per-model (`/api/models/health` `usable/402/404/410`) + `jobs/sync-live-models.ts` live sync 882 free. Đổi `.env` phải **restart gateway** `config.ts:22` mới nạp `hasRealKey`.
-* **Token & Vector 2 flags**: `lib/token-estimator.ts` char/4, `lib/request-log.ts` aggregation `allTimeTokens` + `tokensByProvider` cho Dashboard/Logs charts. Flags: `SEMANTIC_CACHE_ENABLED` (default 0, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL`), `COMPRESSION_ENABLED` (default 0), `COST_ROUTING_ENABLED` (default 0) — `config.ts:158`.
+* **Gateway**: Hono app running on Bun/Node/Cloudflare Workers (WinterCG). Multi-runtime, ultrafast RegExpRouter. Vector 1+2 routes: `/v1/chat/completions`, `/v1/embeddings`, `/v1/images/generations`, **new** `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/responses` (+ alias `/v1/conversations`), `/v1/messages` (Anthropic) — see `app.ts:14` + `routes/v1/audio.ts`, `routes/v1/responses.ts`, `routes/v1/anthropic.ts`. Middleware: `secureHeaders` + `cors` + `bodyLimit` 10MB **skip for `multipart/form-data` audio** (`app.ts:29` `if path startsWith /v1/audio`) + `traceparent` propagation via `requestLogger`/`otel` + `virtualKeyRateLimit`.
+* **Router**: Select provider pool based on `model`, alias (`auto`, `gpt-4`, `glm`, `qwen`, `code`, `embedding`, `kilo-auto`), header `x-router`, tier fallback 4-tier freellms, sanitize `gemini 3.6 flash`/`nvidia: nemotron` (`openai-compatible.ts:31`). When `COST_ROUTING_ENABLED=1` re-rank via `rankProvidersByCostAndLatency` (`lib/cost-router.ts:99`).
+* **Adapters**: Each provider implements `Provider` interface. 51 ids (30 freellms NVIDIA 97, ModelScope 43, Cloudflare 35... + 11 alias + 4 B.AI/TokenHarbor alias) via `createOpenAICompatibleProvider`, Gemini `gemini-3.6-flash` (`gemini.ts:5`), Pollinations scraped, **Anthropic** (`providers/anthropic.ts`) via `anthropic-translator`. `nvidia-nim auto: nvidia/nemotron-3-ultra-550b-a55b` (fixed 410).
+* **Vector 2 libs**: `lib/redis.ts` singleton lazy `initRedis()`/`getRedis()` (ioredis, fallback in-memory), `lib/semantic-cache.ts` SHA256 `semantic:{model}:{hash}` + Redis + mem + `hitRate`, `lib/compression.ts` (`toolsMinify`/`relevanceKeep` query-aware/`historySummarize`/`codeDedup` normalized + `compressMessages` returns `savedTokens`/`ratio`), `lib/cost-router.ts` (`FREELLMS_COST` $/1M + `rankProvidersByCostAndLatency` + `syncPricing` CDN LiteLLM + rolling `successRate` from request-log), `lib/provider-executor.ts` (shared `tryProviders()` fallback loop for all 6 v1 routes: breaker → key → quota → skip → call), `lib/sliding-window.ts` (Redis Lua sliding-window-counter for quota + rate-limit, in-memory fallback), `lib/analytics.ts` (`getAnalytics` interval/groupBy + `calculateSavings` + `costBreakdown`), `lib/anthropic-translator.ts` (keeps `tool_use` → `tool_calls`) + `lib/responses-translator.ts`.
+* **Dashboard**: Vite + React (recharts), 6 routes `Dashboard→Providers→Models→Keys→Usage→Logs` (header 2 rows `max-w-[1440px]` + Master **editable input** row 1 (password/text toggle, auto-filled from `GET /api/bootstrap`), nav centered row 2), `Dashboard` 4 cards + 3 charts + tokens, `Models` **filter bar 1 row**: `q` + `provider` + `verified` + **Filters** dropdown (4 toggles `hasKey` **default OFF** + `hide404`/`Hide credits`/`Hide invalid ID` default ON) + **top-right 3 buttons** `Check Live (n)`/`Sync Live Now`/`Refresh` (`Refresh` resets `hasKeyOnly:false`, `Check` requires filter `q`/`provider`), pagination 25/50 sticky bottom + checkbox (`isRowDisabled` prioritizes `live usable 200`/`usage>0` before `deprecated`/`404/410`) + `Used/Limit` + `auto sync` (poll sync status 6s + visibility), `Providers` pagination 25/50 + `Get Key ↗` + health + **Sync Live Now** + **auto boot-sync** (`★ NEW` violet + poll 8s + `/api/sync/status`), `Usage` Provider topology (App centre + green/violet animated line, **auto highlight newest provider**), `Keys` Generator + CRUD `fgk-...`, `Logs` charts + SSE.
+* **Data Layer**: `data/freellms-providers.json` (30), `data/freellms-models-free.json` (316), `models.yaml` (316), `data/verified-models.json` (live verify), `data/model-health.json` (persisted `404/410` + `200 usable` — `POST /api/models/health/mark` `200` override `404`, `GET /v1/models` `verified_free` after `Check`), `data/live-models.json` (live sync 882 free, `POST /api/models/live/sync {freeOnly:true}` on both pages), `data/request-log.json` (1000 logs), **new** `data/provider-stats.json` (latency EMA per provider for cost-router), **Redis semantic cache** (`semantic:*` keys, TTL `CACHE_TTL_S`), **cost pricing** sync from LiteLLM CDN (`model_prices_and_context_window.json` → `FREELLMS_COST`), `lib/paths.ts` resolve `data/` for both `cwd=root` and `cwd=apps/gateway`.
+* **Scheduler + Boot-Sync**: `jobs/scheduler.ts` 24h + `jobs/boot-sync.ts:76 runBootSync()` auto detect new providers via `data/.provider-fingerprint.json` (`hasKey` false→true, `addedAt`) → auto `syncLiveModels` + `verify` ~3s after start, persist `newestProviders`/`lastAdded` for UI. `GET /api/sync/status` + `GET /api/providers` (`isNewest`/`addedAt`) + `POST /api/sync/boot`. Frontend polls (`Providers 8s`/`Models 10s`/`Usage 3s`) tự highlight violet `★ NEW` và auto reload — **sau khi update `.env` + restart gateway thì Providers/Models/Usage tự cập nhật không cần bấm Sync Live**. Changing `.env` still requires **restart gateway** `config.ts:22` to reload `hasRealKey`.
+* **Token & Vector 2 flags**: `lib/token-estimator.ts` char/4, `lib/request-log.ts` aggregation `allTimeTokens` + `tokensByProvider` for Dashboard/Logs charts. Flags: `SEMANTIC_CACHE_ENABLED` (default 0, `SEMANTIC_THRESHOLD=0.92`, `CACHE_TTL_S=3600`, `EMBEDDING_MODEL`), `COMPRESSION_ENABLED` (default 0), `COST_ROUTING_ENABLED` (default 0) — `config.ts:158`.
 
-Tham khảo: `free-llm-gateway` (24+ providers) và `OmniRoute` (271 providers, 90 free).
+References: `free-llm-gateway` (24+ providers) and `OmniRoute` (271 providers, 90 free).
 
-## 2. Luồng request
+## 2. Request Flow
 
 ```
 1. POST /v1/chat/completions  {model, messages, stream, tools}
 2. middleware/auth            -> verify `fgk-...` timing-safe, load scopes
-3. middleware/rateLimit       -> Redis sliding-window check RPM (atomic, dùng chung mọi instance)
-4. token-estimator            -> ước tính TPM pre-flight, reject nếu vượt
+3. middleware/rateLimit       -> Redis sliding-window RPM check (atomic, shared across instances)
+4. token-estimator            -> estimate TPM pre-flight, reject if exceeded
 5. smart-router               -> resolve alias (auto/gpt-4/glm/qwen) -> provider pool ordered
-                               filter deprecated nếu có verified data (verified=free)
-6. provider-executor          -> tryProviders() chung cho mọi route v1:
-     breaker chỉ đếm 5xx/429/exception (4xx không trip) -> key least-failed-first -> checkQuotaAsync
-     (Redis sliding, fallback in-memory) -> deprecated skip -> provider call
-     catch 429: markRateLimited + retryAfterMs trong error; catch khác: provider kế tiếp
+                                filter deprecated if verified data exists (verified=free)
+6. provider-executor          -> shared tryProviders() loop for every v1 route:
+     breaker 5xx/429-only (4xx never trips) -> key least-failed-first -> checkQuotaAsync
+     (Redis sliding, in-memory fallback) -> deprecated skip -> provider call
+     catch 429: markRateLimited + retryAfterMs in error; catch other: next provider
      success: recordUsage, break
-7. normalizer                 -> chuyển Gemini shape về OpenAI shape
+7. normalizer                 -> convert Gemini shape to OpenAI shape
 8. SSE passthrough            -> if stream: proxy chunk-by-chunk, handle mid-stream error
-9. logger + request_db        -> ghi latency, tokens, cost, provider đã dùng
+9. logger + request_db        -> log latency, tokens, cost, provider used
 10. return OpenAI JSON/SSE
 ```
 
@@ -129,40 +129,40 @@ export interface Provider {
 }
 ```
 
-* `openai-compatible` (28/30): NVIDIA (`integrate.api.nvidia.com/v1`), Groq (`api.groq.com/openai/v1`), Cerebras, GitHub Models (`models.github.ai/inference`), OVH, Cohere (`/v2`), ModelScope, Chutes, SambaNova, SiliconFlow, Glhf, Mistral, LLM7, Agnes, Aion, Z AI (`open.bigmodel.cn/api/paas/v4`), DeepSeek, OpenRouter, Ollama Cloud, Nscale, Nebius, AI21… — chỉ cần `baseURL + Authorization`.
-* `gemini`: Google (`generativelanguage.googleapis.com/v1beta`) — cần `format-translator` (OpenAI → Gemini contents).
-* `scraped`: Pollinations (`text.pollinations.ai/openai`) — không cần key, tự map alias `auto` → `openai`.
+* `openai-compatible` (28/30): NVIDIA (`integrate.api.nvidia.com/v1`), Groq (`api.groq.com/openai/v1`), Cerebras, GitHub Models (`models.github.ai/inference`), OVH, Cohere (`/v2`), ModelScope, Chutes, SambaNova, SiliconFlow, Glhf, Mistral, LLM7, Agnes, Aion, Z AI (`open.bigmodel.cn/api/paas/v4`), DeepSeek, OpenRouter, Ollama Cloud, Nscale, Nebius, AI21… — just `baseURL + Authorization`.
+* `gemini`: Google (`generativelanguage.googleapis.com/v1beta`) — needs `format-translator` (OpenAI → Gemini contents).
+* `scraped`: Pollinations (`text.pollinations.ai/openai`) — no key needed, auto maps alias `auto` → `openai`.
 
-Registry `apps/gateway/src/providers/registry.ts:1` liệt kê 41 ids (30 freellms slugs + 11 alias `mistral`/`gemini`/`nvidia`/`kilo-code`/`openrouter`), `providerMeta` chứa caps/tier/noCard, alias map 15+ keys (`kilo-auto`, `gemini-3.6`...).
+Registry `apps/gateway/src/providers/registry.ts:1` lists 41 ids (30 freellms slugs + 11 alias `mistral`/`gemini`/`nvidia`/`kilo-code`/`openrouter`), `providerMeta` contains caps/tier/noCard, alias map 15+ keys (`kilo-auto`, `gemini-3.6`...).
 
 ## 4. Router & Fallback
 
-Học `smart_router.py` + OmniRoute 19 strategies, thực tế freellms tier:
+Based on `smart_router.py` + OmniRoute 19 strategies, actual freellms tiers:
 
-| Strategy | Mô tả |
-|----------|-------|
-| `round-robin` | Mặc định, phân tán tải |
-| `tiered` | 4-tier từ `.env.example:19` `FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]` |
-| `latency` | Chọn p50 thấp nhất (P3) |
-| `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (xem `registry.ts:42`) |
-| `verified` | Nếu có `data/verified-models.json` + `data/model-health.json` (persisted 404/410), `GET /v1/models?verified=free` loại `deprecated` khỏi pool |
-| `cost-aware` | Khi `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-rank pool theo `FREELLMS_COST` ($/1M tokens) + latency EMA từ `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*COST_WEIGHT(5) + latency*LATENCY_WEIGHT(0.0005) - headroom*HEADROOM_WEIGHT(0.3)`, sort asc (env override); `syncPricing()` sync từ LiteLLM CDN `model_prices_and_context_window.json` |
+| Strategy | Description |
+|----------|-------------|
+| `round-robin` | Default, distribute load |
+| `tiered` | 4-tier from `.env.example:19` `FALLBACK_TIERS=[["nvidia-nim","groq","cerebras","google-gemini"],["cloudflare-workers-ai","cohere","sambanova","siliconflow"],["ovhcloud-ai-endpoints","modelscope","llm7-io"],["openrouter","kilo-code","pollinations"]]` |
+| `latency` | Pick lowest p50 (P3) |
+| `alias` | `auto`→5 P0, `gpt-4`→5, `claude-3`→4, `glm`→3, `qwen`→4, `code`→4, `embedding`→3 (see `registry.ts:42`) |
+| `verified` | If `data/verified-models.json` + `data/model-health.json` (persisted 404/410) exists, `GET /v1/models?verified=free` removes `deprecated` from pool |
+| `cost-aware` | When `COST_ROUTING_ENABLED=1`, `rankProvidersByCostAndLatency(ids)` (`lib/cost-router.ts:99`) re-ranks pool by `FREELLMS_COST` ($/1M tokens) + latency EMA from `data/provider-stats.json` (fallback 100ms) + quota headroom — `score = cost*COST_WEIGHT(5) + latency*LATENCY_WEIGHT(0.0005) - headroom*HEADROOM_WEIGHT(0.3)`, sort asc (env overrides); `syncPricing()` syncs from LiteLLM CDN `model_prices_and_context_window.json` |
 
-Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config.ts:30`). Mid-stream SSE error → emit `data: {"error": ...}\n\n` rồi close. Persisted `model-health.json` được `chat.ts:22` merge để skip `deprecated` ngay cả khi chưa `verify`. Với cost-routing, pool đã sort sẽ được duyệt theo thứ tự tiết kiệm + nhanh nhất.
+Fallback: Tiered fallback with circuit breaker (5 fails / 30s cooldown, `config.ts:30`). Mid-stream SSE error → emit `data: {"error": ...}\n\n` then close. Persisted `model-health.json` is merged by `chat.ts:22` to skip `deprecated` even before `verify`. With cost-routing, sorted pool is iterated in cheapest + fastest order.
 
 ## 5. Key Management & Security
 
-* **Encryption at rest**: AES-256-GCM (WebCrypto), key từ `ENCRYPTION_KEY` — **tự sinh** 64 hex nếu thiếu/placeholder (`config.ts:32`), persist `.env` hoặc `data/.gateway-keys.json`, không dùng làm API key.
-* **Master key (single-key)**: `MASTER_KEY=fgk-master-...` — **1 key duy nhất** cho `/v1/*` + `/api/*` admin, tự sinh nếu thiếu và seed `vk-master` (`lib/virtual-keys.ts:116`). `fgk-...` scoped là tùy chọn per-app.
+* **Encryption at rest**: AES-256-GCM (WebCrypto), key from `ENCRYPTION_KEY` — **auto-generated** 64 hex if missing/placeholder (`config.ts:32`), persisted to `.env` or `data/.gateway-keys.json`, never used as API key.
+* **Master key (single-key)**: `MASTER_KEY=fgk-master-...` — **single key** for `/v1/*` + `/api/*` admin, auto-generated if missing and seeded as `vk-master` (`lib/virtual-keys.ts:116`). `fgk-...` scoped is optional per-app.
 * **Virtual keys**: prefix `fgk-`, hash SHA-256, scopes `{models, providers}`, `rpmLimit`, `tpdLimit`.
-* **Key pool**: `GROQ_API_KEYS=gsk_xxx,gsk_yyy` → round-robin, skip `Retry-After`. `config.ts:32` hỗ trợ 30 providers freellms (kể cả `OVHCLOUD_API_KEYS` alias).
+* **Key pool**: `GROQ_API_KEYS=gsk_xxx,gsk_yyy` → round-robin, skip `Retry-After`. `config.ts:32` supports 30 freellms providers (including `OVHCLOUD_API_KEYS` alias).
 * **Auth**: `hono/bearer-auth` + timing-safe compare, `admin`/`user`.
 
 ## 6. Rate Limiting & Quota
 
 * **Redis rolling window**: RPM/RPD/TPM/TPD per virtual key + per provider key (freellms limits: NVIDIA 40 RPM shared, Groq 30/14.4K, Cerebras 15/1M TPD, Gemini 15/1.5K, OVH 2 anon, Agnes 30, OpenRouter 200/day, Kilo ~200/hr).
-* **Headers**: `x-ratelimit-remaining-*`, `retry-after` khi 429.
-* **Token estimator**: `js-tiktoken` pre-flight. `quota-tracker.ts` (P3) sẽ dùng `models.yaml:1` `limit` field.
+* **Headers**: `x-ratelimit-remaining-*`, `retry-after` on 429.
+* **Token estimator**: `js-tiktoken` pre-flight. `quota-tracker.ts` (P3) will use `models.yaml:1` `limit` field.
 
 ## 7. Data & Verification
 
@@ -172,12 +172,13 @@ Fallback: Tiered fallback với circuit breaker (5 fails / 30s cooldown, `config
 | `data/freellms-models-free.json` | freellms.org/models (316 free) | `name, slug, context, score, limit, verified, modality` |
 | `models.yaml` | `scripts/sync-freellms.py` | 316 entries, `id: nvidia-nim/z-ai/glm-5.2`, `score`, `limit` |
 | `data/verified-models.json` | `jobs/verify-free.ts` live probe | `status: verified_free / deprecated / unverified_no_key / error`, `last_verified` |
-| `data/verified-summary.json` | `jobs/verify-free.ts` | Tổng hợp per-provider |
-| `data/provider-stats.json` | `lib/cost-router.ts` + `lib/analytics.ts` | Latency EMA per provider (`emaLatencyMs`/`latency`), quota headroom — dùng cho `rankProvidersByCostAndLatency` |
+| `data/verified-summary.json` | `jobs/verify-free.ts` | Summary per-provider |
+| `data/provider-stats.json` | `lib/cost-router.ts` + `lib/analytics.ts` | Latency EMA per provider (`emaLatencyMs`/`latency`), quota headroom — used for `rankProvidersByCostAndLatency` |
+| `data/.provider-fingerprint.json` | `jobs/boot-sync.ts` | Fingerprint `providers` `hasKey`/`keyCount`/`addedAt`, `lastAdded`/`lastAddedAt`, `bootSync`/`liveSync` — auto detect newest provider sau khi update `.env` + restart |
 | `Redis semantic cache` | `lib/redis.ts` singleton + `lib/semantic-cache.ts` | `semantic:{model}:{sha256}` keys, TTL `CACHE_TTL_S` (3600), `hits`/`misses`/`hitRate` (scan+del clear) — fallback in-memory Map |
 | `cost pricing CDN` | `lib/cost-router.ts` `syncPricing()` | LiteLLM CDN `model_prices_and_context_window.json` → `FREELLMS_COST` ($ per 1M tokens, free=0, groq 0.05, openrouter 0.1...) |
 
-Luồng sync: `scripts/sync-freellms.py` (Layer 1) → `jobs/verify-free.ts` probe `provider.models()` mỗi 24h (Layer 2, scheduler + `POST /api/verify`) → `GET /v1/models?verified=free` chỉ trả `verified_free` + `?provider=` exact filter (frontend `provider` datalist 20). Xem `docs/OPERATIONS.md:1`.
+Sync flow: `scripts/sync-freellms.py` (Layer 1) → `jobs/verify-free.ts` probe `provider.models()` every 24h (Layer 2, scheduler + `POST /api/verify`) → `GET /v1/models?verified=free` returns only `verified_free` + `?provider=` exact filter (frontend `provider` datalist 20). See `docs/OPERATIONS.md:1`.
 
 ## 8. Database & Files
 
@@ -191,9 +192,9 @@ requests(id, virtual_key_id, provider, model, prompt_tokens, completion_tokens, 
 providers_cache(provider, models JSON, synced_at)
 ```
 
-* SQLite dev, Postgres prod, BRIN index. Runtime `data/virtual-keys.json` (hash), `data/request-log.json` (1000), `resolveDataPath` cho cả cwd.
+* SQLite dev, Postgres prod, BRIN index. Runtime `data/virtual-keys.json` (hash), `data/request-log.json` (1000), `resolveDataPath` for both `cwd=root` and `cwd=apps/gateway`.
 
-## 9. Cấu trúc thư mục
+## 9. Directory Structure
 
 ```
 .

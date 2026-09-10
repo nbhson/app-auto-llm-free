@@ -2,6 +2,21 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.0] - 2026-09-10
+
+### Added
+- **Auto boot-sync khi update `.env` + restart gateway** — mỗi khi thêm provider mới (cấp key mới trong `.env`) và chạy lại gateway thì 3 trang tự động cập nhật không cần bấm `Sync Live`:
+  - `apps/gateway/src/jobs/boot-sync.ts:1` job mới phát hiện provider mới qua `data/.provider-fingerprint.json` (`hasKey` chuyển `false→true`, tính `addedAt`/`lastAdded`), tự động chạy `syncLiveModels({freeOnly:false})` + `verifyFreeModels()` sau 3s khởi động, lưu `bootSync`/`liveSync` state, xử lý kẹt `running`
+  - `apps/gateway/src/jobs/scheduler.ts:43` tích hợp `runBootSync()` — thay vì chỉ verify khi stale 24h, giờ luôn kiểm tra fingerprint; có provider mới thì live-sync ngay, fallback vẫn verify khi stale
+  - `apps/gateway/src/routes/api.ts:42` thêm `GET /api/sync/status` + `POST /api/sync/boot` (trả `fingerprint`, `newestProviders`, `bootSync`, `liveModels`), enrich `GET /api/providers` trả `addedAt`/`isNewest`/`sync.lastAdded` để UI highlight
+  - `apps/web/src/pages/Providers.tsx:1` poll `/api/sync/status` 5s + poll providers 8s + `visibilitychange`, badge `★ NEW` tím + border tím + `live-models`/`bootSync` info trên header, `isNewest` highlight
+  - `apps/web/src/pages/Models.tsx:1` poll sync 6s + poll models 10s, tự `fetchModels()` khi `liveModels.generated_at` đổi hoặc `lastAdded` xuất hiện → trang Models tự sync models của provider vừa thêm
+  - `apps/web/src/pages/Usage.tsx:1` fetch sync status, sort topology `newestProviders` lên đầu, line/node tím `★ NEW`, auto highlight newest provider khi idle, banner `NEW provider: xxx`
+- **Docs 1.2.0**: `CHANGELOG 1.2.0`, bump version `package.json` + `apps/gateway` + `apps/web` `1.1.0→1.2.0`, `app.ts` + `health.ts` + `main.tsx` badge `v1.2.0`, `README` + `docs/en|vi/OPERATIONS|ARCHITECTURE|CONFIGURATION` mô tả boot-sync
+
+### Changed
+- **Version bump**: `package.json` `apps/gateway` `apps/web` `1.1.0→1.2.0`, `main.tsx` badge `v1.2.0`, `app.ts:72` + `health.ts:10` `version 1.2.0`
+
 ## [1.1.0] - 2026-09-10
 
 ### Added

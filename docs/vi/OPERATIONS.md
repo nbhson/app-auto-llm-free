@@ -1,38 +1,38 @@
-> **Tiếng Việt** | [🇬🇧 English](../en/OPERATIONS.md) | [Docs Index](../README.md)
+> **English** | [🇻🇳 Tiếng Việt](../vi/OPERATIONS.md) | [Docs Index](../README.md)
 
-# Vận hành & Xác thực Free Tier (24h Sync — Live là Source of Truth)
+# Operations & Free Tier Verification (24h Sync — Live is Source of Truth)
 
-## Vấn đề: freellms.org có thể lỗi thời (đã disabled)
+## Problem: freellms.org May Be Outdated (now disabled)
 
-`data/freellms-models-free.json` (316 free) là snapshot 2026-09-06. Provider có thể đã rút free tier (ví dụ Groq 16/23 paid, Ollama Cloud 5/8 paid, OpenRouter 28/45 paid trong scan). **Freellms sync hiện đã disabled** (không còn latest) — live provider APIs mới là source of truth.
+`data/freellms-models-free.json` (316 free) is a snapshot from 2026-09-06. Providers may have already withdrawn their free tier (e.g. Groq 16/23 paid, Ollama Cloud 5/8 paid, OpenRouter 28/45 paid in the scan). **Freellms sync is now disabled** (not latest) — live provider APIs are the new source of truth.
 
-## Giải pháp: 2-layer sync (freellms lịch sử + live hiện tại)
+## Solution: 2-Layer Sync (historical freellms + live current)
 
-### Layer 1 — Freellms sync (lịch sử, disabled)
+### Layer 1 — Freellms Sync (Historical, disabled)
 
 ```bash
 python scripts/sync-freellms.py
 # Fetch https://freellms.org/providers + /models -> data/*.json + models.yaml
-# Trước đây chạy mỗi 24h qua GitHub Actions 02:00 UTC — HIỆN ĐÃ DISABLED, không còn latest
+# Previously ran every 24h via GitHub Actions at 02:00 UTC — NOW DISABLED, not latest
 ```
 
-File (lịch sử):
+Files (historical):
 - `data/freellms-providers.json` — 30 providers, caps/tier
-- `data/freellms-models-free.json` — 316 free, có `score/limit/verified`
-- `models.yaml` — 316 entries cho gateway (snapshot)
+- `data/freellms-models-free.json` — 316 free, includes `score/limit/verified`
+- `models.yaml` — 316 entries for the gateway (snapshot)
 
-### Layer 2 — Live verify (Thực sự còn free không?) + Live sync (Source of truth mới)
+### Layer 2 — Live Verify (Is It Still Actually Free?) + Live Sync (New Source of Truth)
 
-**A. Verify free** `apps/gateway/src/jobs/verify-free.ts` so sánh **freellms FREE** vs **live /models** từ provider.
+**A. Verify free** `apps/gateway/src/jobs/verify-free.ts` compares **freellms FREE** vs **live /models** from the provider.
 
 **Logic:**
 
 ```
 for each provider in registry (30):
-  keys = config.providerKeys[provider] // từ .env
+  keys = config.providerKeys[provider] // from .env
   if !keys && provider not in [pollinations, llm7-io]:
      mark all its models -> unverified_no_key
-     => cần cấu hình API key để xác thực
+     => API key configuration is needed to verify
   else:
      live = await provider.models(keys[0]) // GET {baseUrl}/models
      for each freellms model in that provider:
@@ -40,27 +40,27 @@ for each provider in registry (30):
         status = found ? verified_free : deprecated
 ```
 
-**Trạng thái (`status`):**
+**Statuses (`status`):**
 
-| status | Ý nghĩa | Hành động |
-|--------|---------|-----------|
-| `verified_free` | Provider trả về model, còn free | Dùng bình thường |
-| `deprecated` | Freellms nói free nhưng live không còn list → có thể đã rút, đổi tên | Báo deprecated, gateway sẽ skip trong fallback nếu `?verified=free` |
-| `unverified_no_key` | Chưa cấu hình API key nên không probe được | Cảnh báo trong `/api/providers` -> `no-key`, cần thêm key vào `.env` |
-| `error` | Provider unreachable / 429 | Retry sau |
-| `unverified_no_data` | Chưa chạy verify lần nào | Hiển thị freellms data với badge unverified |
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `verified_free` | Provider returns the model and it is still free | Use normally |
+| `deprecated` | Freellms says free but the live list no longer includes it → may have been withdrawn or renamed | Flag as deprecated; gateway will skip it in fallback if `?verified=free` |
+| `unverified_no_key` | No API key configured, so probing is not possible | Warning in `/api/providers` -> `no-key`; add a key to `.env` |
+| `error` | Provider unreachable / 429 | Retry later |
+| `unverified_no_data` | Verify has never been run | Show freellms data with an unverified badge |
 
 **Output:**
 
-- `data/verified-models.json` — 316 rows chi tiết (`live_free`, `last_verified`, `error`)
-- `data/verified-summary.json` — tổng hợp (`verified_free`, `deprecated`, `unverified_no_key`)
+- `data/verified-models.json` — 316 detailed rows (`live_free`, `last_verified`, `error`)
+- `data/verified-summary.json` — aggregated summary (`verified_free`, `deprecated`, `unverified_no_key`)
 
-**B. Live sync (source of truth mới)** `apps/gateway/src/jobs/sync-live-models.ts` fetch **live provider.models()** qua real keys (`hasRealKey: k.length>20 && !k.includes('xxx')`) → `data/live-models.json`.
+**B. Live sync (new source of truth)** `apps/gateway/src/jobs/sync-live-models.ts` fetches **live provider.models()** via real keys (`hasRealKey: k.length>20 && !k.includes('xxx')`) → `data/live-models.json`.
 
-**Logic freeOnly (mặc định true):**
+**freeOnly logic (default true):**
 
 ```
-freeOnly = true (mặc định)
+freeOnly = true (default)
 for each provider with hasRealKey or public:
   live = await provider.models(key) // 2185 total fetched
   if freeOnly:
@@ -72,57 +72,59 @@ for each provider with hasRealKey or public:
 save to data/live-models.json { total, providers, free_only, total_fetched, models[] }
 ```
 
-- `data/live-models.json` — `total:2185, free_only:true, total_fetched, providers, models[]` (882 free / 853 hasKey, alias thêm 2190 total khi serve)
-- `POST /api/models/live/sync {freeOnly:true}` — trigger sync (UI nút **Sync Live Now** chỉ pull freeOnly)
+- `data/live-models.json` — `total:2185, free_only:true, total_fetched, providers, models[]` (882 free / 853 hasKey, alias adds 2190 total when served)
+- `POST /api/models/live/sync {freeOnly:true}` — trigger sync (UI button **Sync Live Now** only pulls freeOnly)
 - `GET /api/models/live` — get cache
-- `GET /v1/models?hasKey=1` — khi có live cache sẽ phục vụ **live 2190 total** thay vì freellms 324
-- `GET /api/providers?hasKey=1` — filter real keys, highlight xanh lá
-- **Models UI**: 4 toggles trong Filters dropdown `hasKey` (mặc định TẮT `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (mặc định BẬT, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` hiện lưu cả `404/410` và `200 usable` (usable override 404 nên reload giữ không đỏ, `v1/models.ts:153` + `isRowDisabled`), ẩn khi hide toggles checked. `Refresh` xóa `q`/`provider`/`verified` và reset `hasKeyOnly:false` + `hide*` true. `Check Live` yêu cầu filter `q` hoặc `provider` (tooltip nếu thiếu).
-- **Sync Live Now** ở cả `/providers` và `/models` (cùng `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx:37`/`Models.tsx:99`) chỉ pull free models — lọc Permanent Free tier hoặc `:free` suffix hoặc freellms free list, ghi `data/live-models.json`, sau đó `POST /api/verify`. Đổi `.env` keys **phải restart gateway** `config.ts:22` (`docker compose restart gateway` hoặc `pkill -f "tsx watch"; npm run dev:gateway`) để nạp `hasRealKey` trước sync.
+- `GET /v1/models?hasKey=1` — when live cache exists serves **live 2190 total** instead of freellms 324
+- `GET /api/providers?hasKey=1` — filter real keys, highlight green
+ - **Models UI**: 4 toggles in Filters dropdown `hasKey` (default OFF `hasKeyOnly:0` + `hasKeyOnly_migrated`) + `hide404`/`hidePayment`/`hideInvalid` (default ON, `hide404_migrated`), strikethrough `line-through #dc2626` + disabled checkbox, persisted `data/model-health.json` now stores both `404/410` and `200 usable` (usable overrides 404 so reload stays non-red, `v1/models.ts:153` + `isRowDisabled`), hidden when hide toggles checked. `Refresh` clears `q`/`provider`/`verified` and resets `hasKeyOnly:false` + `hide*` true. `Check Live` requires filter `q` or `provider` (tooltip otherwise).
+ - **Sync Live Now** on both `/providers` and `/models` (same `POST /api/models/live/sync {freeOnly:true}` `Providers.tsx:37`/`Models.tsx:99`) only pulls free models — filtered by Permanent Free tier or `:free` suffix or freellms free list, writes `data/live-models.json`, then `POST /api/verify`. Changing `.env` keys **requires restarting the gateway** `config.ts:22` (`docker compose restart gateway` or `pkill -f "tsx watch"; npm run dev:gateway`) to reload `hasRealKey` before sync.
 
-**Rate limit fix**: Frontend debounce `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` tăng limit list endpoints lên 4x (min 200) để tránh 429 khi gõ/pagination.
+**Rate limit fix**: Frontend debounces `q` 400ms (Models/Providers), backend `middleware/rate-limit.ts` increases limit for list endpoints to 4x (min 200) to avoid 429 while typing/pagination.
 
-## Scheduler tự động (24h — verify + live sync)
+## Automatic Scheduler (24h — verify + live sync + **auto boot-sync on `.env` update**)
 
-`apps/gateway/src/jobs/scheduler.ts` chạy trong gateway:
+`apps/gateway/src/jobs/scheduler.ts` + `jobs/boot-sync.ts` run inside the gateway:
 
-- Khi start: nếu `data/verified-models.json` cũ hơn `SYNC_INTERVAL_MS` (default 86400000 = 24h) → verify + syncLiveModels sau 5s
-- Sau đó `setInterval` mỗi 24h → `verifyFreeModels()` + `saveVerifyReport()` + `syncLiveModels({freeOnly:true})`
+- On startup (**auto boot-sync** `boot-sync.ts:76 runBootSync()`): compare current `config.providerKeys` vs `data/.provider-fingerprint.json` (`hasKey` `false→true`); if **new providers** (`newlyAdded`) exist → `syncLiveModels({freeOnly:false})` + `verifyFreeModels()` after ~3s, persist `addedAt`/`lastAdded`/`lastAddedAt`/`bootSync`/`liveSync`, reset model-store cache. If no new provider but `verified-models.json` stale (> `SYNC_INTERVAL_MS`) → fallback verify. **Tự động sau khi update `.env` + restart gateway**: Providers page có ngay, Models tự sync, Usage topology highlight provider mới nhất (violet `★ NEW`) — không cần bấm `Sync Live`.
+- Then `setInterval` every 24h → `verifyFreeModels()` + `saveVerifyReport()` + `syncLiveModels({freeOnly:true})`
 
-Cấu hình:
+Configuration:
 
 ```env
 SYNC_INTERVAL_MS=86400000
-DISABLE_SCHEDULER=0   # đặt 1 để tắt
+DISABLE_SCHEDULER=0   # set to 1 to disable
 ```
 
 ## Endpoints
 
-| Method | Path | Mô tả |
-|--------|------|-------|
-| `GET` | `/v1/models?hasKey=1` | **Live source of truth** khi có cache (2190 total) — `q` debounce 400ms, `page`/`limit` LOV 25/50 ở sticky bottom, `provider` filter |
-| `GET` | `/v1/models?verified=free` | Chỉ trả models `verified_free` (316 vs 7 bug fix `lib/paths.ts`) — freellms snapshot |
-| `GET` | `/v1/models?verified=deprecated` | Chỉ deprecated (kể cả persisted 404/410) |
-| `GET` | `/v1/models?verified=unverified` | Chỉ unverified |
-| `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter theo provider + hasKey (real keys) |
-| `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, debounce 400ms) |
-| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` có `free_models`, `keys`, `hasRealKey`, `Get Key` URL, `status` — pagination 25/50 sticky bottom, `q` debounce 400ms |
-| `GET` | `/api/providers/health` | Live ping 51 providers 5s |
-| `POST` | `/api/models/live/sync` | **Mới**: Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
-| `GET` | `/api/models/live` | **Mới**: Get live cache |
-| `GET` | `/api/models/health?model=` | Probe 1 model chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/models?hasKey=1` | **Live source of truth** when cache exists (2190 total) — `q` 400ms debounce, `page`/`limit` LOV 25/50 at sticky bottom, `provider` filter |
+| `GET` | `/v1/models?verified=free` | Return only `verified_free` models (316 vs 7 bug fix `lib/paths.ts`) — freellms snapshot |
+| `GET` | `/v1/models?verified=deprecated` | Only deprecated (including persisted 404/410) |
+| `GET` | `/v1/models?verified=unverified` | Only unverified |
+| `GET` | `/v1/models?provider=nvidia-nim&hasKey=1` | Filter by provider + hasKey (real keys) |
+| `GET` | `/v1/models?q=gemma&page=1&limit=25` | Search + pagination LOV 25/50 (sticky bottom, 400ms debounce) |
+| `GET` | `/api/providers?page=&limit=&q=&hasKey=` | `detailed[]` with `free_models`, `keys`, `hasRealKey`, `isNewest`/`addedAt`, `Get Key` URL, `status` + `sync.lastAdded` — pagination 25/50 sticky bottom, `q` 400ms debounce, **auto poll 8s + `/api/sync/status`** |
+| `GET` | `/api/providers/health` | Live ping of 51 providers in 5s |
+| `GET` | `/api/sync/status` | **New 1.2.0**: fingerprint (`providers` `hasKey`/`addedAt`, `lastAdded`, `bootSync`, `liveModels`, `newestProviders`) — dùng cho auto highlight newest |
+| `POST` | `/api/sync/boot` | **New 1.2.0**: manual trigger `runBootSync({force})` |
+| `POST` | `/api/models/live/sync` | Sync live `{freeOnly:true}` → `data/live-models.json` (2185/882) |
+| `GET` | `/api/models/live` | Get live cache |
+| `GET` | `/api/models/health?model=` | Probe 1 model with chat `Hi` 5 tokens 8s → `usable/unusable/no-key/410 Gone` |
 | `GET` | `/api/models/health?provider=&limit=` | Bulk probe `limit` models (summary) |
-| `GET` | `/api/models/health/persisted` | Persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` giữ không đỏ sau reload, `hide404`/khác mặc định `hasKey TẮT` |
-| `POST` | `/api/models/health/mark` | Mark health `{ids:[],http_status:404|200,error,status:"usable"|"unusable",latency_ms}` — `404` tạo deprecated strikethrough, `200 usable` override `404` trước và `v1/models.ts:153` đổi `verified_free` + frontend `isRowDisabled` xóa đỏ |
+| `GET` | `/api/models/health/persisted` | Persisted health (`data/model-health.json`) — `404/410` strikethrough + `200 usable` keeps non-red after reload, `hide404`/others default `hasKey OFF` |
+| `POST` | `/api/models/health/mark` | Mark health `{ids:[],http_status:404|200,error,status:"usable"|"unusable",latency_ms}` — `404` creates deprecated strikethrough, `200 usable` overrides previous `404` and `v1/models.ts:153` flips to `verified_free` + frontend `isRowDisabled` clears red |
 | `GET` | `/api/verify` | Full report `verified-models.json` |
-| `GET` | `/api/verify/summary` | Summary nhanh |
-| `POST` | `/api/verify` | Trigger verify ngay (body `{dryRun: false}`), scheduler cũng sync live |
+| `GET` | `/api/verify/summary` | Quick summary |
+| `POST` | `/api/verify` | Trigger immediate verify (body `{dryRun: false}`), scheduler also syncs live |
 | `GET` | `/api/stats` | `allTimeTokens`, `tokensByProvider`, `avgTokens`, `free_models:316`, `breakers` |
 | `GET` | `/api/logs` | Paginated logs |
-| `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, đã bỏ Auto sync 5s duplicate |
-| `GET` | `/api/models/sync` | Freellms sync info (lịch sử, disabled) |
+| `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, duplicate Auto sync 5s removed |
+| `GET` | `/api/models/sync` | Freellms sync info (historical, disabled) |
 
-Ví dụ:
+Examples:
 
 ```bash
 # Live source of truth
@@ -140,47 +142,47 @@ curl -X POST http://localhost:7373/api/verify -H "Authorization: Bearer fgk-mast
 ## CLI
 
 ```bash
-# Dry-run (không cần key, dùng freellms làm live)
+# Dry-run (no key needed, uses freellms as live source)
 npm run verify:free:dry -w apps-gateway
 
-# Live (cần .env keys)
+# Live (requires .env keys)
 npm run verify:free -w apps-gateway
-# hoặc
+# or
 npx tsx apps/gateway/src/jobs/verify-free.ts --dry-run
 npx tsx apps/gateway/src/jobs/sync-live-models.ts # live sync freeOnly
 ```
 
 ## GitHub Actions (daily 02:00 UTC)
 
-`.github/workflows/sync-freellms.yml` chạy (lịch sử):
+`.github/workflows/sync-freellms.yml` runs (historical):
 
-1. `python scripts/sync-freellms.py` → update `data/*` + `models.yaml` (hiện disabled)
-2. `tsx verify-free.ts --dry-run` (hoặc live nếu có secrets `GROQ_API_KEYS` v.v.)
-3. Commit nếu có thay đổi → push `main`
+1. `python scripts/sync-freellms.py` → updates `data/*` + `models.yaml` (now disabled)
+2. `tsx verify-free.ts --dry-run` (or live if secrets `GROQ_API_KEYS` etc. are present)
+3. Commit if changed → push to `main`
 
-Hiện tại khuyến nghị: secrets `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA_API_KEYS`, `GEMINI_API_KEYS`… để `jobs/sync-live-models.ts` chạy live thay vì dry-run. Freellms cron giữ để backup nhưng không còn source chính.
+Currently recommended: add secrets `GROQ_API_KEYS`, `CEREBRAS_API_KEYS`, `NVIDIA_API_KEYS`, `GEMINI_API_KEYS`… so `jobs/sync-live-models.ts` runs live instead of dry-run. Freellms cron is kept as backup but no longer the main source.
 
-## Khuyến nghị vận hành
+## Operational Recommendations
 
-- **Dev**: chỉ cần live data qua `POST /api/models/live/sync` với 1–2 real keys hoặc freellms snapshot, không cần verify đầy đủ (dry-run <1s)
-- **Prod**: cấu hình ít nhất 5 keys P0 (NVIDIA, Groq, Cerebras, Gemini, GitHub) để live sync 882 free (853 hasKey) mỗi 24h; scheduler tự gọi cả verify lẫn syncLiveModels. Các provider còn lại sẽ ở `unverified_no_key` nhưng vẫn phục vụ với cảnh báo
-- **Dashboard**: 
-  - `/models`: 1 hàng filter `q` + `provider` + `verified` + **Filters** dropdown (4 toggles: `hasKey` mặc định TẮT + `hide404`/`hidePayment`/`hideInvalid` mặc định BẬT) + phải 3 nút `Check Live (n)` — `Sync Live Now` — `Refresh` (xóa `hasKeyOnly:false`); sticky bottom pagination `Page X/Y` + `LOV 25/50`; bảng `isRowDisabled` ưu tiên `live usable 200`/`usage>0` trước `deprecated`, per-row `Check` persist `200 usable` vào `data/model-health.json` nên reload giữ không đỏ; `hide*` ẩn
-  - `/providers`: filter `q` debounce 400ms + pill `hasKey` (mặc định TẮT) + highlight `hasRealKey` xanh lá; sticky bottom `LOV 25/50`; **Sync Live Now** cùng endpoint với Models, ghi `data/live-models.json`
-  - `/logs`: chỉ **Live ON** (SSE + 2s poll), đã bỏ `Auto sync 5s` duplicate
-  - Rate limit list endpoints đã tăng 4x (200) để tránh 429 khi gõ/pagination
+- **Dev**: live data via `POST /api/models/live/sync` with 1–2 real keys or freellms snapshot is sufficient; no full verify needed (dry-run <1s)
+- **Prod**: configure at least 5 P0 keys (NVIDIA, Groq, Cerebras, Gemini, GitHub) for live sync of 882 free (853 hasKey) every 24h; scheduler auto-calls both verify and syncLiveModels. Remaining providers will stay `unverified_no_key` but still serve with a warning
+ - **Dashboard**:
+   - `/models`: single filter row `q` + `provider` + `verified` + **Filters** dropdown (4 toggles: `hasKey` default OFF + `hide404`/`hidePayment`/`hideInvalid` default ON) + top-right 3 buttons `Check Live (n)` — `Sync Live Now` — `Refresh` (clears `hasKeyOnly:false`); sticky bottom pagination `Page X/Y` + `LOV 25/50`; table `isRowDisabled` prioritizes `live usable 200`/`usage>0` over `deprecated`, per-row `Check` persists `200 usable` to `data/model-health.json` so reload stays non-red; `hide*` hides
+   - `/providers`: filter `q` 400ms debounce + pill `hasKey` (default OFF) + `hasRealKey` green highlight; sticky bottom `LOV 25/50`; **Sync Live Now** same endpoint as Models, writes `data/live-models.json`
+  - `/logs`: only **Live ON** (SSE + 2s poll), duplicate `Auto sync 5s` removed
+  - Rate limit for list endpoints increased to 4x (200) to prevent 429 while typing/pagination
 
-## Khi model bị deprecated thì sao?
+## What Happens When a Model Is Deprecated?
 
-Gateway sẽ:
-- Vẫn giữ trong `GET /v1/models` nhưng kèm `live_status: deprecated` + `persisted_404: true` + strikethrough (disabled `isRowDisabled`)
-- Nếu `?verified=free`, loại bỏ deprecated khỏi list (để client chỉ thấy tier thực sự free)
-- `POST /api/models/health/mark` persist `404/410` (`unusable`) và cả `200 usable` (`usable` override 404, `v1/models.ts:153` đổi `verified_free`, frontend `isRowDisabled` xóa đỏ, giữ sau reload) vào `data/model-health.json` + `localStorage hide404`/`modelHealthUsable`, router sẽ skip deprecated trong `getProvidersForRequest` nếu có verified data
-- Per-row `Check` `GET /api/models/health?model=` → `POST /mark {status:"usable",http_status:200}` giữ `llm7-io/codestral-latest` không đỏ sau reload dù `verified-models.json` báo deprecated
-- `hide404`/`hidePayment`/`hideInvalid` mặc định BẬT, `hasKeyOnly` mặc định TẮT sẽ ẩn dòng khỏi UI (persist `*_migrated`), `Refresh` reset về mặc định mà không bật lại `hasKey`
+The gateway will:
+- Still keep it in `GET /v1/models` but with `live_status: deprecated` + `persisted_404: true` + strikethrough (disabled `isRowDisabled`)
+- If `?verified=free`, exclude deprecated from the list (so clients only see tiers that are still actually free)
+- `POST /api/models/health/mark` persists `404/410` (`unusable`) and also `200 usable` (`usable` overrides 404, `v1/models.ts:153` flips to `verified_free`, frontend `isRowDisabled` clears red, survives reload) to `data/model-health.json` + `localStorage hide404`/`modelHealthUsable`, router will skip deprecated entries in `getProvidersForRequest` if verified data exists
+- Per-row `Check` `GET /api/models/health?model=` → `POST /mark {status:"usable",http_status:200}` keeps `llm7-io/codestral-latest` non-red after reload even though `verified-models.json` said deprecated
+- `hide404`/`hidePayment`/`hideInvalid` default ON, `hasKeyOnly` default OFF will hide rows from UI (persist `*_migrated`), `Refresh` resets to defaults without re-enabling `hasKey`
 
 ## Rate limit 429 fix
 
-- Frontend: `qDebounced` 400ms `setTimeout` trong `Models.tsx`/`Providers.tsx` — giảm request khi gõ
-- Backend: `middleware/rate-limit.ts` `isListEndpoint` (`/v1/models`, `/api/providers`, `/api/models/health`) → `effectiveLimit = max(vk.rpmLimit*4, 200)` — tăng 4x cho list/pagination/search
-- Engine (0.9.0): Redis Lua sliding-window-counter (`lib/sliding-window.ts`) — atomic check+commit, dùng chung mọi instance gateway, hết boundary spike của fixed window; fallback in-memory khi mất Redis. Cùng engine cho quota provider qua `checkQuotaAsync` (`lib/quota-tracker.ts`); `recordUsage` ghi kép để `getQuotaHeadroom`/cost-routing vẫn chạy. Entry 429 trong `provider_errors` giờ kèm `retryAfterMs`.
+- Frontend: `qDebounced` 400ms `setTimeout` in `Models.tsx`/`Providers.tsx` — reduces request rate while typing
+- Backend: `middleware/rate-limit.ts` `isListEndpoint` (`/v1/models`, `/api/providers`, `/api/models/health`) → `effectiveLimit = max(vk.rpmLimit*4, 200)` — 4x increase for list/pagination/search
+- Engine (0.9.0): Redis Lua sliding-window-counter (`lib/sliding-window.ts`) — atomic check+commit, shared across gateway instances, no fixed-window boundary spike; falls back to in-memory fixed window when Redis is down. Same engine drives provider quotas via `checkQuotaAsync` (`lib/quota-tracker.ts`); `recordUsage` dual-writes so `getQuotaHeadroom`/cost-routing keeps working. 429 `provider_errors` entries now carry `retryAfterMs`.

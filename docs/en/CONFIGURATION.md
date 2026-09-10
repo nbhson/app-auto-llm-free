@@ -79,7 +79,7 @@ Leaving a provider empty disables it (except `pollinations`/`llm7-io` scraped pr
 - **Windows PowerShell:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F` (or `taskkill /F /IM node.exe`)
 - **Windows CMD/Git Bash:** `netstat -ano | findstr :7373` → `taskkill /PID <PID> /F`
 
-then click **Sync Live Now** `POST /api/models/live/sync` to populate `data/live-models.json`. Fresh clone has empty `data/` (`data/.gitkeep` only, `b930e6d` — `data/*.json` gitignored); run sync to generate. See the full table in `docs/PROVIDERS.md:1`.
+then **auto boot-sync** (`jobs/boot-sync.ts`) tự phát hiện provider mới (qua `data/.provider-fingerprint.json`) và `syncLiveModels` + `verify` sau ~3s — không cần bấm **Sync Live Now** nữa (vẫn có thể bấm `POST /api/models/live/sync` thủ công). Fresh clone có `data/` rỗng (`data/.gitkeep` only, `b930e6d` — `data/*.json` gitignored); lần đầu boot sẽ tự sync nếu có key, hoặc bấm sync. Xem `docs/PROVIDERS.md:1`.
 
 ### Router
 
