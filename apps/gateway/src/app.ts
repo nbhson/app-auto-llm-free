@@ -69,7 +69,7 @@ export function createApp() {
   });
 
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "1.5.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "1.5.1", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
   // LB-friendly liveness/readiness probes — no auth, no version payload
   app.get("/health", (c) => c.json({ status: "ok" }));

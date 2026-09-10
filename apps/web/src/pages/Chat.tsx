@@ -219,7 +219,7 @@ export default function Chat() {
     return ALLOWED_CHAT_MODELS[1]; // default kilo-code/auto
   });
   const [temperature, setTemperature] = useState(() => parseFloat(localStorage.getItem("chatTemp") || "0.7"));
-  const [maxTokens, setMaxTokens] = useState(() => parseInt(localStorage.getItem("chatMaxTokens") || "1024", 10));
+  const [maxTokens, setMaxTokens] = useState(() => parseInt(localStorage.getItem("chatMaxTokens") || "4096", 10));
   const [streamEnabled, setStreamEnabled] = useState(() => localStorage.getItem("chatStream") !== "0");
   const [systemPrompt, setSystemPrompt] = useState(() => localStorage.getItem("chatSystemPrompt") || "");
   const [showSettings, setShowSettings] = useState(false);
@@ -477,58 +477,155 @@ export default function Chat() {
 
       if (!streamEnabled || !res.body) {
         const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || data.content || JSON.stringify(data, null, 2);
+        // robust non-stream content extraction (array content, reasoning fallback)
+        const rawChoice = data.choices?.[0];
+        const rawMsg = rawChoice?.message;
+        let content: string = "";
+        if (rawMsg) {
+          if (typeof rawMsg.content === "string") content = rawMsg.content;
+          else if (Array.isArray(rawMsg.content)) content = rawMsg.content.map((p: any) => p.text || p.content || "").join("");
+          else if (rawMsg.content) content = String(rawMsg.content);
+          if (!content && rawMsg.reasoning_content) content = String(rawMsg.reasoning_content);
+          if (!content && rawMsg.reasoning) content = String(rawMsg.reasoning);
+        }
+        if (!content) content = data.content || data.text || data.output_text || "";
+        if (!content) content = JSON.stringify(data, null, 2);
         const usage = data.usage;
         setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: String(content), provider: data.provider || provider, model: data.model || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens, completion: usage.completion_tokens, total: usage.total_tokens } : undefined } : m)));
         setLastMeta({ provider: provider || data.provider, model: data.model || modelHeader, latencyMs: Date.now() - start, usage });
       } else {
-        // streaming parse
+        // robust streaming parse — handles reasoning_content/reasoning/thinking/text variants + empty fallback
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         let full = "";
+        let reasoningFull = "";
+        let streamError: string | null = null;
+        const extractDelta = (json: any): { content: string; reasoning: string } => {
+          if (!json) return { content: "", reasoning: "" };
+          if (json.error) {
+            const msg = json.error.message || json.error.error || JSON.stringify(json.error);
+            return { content: "", reasoning: `__ERROR__:${msg}` };
+          }
+          const c = json.choices?.[0];
+          if (c) {
+            const d: any = c.delta ?? c.message ?? {};
+            let content = "";
+            let reasoning = "";
+            if (typeof d === "string") content = d;
+            else {
+              // array content (OpenAI multi-part)
+              if (Array.isArray(d.content)) content = d.content.map((p: any) => p.text || p.content || p.output_text || "").join("");
+              else content = d.content ?? d.text ?? d.output_text ?? c.text ?? json.content ?? json.text ?? "";
+              reasoning = d.reasoning_content ?? d.reasoning ?? d.thinking ?? c.reasoning_content ?? c.reasoning ?? json.reasoning_content ?? json.reasoning ?? "";
+              if (!content && Array.isArray(c.content)) content = c.content.map((p: any) => p.text || "").join("");
+            }
+            if (!content && typeof c.text === "string") content = c.text;
+            return { content: content || "", reasoning: reasoning || "" };
+          }
+          const top = json.content ?? json.text ?? json.output_text ?? json.delta?.content ?? json.delta?.text ?? "";
+          return { content: typeof top === "string" ? top : "", reasoning: json.reasoning_content || json.reasoning || "" };
+        };
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
-          for (const line of lines) {
-            const trimmed = line.trim();
+          for (const rawLine of lines) {
+            const trimmed = rawLine.trim();
             if (!trimmed) continue;
+            if (trimmed.startsWith(":")) continue;
+            if (trimmed.startsWith("event:")) continue;
             if (!trimmed.startsWith("data:")) continue;
             const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") break;
+            if (!dataStr) continue;
+            if (dataStr === "[DONE]") { buffer = ""; break; }
             try {
               const json = JSON.parse(dataStr);
-              const delta = json.choices?.[0]?.delta?.content || json.choices?.[0]?.message?.content || json.content || "";
-              if (delta) {
-                full += delta;
+              if (json.error) {
+                streamError = json.error.message || json.error.error || JSON.stringify(json.error);
+                continue;
+              }
+              if (json.usage) setLastMeta((p) => ({ ...(p || {}), usage: json.usage }));
+              const { content: deltaContent, reasoning } = extractDelta(json);
+              if (reasoning && reasoning.startsWith("__ERROR__:")) {
+                streamError = reasoning.slice("__ERROR__:".length);
+                continue;
+              }
+              if (reasoning) reasoningFull += reasoning;
+              if (deltaContent) {
+                full += deltaContent;
                 setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: full, provider, model: modelHeader } : m)));
               }
-              if (json.usage) setLastMeta((p) => ({ ...p, usage: json.usage }));
+              if (json.usage) setLastMeta((p) => ({ ...(p || {}), usage: json.usage }));
             } catch {
               // ignore incomplete json
             }
           }
+          if (streamError) break;
         }
-        // flush leftover buffer
-        if (buffer.trim().startsWith("data:")) {
+        // flush leftover buffer (single data line without trailing newline)
+        if (!streamError && buffer.trim().startsWith("data:")) {
           const dataStr = buffer.trim().slice(5).trim();
           if (dataStr && dataStr !== "[DONE]") {
             try {
               const json = JSON.parse(dataStr);
-              const delta = json.choices?.[0]?.delta?.content || "";
-              if (delta) {
-                full += delta;
+              const { content: deltaContent, reasoning } = extractDelta(json);
+              if (reasoning) reasoningFull += reasoning;
+              if (deltaContent) {
+                full += deltaContent;
                 setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: full, provider, model: modelHeader } : m)));
               }
             } catch {}
           }
         }
-        const latency = Date.now() - start;
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, latencyMs: latency } : m)));
-        setLastMeta((p) => ({ ...(p || {}), provider, model: modelHeader, latencyMs: latency }));
+        if (streamError) throw new Error(streamError);
+        if (!full.trim() && reasoningFull.trim()) {
+          // model only returned reasoning (common for thinking models on refactor) — show it instead of empty
+          full = reasoningFull;
+          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: full, provider, model: modelHeader } : m)));
+        }
+        if (!full.trim()) {
+          // empty stream -> fallback to non-stream once so user still gets answer
+          try {
+            const fallbackRes = await fetch(`/v1/chat/completions`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${mk()}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ ...body, stream: false }),
+            });
+            if (fallbackRes.ok) {
+              const data = await fallbackRes.json();
+              const fbChoice = data.choices?.[0]?.message;
+              let fbContent = "";
+              if (fbChoice) {
+                if (typeof fbChoice.content === "string") fbContent = fbChoice.content;
+                else if (Array.isArray(fbChoice.content)) fbContent = fbChoice.content.map((p: any) => p.text || "").join("");
+                if (!fbContent) fbContent = fbChoice.reasoning_content || fbChoice.reasoning || "";
+              }
+              if (!fbContent) fbContent = data.content || data.text || "";
+              if (fbContent) {
+                full = String(fbContent);
+                const usage = data.usage;
+                setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: full, provider: data.provider || provider, model: data.model || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens, completion: usage.completion_tokens, total: usage.total_tokens } : undefined } : m)));
+                setLastMeta({ provider: provider || data.provider, model: data.model || modelHeader, latencyMs: Date.now() - start, usage });
+              } else {
+                throw new Error("Empty response (stream and fallback both empty). Try different model or increase Max Tokens.");
+              }
+            } else {
+              const txt = await fallbackRes.text().catch(() => "");
+              throw new Error(txt.slice(0, 300) || "Empty stream — fallback failed");
+            }
+          } catch (fbErr: any) {
+            if (fbErr.message?.includes("Empty response")) throw fbErr;
+            throw new Error("Empty response from model (stream returned no content). " + (fbErr.message || "Try non-stream or different model / increase Max Tokens."));
+          }
+        }
+        if (full.trim()) {
+          const latency = Date.now() - start;
+          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, latencyMs: latency } : m)));
+          setLastMeta((p) => ({ ...(p || {}), provider, model: modelHeader, latencyMs: latency }));
+        }
       }
     } catch (e: any) {
       if (e.name === "AbortError") {

@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.1] - 2026-09-11
+
+### Fixed
+- **Chat trả về empty khi refactor code** — `apps/web/src/pages/Chat.tsx:485-600` streaming parser trước chỉ lấy `delta.content` nên reasoning models (kilo/kira/agnes blast thinking) trả `reasoning_content`/`reasoning`/`thinking` 88s rồi `content` rỗng → placeholder trống. Fix: `extractDelta` bắt `content`/`text`/`output_text` + `reasoning_content`/`reasoning`/`thinking`, array-content, ping `:`/`event:` skip, `reasoningFull` fallback (nếu chỉ có reasoning thì hiển thị thay vì rỗng), `streamError` detection, flush leftover `data:`, **fallback non-stream** 1 lần (`stream:false`) nếu vẫn empty → hiển thị nội dung hoặc lỗi rõ ràng thay vì trống. `maxTokens` default `1024→4096` để refactor file lớn không bị `finish_reason:length` rỗng.
+- **UT empty fix** — `apps/gateway/src/lib/chat-allowed.test.ts:155-176` thêm 2 tests kiểm `reasoning_content`/`reasoningFull`/`fallbackRes`/`4096`/`extractDelta`/`streamError`
+
+### Changed
+- **Version bump** — `package.json` `apps/gateway` `apps/web` `1.5.0→1.5.1`, `main.tsx` badge `v1.5.1`, `app.ts` version `1.5.1`
+
 ## [1.5.0] - 2026-09-11
 
 ### Added
