@@ -9,7 +9,7 @@ describe("health route", () => {
     expect(res.status).toBe(200);
     const data = await resJson<HealthResponse>(res);
     expect(data.status).toBe("ok");
-    expect(data.version).toBe("1.6.0");
+    expect(data.version).toBe("1.7.0");
     expect(data.providers).toBe(providerIds.length);
     expect(data.providers).toBeGreaterThan(40);
     expect(data.providers).toBe(51);

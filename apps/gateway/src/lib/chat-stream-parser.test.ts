@@ -1,86 +1,71 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-// Mirror of Chat.tsx extractDelta robust logic — tested standalone to guard empty refactor fix
-function extractDelta(json: any): { content: string; reasoning: string } {
-  if (!json) return { content: "", reasoning: "" };
-  if (json.error) {
-    const msg = json.error.message || json.error.error || JSON.stringify(json.error);
-    return { content: "", reasoning: `__ERROR__:${msg}` };
+// Import the REAL parser from web feature (single source of truth) — no mirror drift
+function findParserPath(): string {
+  const candidates = [
+    resolve(process.cwd(), "apps/web/src/features/chat/lib/sse-parser.ts"), // repo root
+    resolve(process.cwd(), "../web/src/features/chat/lib/sse-parser.ts"), // apps/gateway
+    resolve(process.cwd(), "../../apps/web/src/features/chat/lib/sse-parser.ts"), // apps/gateway via ../../
+  ];
+  for (const p of candidates) {
+    try {
+      readFileSync(p);
+      return p;
+    } catch {}
   }
-  const c = json.choices?.[0];
-  if (c) {
-    const d: any = c.delta ?? c.message ?? {};
-    let content = "";
-    let reasoning = "";
-    if (typeof d === "string") content = d;
-    else {
-      if (Array.isArray(d.content)) content = d.content.map((p: any) => p.text || p.content || p.output_text || "").join("");
-      else content = d.content ?? d.text ?? d.output_text ?? c.text ?? json.content ?? json.text ?? "";
-      reasoning = d.reasoning_content ?? d.reasoning ?? d.thinking ?? c.reasoning_content ?? c.reasoning ?? json.reasoning_content ?? json.reasoning ?? "";
-      if (!content && Array.isArray(c.content)) content = c.content.map((p: any) => p.text || "").join("");
-    }
-    if (!content && typeof c.text === "string") content = c.text;
-    return { content: content || "", reasoning: reasoning || "" };
-  }
-  const top = json.content ?? json.text ?? json.output_text ?? json.delta?.content ?? json.delta?.text ?? "";
-  return { content: typeof top === "string" ? top : "", reasoning: json.reasoning_content || json.reasoning || "" };
+  throw new Error(`sse-parser.ts not found: ${candidates.join(", ")}`);
 }
 
-// Helper to simulate SSE parsing (buffer + lines) like Chat.tsx does, returns aggregated full
-function simulateSseParse(chunks: string[]): { full: string; reasoningFull: string; error: string | null } {
-  let buffer = "";
-  let full = "";
-  let reasoningFull = "";
-  let streamError: string | null = null;
-  for (const chunk of chunks) {
-    buffer += chunk;
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const rawLine of lines) {
-      const trimmed = rawLine.trim();
-      if (!trimmed) continue;
-      if (trimmed.startsWith(":")) continue;
-      if (trimmed.startsWith("event:")) continue;
-      if (!trimmed.startsWith("data:")) continue;
-      const dataStr = trimmed.slice(5).trim();
-      if (!dataStr) continue;
-      if (dataStr === "[DONE]") { buffer = ""; break; }
-      try {
-        const json = JSON.parse(dataStr);
-        if (json.error) { streamError = json.error.message || JSON.stringify(json.error); continue; }
-        const { content, reasoning } = extractDelta(json);
-        if (reasoning && reasoning.startsWith("__ERROR__:")) { streamError = reasoning.slice("__ERROR__:".length); continue; }
-        if (reasoning) reasoningFull += reasoning;
-        if (content) full += content;
-      } catch {}
-    }
-    if (streamError) break;
-  }
-  if (!streamError && buffer.trim().startsWith("data:")) {
-    const dataStr = buffer.trim().slice(5).trim();
-    if (dataStr && dataStr !== "[DONE]") {
-      try { const json = JSON.parse(dataStr); const { content, reasoning } = extractDelta(json); if (reasoning) reasoningFull += reasoning; if (content) full += content; } catch {}
-    }
-  }
-  // fallback reasoning if content empty
-  if (!full.trim() && reasoningFull.trim()) full = reasoningFull;
-  return { full, reasoningFull, error: streamError };
+const parserPath = findParserPath();
+const parserCode = readFileSync(parserPath, "utf-8");
+
+// Node >= 22.18 (default) / >= 23: native TS type stripping — import .ts directly
+const modUrl = pathToFileURL(parserPath).href;
+const imported = await import(modUrl);
+const extractDelta = imported.extractDelta as (json: unknown) => { content: string; reasoning: string };
+const parseSseStream = imported.parseSseStream as (
+  stream: ReadableStream<Uint8Array>,
+  cb: { onDelta?: (c: string, r: string) => void; onUsage?: (u: unknown) => void; onError?: (m: string) => void },
+  signal?: AbortSignal,
+) => Promise<{ full: string; reasoningFull: string; error: string | null }>;
+
+function toStream(chunks: string[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  let i = 0;
+  return new ReadableStream({
+    pull(controller) {
+      if (i >= chunks.length) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(enc.encode(chunks[i++]));
+    },
+  });
 }
 
-describe("chat stream parser — robust delta extraction (empty refactor fix)", () => {
+describe("chat stream parser — real web module (robust delta extraction)", () => {
+  it("module exports match expected API", () => {
+    expect(parserCode).toContain("export function extractDelta");
+    expect(parserCode).toContain("export async function parseSseStream");
+  });
+
   it("extracts standard delta.content", () => {
-    const j = { choices: [{ delta: { content: "hello " } }] };
-    expect(extractDelta(j).content).toBe("hello ");
+    expect(extractDelta({ choices: [{ delta: { content: "hello " } }] }).content).toBe("hello ");
   });
 
   it("extracts delta.text fallback (some providers use text)", () => {
-    const j = { choices: [{ delta: { text: "hello text" } }] };
-    expect(extractDelta(j).content).toBe("hello text");
+    expect(extractDelta({ choices: [{ delta: { text: "hello text" } }] }).content).toBe("hello text");
+  });
+
+  it("extracts output_text variant", () => {
+    expect(extractDelta({ choices: [{ delta: { output_text: "out" } }] }).content).toBe("out");
   });
 
   it("extracts reasoning_content separately (kilo/kira thinking)", () => {
-    const j = { choices: [{ delta: { reasoning_content: "thinking...", content: "" } }] };
-    const { content, reasoning } = extractDelta(j);
+    const { content, reasoning } = extractDelta({ choices: [{ delta: { reasoning_content: "thinking...", content: "" } }] });
     expect(content).toBe("");
     expect(reasoning).toBe("thinking...");
   });
@@ -91,21 +76,22 @@ describe("chat stream parser — robust delta extraction (empty refactor fix)", 
   });
 
   it("handles array content (multi-part) -> joins text", () => {
-    const j = { choices: [{ delta: { content: [{ text: "part1 " }, { text: "part2" }] } }] };
-    expect(extractDelta(j).content).toBe("part1 part2");
+    expect(extractDelta({ choices: [{ delta: { content: [{ text: "part1 " }, { text: "part2" }] } }] }).content).toBe("part1 part2");
+  });
+
+  it("handles string delta (rare providers)", () => {
+    expect(extractDelta({ choices: [{ delta: "raw string" }] }).content).toBe("raw string");
   });
 
   it("handles top-level content fallback (non-OpenAI SSE)", () => {
-    const j = { content: "top level" };
-    expect(extractDelta(j).content).toBe("top level");
+    expect(extractDelta({ content: "top level" }).content).toBe("top level");
   });
 
   it("detects error object", () => {
-    const j = { error: { message: "quota exceeded" } };
-    expect(extractDelta(j).reasoning).toContain("__ERROR__:quota exceeded");
+    expect(extractDelta({ error: { message: "quota exceeded" } }).reasoning).toContain("__ERROR__:quota exceeded");
   });
 
-  it("simulates full SSE with ping/event ignored and content aggregated", () => {
+  it("full SSE via parseSseStream: ping/event ignored, content + reasoning aggregated, [DONE] handled", async () => {
     const chunks = [
       ": ping\n\n",
       "event: delta\n",
@@ -115,42 +101,59 @@ describe("chat stream parser — robust delta extraction (empty refactor fix)", 
       'data: {"choices":[{"delta":{"content":"function foo() {}"}}]}\n\n',
       "data: [DONE]\n\n",
     ];
-    const { full, reasoningFull } = simulateSseParse(chunks);
+    const { full, reasoningFull } = await parseSseStream(toStream(chunks), {});
     expect(reasoningFull).toBe("thinking 1 thinking 2 ");
     expect(full).toBe("refactored code: function foo() {}");
   });
 
-  it("fallback to reasoning when content empty (model only returned thinking)", () => {
+  it("fallback to reasoning when content empty (model only returned thinking)", async () => {
     const chunks = [
       'data: {"choices":[{"delta":{"reasoning_content":"only reasoning"}}]}\n\n',
       "data: [DONE]\n\n",
     ];
-    const { full, reasoningFull } = simulateSseParse(chunks);
+    const { full, reasoningFull } = await parseSseStream(toStream(chunks), {});
     expect(reasoningFull).toBe("only reasoning");
-    expect(full).toBe("only reasoning"); // fallback applied
+    expect(full).toBe("only reasoning");
   });
 
-  it("ignores : ping and event: lines, handles leftover buffer without newline", () => {
-    const chunks = [
-      'data: {"choices":[{"delta":{"content":"hello"}}]}', // no trailing \n in this chunk
-    ];
-    // simulate final flush: buffer holds data line without newline -> should be flushed
-    const { full } = simulateSseParse(chunks);
-    // without newline, simulateSseParse flushes leftover buffer
+  it("handles leftover buffer without trailing newline (flush)", async () => {
+    const chunks = ['data: {"choices":[{"delta":{"content":"hello"}}]}'];
+    const { full } = await parseSseStream(toStream(chunks), {});
     expect(full).toBe("hello");
   });
 
-  it("aggregates split JSON across chunks (incomplete line buffering)", () => {
-    // SSE spec: JSON may be split across TCP chunks; parser buffers until newline
+  it("aggregates split JSON across chunks (incomplete line buffering)", async () => {
     const part1 = 'data: {"choices":[{"delta":{"content":"hel';
     const part2 = 'lo world"}}]}\n\n';
-    const { full } = simulateSseParse([part1, part2]);
+    const { full } = await parseSseStream(toStream([part1, part2]), {});
     expect(full).toBe("hello world");
   });
 
-  it("handles stream error inside data", () => {
+  it("handles stream error inside data", async () => {
     const chunks = ['data: {"error":{"message":"rate limited"}}\n\n'];
-    const { error } = simulateSseParse(chunks);
+    const { error } = await parseSseStream(toStream(chunks), {});
     expect(error).toContain("rate limited");
+  });
+
+  it("onDelta callback receives each delta (throttle hook point)", async () => {
+    const got: string[] = [];
+    const chunks = ['data: {"choices":[{"delta":{"content":"a"}}]}\n\n', 'data: {"choices":[{"delta":{"content":"b"}}]}\n\n', "data: [DONE]\n\n"];
+    await parseSseStream(toStream(chunks), { onDelta: (c) => got.push(c) });
+    expect(got).toEqual(["a", "b"]);
+  });
+
+  it("onUsage callback receives usage object", async () => {
+    const usages: unknown[] = [];
+    const chunks = ['data: {"choices":[{"delta":{"content":"x"}}],"usage":{"total_tokens":42}}\n\n', "data: [DONE]\n\n"];
+    await parseSseStream(toStream(chunks), { onUsage: (u) => usages.push(u) });
+    expect(usages.length).toBeGreaterThan(0);
+    expect((usages[0] as Record<string, unknown>).total_tokens).toBe(42);
+  });
+
+  it("aborts via signal (Stop button path) — throws AbortError", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const chunks = ['data: {"choices":[{"delta":{"content":"never"}}]}\n\n'];
+    await expect(parseSseStream(toStream(chunks), {}, ac.signal)).rejects.toThrow("Aborted");
   });
 });

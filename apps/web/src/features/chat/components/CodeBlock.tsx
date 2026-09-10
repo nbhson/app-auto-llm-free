@@ -28,6 +28,7 @@ export const CodeBlock = React.memo(function CodeBlock({ children, className }: 
       <div className="flex items-center justify-between px-3 py-1.5 bg-slate-100 border-b border-slate-200">
         <span className="text-xs font-mono font-semibold text-slate-600">{lang || t("chat.code")}</span>
         <button
+          aria-label={copied ? "Copied" : "Copy code"}
           onClick={handleCopy}
           className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
         >

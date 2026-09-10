@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from "react";
-import { extractDelta } from "../lib/sse-parser";
+import { extractDelta, parseSseStream } from "../lib/sse-parser";
 import { getMasterKey } from "../lib/storage";
 import type { ChatMessage } from "../types";
 
@@ -172,55 +172,17 @@ export function useChatStream(opts: UseChatStreamOpts) {
         setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: String(content), provider: (data.provider as string) || provider, model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens as number, completion: usage.completion_tokens as number, total: usage.total_tokens as number } : undefined } : m)));
         setLastMeta({ provider: provider || (data.provider as string), model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, usage });
       } else {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let full = "";
-        let reasoningFull = "";
-        let streamError: string | null = null;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const rawLine of lines) {
-            const trimmed = rawLine.trim();
-            if (!trimmed) continue;
-            if (trimmed.startsWith(":")) continue;
-            if (trimmed.startsWith("event:")) continue;
-            if (!trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.slice(5).trim();
-            if (!dataStr) continue;
-            if (dataStr === "[DONE]") { buffer = ""; break; }
-            try {
-              const json = JSON.parse(dataStr);
-              const j = json as Record<string, unknown>;
-              if (j.error) {
-                const e = j.error as Record<string, unknown>;
-                streamError = (e.message as string) || (e.error as string) || JSON.stringify(e);
-                continue;
-              }
-              if (j.usage) setLastMeta((p) => ({ ...(p || {}), usage: j.usage as unknown }));
-              const { content: deltaContent, reasoning } = extractDelta(json);
-              if (reasoning && reasoning.startsWith("__ERROR__:")) {
-                streamError = reasoning.slice("__ERROR__:".length);
-                continue;
-              }
-              if (reasoning) reasoningFull += reasoning;
-              if (deltaContent) {
-                full += deltaContent;
-                scheduleFlush(deltaContent, assistantId, provider, modelHeader);
-              }
-              if (j.usage) setLastMeta((p) => ({ ...(p || {}), usage: j.usage as unknown }));
-            } catch {
-              // ignore incomplete json
-            }
-          }
-          if (streamError) break;
-        }
-        // Ensure any pending RAF is flushed
+        // Reuse shared SSE parser — DRY, throttle via RAF
+        const { full, reasoningFull, error: streamError } = await parseSseStream(
+          res.body,
+          {
+            onDelta: (delta) => scheduleFlush(delta, assistantId, provider, modelHeader),
+            onUsage: (u) => setLastMeta((p) => ({ ...(p || {}), usage: u })),
+            onError: (msg) => setLastMeta((p) => ({ ...(p || {}), usage: undefined })),
+          },
+          controller.signal,
+        );
+        // Flush any pending RAF batch
         if (throttleRef.current.raf) {
           cancelAnimationFrame(throttleRef.current.raf);
           throttleRef.current.raf = null;
@@ -228,29 +190,10 @@ export function useChatStream(opts: UseChatStreamOpts) {
         if (throttleRef.current.pending) {
           const pending = throttleRef.current.pending;
           throttleRef.current.pending = "";
-          full += ""; // full already aggregated via scheduleFlush pending; ensure sync
-          // Apply pending directly (full already has it via scheduleFlush? we used scheduleFlush to batch. Need to ensure full reflects pending. Instead flush to state)
           setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: (m.content || "") + pending, provider, model: modelHeader } : m)));
-        }
-        // flush leftover buffer
-        if (!streamError && buffer.trim().startsWith("data:")) {
-          const dataStr = buffer.trim().slice(5).trim();
-          if (dataStr && dataStr !== "[DONE]") {
-            try {
-              const json = JSON.parse(dataStr);
-              const { content: deltaContent, reasoning } = extractDelta(json);
-              if (reasoning) reasoningFull += reasoning;
-              if (deltaContent) {
-                full += deltaContent;
-                setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: (m.content || "") + deltaContent, provider, model: modelHeader } : m)));
-              }
-            } catch {}
-          }
         }
         if (streamError) throw new Error(streamError);
         // If only reasoning, show it
-        // Need to check current content length; if empty use reasoningFull
-        // We already flushed; if still empty, set reasoning
         setMessages((prev) => {
           const cur = prev.find((m) => m.id === assistantId);
           if (cur && !cur.content.trim() && reasoningFull.trim()) {
@@ -258,21 +201,18 @@ export function useChatStream(opts: UseChatStreamOpts) {
           }
           return prev;
         });
-        // Determine if still empty after all
-        const curContent = (() => {
-          // optimistic: if full was aggregated via schedule, check full var
-          // Also check reasoning fallback
-          if (full.trim()) return full;
-          if (reasoningFull.trim()) return reasoningFull;
-          return "";
-        })();
-        if (!curContent.trim()) {
-          // fallback to non-stream once
+        const curContent = full.trim() || reasoningFull.trim();
+        if (!curContent) {
+          // fallback to non-stream once — with its own AbortController so Stop works
+          const fallbackController = new AbortController();
+          const prevAbort = abortRef.current;
+          abortRef.current = fallbackController;
           try {
             const fallbackRes = await fetch(`/v1/chat/completions`, {
               method: "POST",
               headers: { Authorization: `Bearer ${mk}`, "Content-Type": "application/json" },
               body: JSON.stringify({ ...body, stream: false }),
+              signal: fallbackController.signal,
             });
             if (fallbackRes.ok) {
               const data = await fallbackRes.json() as Record<string, unknown>;
@@ -286,9 +226,9 @@ export function useChatStream(opts: UseChatStreamOpts) {
               }
               if (!fbContent) fbContent = (data.content as string) || (data.text as string) || "";
               if (fbContent) {
-                full = String(fbContent);
+                const fbFull = String(fbContent);
                 const usage = data.usage as Record<string, unknown> | undefined;
-                setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: full, provider: (data.provider as string) || provider, model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens as number, completion: usage.completion_tokens as number, total: usage.total_tokens as number } : undefined } : m)));
+                setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: fbFull, provider: (data.provider as string) || provider, model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens as number, completion: usage.completion_tokens as number, total: usage.total_tokens as number } : undefined } : m)));
                 setLastMeta({ provider: provider || (data.provider as string), model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, usage });
               } else {
                 throw new Error("Empty response (stream and fallback both empty). Try different model or increase Max Tokens.");
@@ -298,9 +238,13 @@ export function useChatStream(opts: UseChatStreamOpts) {
               throw new Error(txt.slice(0, 300) || "Empty stream — fallback failed");
             }
           } catch (fbErr: unknown) {
+            if ((fbErr as { name?: string })?.name === "AbortError") throw fbErr;
             const msg = fbErr instanceof Error ? fbErr.message : String(fbErr);
             if (msg.includes("Empty response")) throw fbErr;
             throw new Error("Empty response from model (stream returned no content). " + (msg || "Try non-stream or different model / increase Max Tokens."));
+          } finally {
+            // restore original controller if still fallback one
+            if (abortRef.current === fallbackController) abortRef.current = prevAbort;
           }
         } else {
           const latency = Date.now() - start;

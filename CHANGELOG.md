@@ -2,6 +2,31 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.0] - 2026-09-11
+
+### Added
+- **Chat componentized 1.7.0** — `apps/web/src/pages/Chat.tsx` 688→311 LOC, tách UI thành `features/chat/components/{ChatHeader, MessageList, Composer, ContextPanel, TipsCard, ErrorBoundary}` — mỗi component `React.memo`, Chat page chỉ giữ state + effects + wiring
+- **ErrorBoundary** cho `MarkdownContent` — markdown lỗi không crash toàn page, hiển thị fallback alert
+- **A11y (WCAG)** — `aria-label` cho 12+ icon buttons (send/stop/copy/upload/dismiss/refresh/settings/model), `role="log" aria-live="polite"` cho message list (screen reader đọc streaming), `role="alert"` error bar, `role="status"` thinking indicator, `role="progressbar"` context bar + `aria-valuenow`, `role="listbox"/"option"` model dropdown + `aria-expanded`/`aria-haspopup`, `Escape` đóng dropdown
+- **Confirm trước Refresh** — `window.confirm(t("chat.confirmRefresh"))` khi messages > 1, tránh mất history (key i18n VI/EN mới)
+- **UT thực thi module thật** — `chat-stream-parser.test.ts` rewrite: import trực tiếp `sse-parser.ts` từ web (single source of truth, Node native TS type-stripping), 18 tests bao gồm `parseSseStream` + `onDelta/onUsage` callbacks + abort path — bỏ mirror drift cũ
+
+### Changed
+- **DRY: reuse parseSseStream** — `useChatStream.ts` gọi shared `parseSseStream(res.body, {onDelta: scheduleFlush}, signal)` thay vì re-implement 70 dòng SSE loop; fallback non-stream có `fallbackController` riêng (Stop hoạt động cả khi fallback)
+- **ChatHeader encapsulated** — model dropdown + filter state local, không leak `modelSearchOpen/modelFilter` lên page
+- **Bundle split** — `vite.config.ts` `manualChunks`: `vendor-react` 180KB, `vendor-markdown` 337KB, `vendor-charts` 418KB — hết chunk 1.16MB warning, load song song + cache theo vendor
+- **Constants centralized** — `CHAT_CONSTANTS` (ROLE_OVERHEAD/IMAGE_TOKENS/SCROLL_THROTTLE_MS/PERSIST_DEBOUNCE_MS/MODELS_FETCH_TIMEOUT_MS/MAX_IMAGE_SIZE...) trong `token.ts`
+- **Storage hardening** — `persistMessages` strip `dataUrl/preview` (base64) khỏi attachments trước khi localStorage (tránh quota 5MB), `clearPersistedMessages` xóa cả `chatMessages_full`
+- **Timeout models fetch** — `AbortController` + `MODELS_FETCH_TIMEOUT_MS` 8s cho `/v1/models`
+- **UT architecture update** — `chat-architecture.test.ts` 10 tests mới cho 1.7.0 (componentized <320 LOC, DRY parseSseStream, a11y asserts, manualChunks); `chat-allowed.test.ts` update paths cho components mới
+- **Version** — 1.6.0→1.7.0 (root/gateway/web, badge, health)
+
+### Fixed
+- **Duplicate SSE logic** (70 dòng) — useChatStream giờ dùng đúng `lib/sse-parser.ts` đã test 18 cases
+- **Fallback không abort được** — non-stream fallback giờ nhận `signal` từ `fallbackController`, Stop hoạt động mọi lúc
+- **localStorage quota** — dataUrl base64 không còn persist (chỉ giữ name/type/size), giảm 80% kích thước quota
+- **Dropdown không đóng bằng Escape** — thêm onKeyDown Escape + aria
+
 ## [1.6.0] - 2026-09-11
 
 ### Added

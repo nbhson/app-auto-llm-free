@@ -12,5 +12,16 @@ export default defineConfig({
       "/api": "http://localhost:7373",
     },
   },
-  build: { outDir: "dist" },
+  build: {
+    outDir: "dist",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-markdown": ["react-markdown", "remark-gfm", "rehype-highlight", "highlight.js"],
+          "vendor-charts": ["recharts"],
+        },
+      },
+    },
+  },
 });

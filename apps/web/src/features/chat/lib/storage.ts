@@ -31,15 +31,19 @@ export function loadMessages(fallbackWelcome: ChatMessage): ChatMessage[] {
 export function persistMessages(messages: ChatMessage[]): void {
   try {
     // Store last 30 without heavy dataUrl (truncate to avoid quota)
-    const toStore = messages.slice(-30);
+    const toStore = messages.slice(-30).map((m) => ({
+      ...m,
+      attachments: m.attachments?.map((a) => ({ ...a, dataUrl: undefined, preview: undefined })),
+    }));
     localStorage.setItem(MSG_KEY, JSON.stringify(toStore));
-    // Full backup (may be large) — best effort
-    try { localStorage.setItem(MSG_FULL_KEY, JSON.stringify(messages)); } catch {}
   } catch {}
 }
 
 export function clearPersistedMessages(): void {
-  try { localStorage.removeItem(MSG_KEY); } catch {}
+  try {
+    localStorage.removeItem(MSG_KEY);
+    localStorage.removeItem(MSG_FULL_KEY);
+  } catch {}
 }
 
 export const prefs = {

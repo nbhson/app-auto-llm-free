@@ -53,12 +53,16 @@ describe("Chat allowed models — 6 strict modes (added free-llm-gateway/auto)",
   });
 
   it("Chat breakdown is clickable and navigates to message", () => {
-    const txt = readWeb("apps/web/src/pages/Chat.tsx");
-    expect(txt).toContain("scrollToMessage");
-    expect(txt).toContain("highlightedId");
-    expect(txt).toContain('t("chat.breakdown")');
-    expect(txt).toContain("onClick={() => scrollToMessage");
-    expect(txt).toContain("id={`msg-${m.id}`}");
+    // 1.7.0: breakdown UI in ContextPanel, scrollToMessage in Chat.tsx, msg anchor in MessageList
+    const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
+    const panelTxt = readWeb("apps/web/src/features/chat/components/ContextPanel.tsx");
+    const listTxt = readWeb("apps/web/src/features/chat/components/MessageList.tsx");
+    const combined = chatTxt + "\n" + panelTxt + "\n" + listTxt;
+    expect(combined).toContain("scrollToMessage");
+    expect(combined).toContain("highlightedId");
+    expect(combined).toContain('t("chat.breakdown")');
+    expect(panelTxt).toContain("onScrollToMessage");
+    expect(listTxt).toContain("id={`msg-${m.id}`}");
   });
 });
 
@@ -145,9 +149,14 @@ describe("i18n VI/EN coverage for 8 pages (incl. Chat)", () => {
     }
   });
   it("Chat.tsx uses t() for UI (VI/EN)", () => {
-    const txt = readWeb("apps/web/src/pages/Chat.tsx");
-    expect(txt).toContain('const { t } = useLang()');
-    const tUsages = (txt.match(/t\("chat\./g) || []).length;
+    // 1.7.0: t() usages spread across Chat.tsx + components (ChatHeader/Composer/ContextPanel/TipsCard)
+    const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
+    const headerTxt = readWeb("apps/web/src/features/chat/components/ChatHeader.tsx");
+    const composerTxt = readWeb("apps/web/src/features/chat/components/Composer.tsx");
+    const panelTxt = readWeb("apps/web/src/features/chat/components/ContextPanel.tsx");
+    const combined = chatTxt + headerTxt + composerTxt + panelTxt;
+    expect(chatTxt).toContain('const { t } = useLang()');
+    const tUsages = (combined.match(/t\("chat\./g) || []).length;
     expect(tUsages).toBeGreaterThanOrEqual(20);
   });
   it("All 8 pages import useLang and use t()", () => {
