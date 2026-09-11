@@ -193,12 +193,13 @@ chatRoute.post(
       logger.info({ tools: effectiveTools.length }, "web tools injected");
     }
 
-    // Helper to call provider (single attempt, respects shouldSkip)
+    // Helper to call provider — for auto, race 3 providers in parallel gateway-wide (not only Chat page)
     const callProvider = (msgs: unknown[], useStream: boolean | undefined, tools: unknown[] | undefined, toolChoice: unknown) =>
       tryProviders({
         providerOrder,
         quotaTokens: estimatedForQuota.total,
         timeoutMs: perProviderTimeout,
+        parallel: isAuto ? config.providerParallelAuto : undefined,
         shouldSkip: (pid) => {
           const fullId = model.includes("/") ? model : `${pid}/${model}`;
           const requestedPrefix = model.split("/")[0];

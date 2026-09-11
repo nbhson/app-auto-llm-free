@@ -31,13 +31,76 @@ export interface TryProvidersOpts {
   shouldSkip?: (providerId: string) => string | null;
   call: (attempt: ProviderAttempt) => Promise<Response>;
   timeoutMs?: number;
+  parallel?: number;
 }
 
 export type TryProvidersResult =
   | { ok: true; providerId: string; key: string; res: Response }
   | { ok: false; errors: ProviderError[] };
 
+async function tryProvidersParallel(opts: TryProvidersOpts, batchSize: number): Promise<TryProvidersResult> {
+  const errors: ProviderError[] = [];
+  for (let i = 0; i < opts.providerOrder.length; i += batchSize) {
+    const batch = opts.providerOrder.slice(i, i + batchSize);
+    const attempts = batch.map(async (pid): Promise<{ providerId: string; key: string; res: Response }> => {
+      const provider = providers[pid];
+      if (!provider) throw { provider: pid, error: "unknown provider" } as ProviderError;
+      if (isOpen(pid)) throw { provider: pid, error: "circuit open (cooldown)" } as ProviderError;
+      const key = getNextKeyManaged(pid);
+      if (key === null) throw { provider: pid, error: `no key configured (set ${pid.toUpperCase().replace(/-/g, "_")}_API_KEYS)` } as ProviderError;
+      if (!key && !isPublicProvider(pid)) throw { provider: pid, error: "missing key" } as ProviderError;
+      if (opts.quotaTokens !== undefined) {
+        const quota = await checkQuotaAsync(pid, key, opts.quotaTokens!);
+        if (!quota.allowed) {
+          if (quota.retryAfterMs) markRateLimited(pid, key, quota.retryAfterMs);
+          throw { provider: pid, error: quota.reason, retryAfterMs: quota.retryAfterMs } as ProviderError;
+        }
+      }
+      if (opts.shouldSkip) {
+        const reason = opts.shouldSkip(pid);
+        if (reason) throw { provider: pid, error: reason } as ProviderError;
+      }
+      const timeoutMs = opts.timeoutMs ?? config.providerTimeoutMs;
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`provider timeout after ${timeoutMs}ms — thử model khác hoặc tắt Web Tools (Globe) nếu bật`)), timeoutMs);
+        timer.unref?.();
+      });
+      try {
+        const res = await Promise.race([opts.call({ providerId: pid, provider, key }), timeout]);
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          let retryAfterMs: number | undefined;
+          if (res.status === 429) {
+            const retry = parseInt(res.headers.get("retry-after") || "60", 10) * 1000;
+            retryAfterMs = Number.isNaN(retry) ? 60000 : retry;
+            markRateLimited(pid, key, retryAfterMs);
+          }
+          recordFailureIfRetryable(pid, res.status);
+          throw { provider: pid, status: res.status, error: text.slice(0, 600), retryAfterMs } as ProviderError;
+        }
+        recordSuccess(pid);
+        markSuccess(pid, key);
+        if (opts.quotaTokens !== undefined) recordUsage(pid, key, opts.quotaTokens!);
+        return { providerId: pid, key, res };
+      } finally { if (timer) clearTimeout(timer); }
+    });
+    try {
+      const winner = await Promise.any(attempts);
+      return { ok: true, providerId: winner.providerId, key: winner.key, res: winner.res };
+    } catch {
+      const settled = await Promise.allSettled(attempts);
+      for (const r of settled) if (r.status === "rejected") errors.push(r.reason as ProviderError);
+      logger.warn({ batch: batch.join(","), errors: errors.slice(-batch.length).map((e) => `${e.provider}:${String(e.error).slice(0, 80)}`) }, "parallel batch failed, trying next batch");
+    }
+  }
+  return { ok: false, errors };
+}
+
 export async function tryProviders(opts: TryProvidersOpts): Promise<TryProvidersResult> {
+  if (opts.parallel && opts.parallel > 1 && opts.providerOrder.length > 1) {
+    return tryProvidersParallel(opts, Math.min(opts.parallel, 5));
+  }
   const errors: ProviderError[] = [];
   for (const pid of opts.providerOrder) {
     const provider = providers[pid];

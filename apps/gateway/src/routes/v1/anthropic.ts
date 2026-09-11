@@ -192,13 +192,16 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
     providerOrder = providerOrder.filter((p) => p !== prefix);
   }
 
-  // harness 06 Decide Tools: cost-aware re-ranking (parity with chat.ts)
-  if (config.costRoutingEnabled && !pinned && providerOrder.length > 1) {
+  // harness 06 Decide Tools: cost-aware re-ranking (parity with chat.ts) — auto always ranked for fast gateway
+  const isAuto = model === "free-llm-gateway/auto" || model === "auto";
+  const shouldRank = (config.costRoutingEnabled || (isAuto && config.nodeEnv !== "test")) && !pinned && providerOrder.length > 1;
+  if (shouldRank) {
     try {
       providerOrder = rankProvidersByCostAndLatency(providerOrder);
-      logger.info({ providerOrder }, "cost routing re-ranked (anthropic)");
+      logger.info({ providerOrder, isAuto }, "cost routing re-ranked (anthropic)");
     } catch { /* ignore: cost routing failed */ }
   }
+  const perProviderTimeout = isAuto ? (config.nodeEnv === "test" ? 4000 : config.providerTimeoutAutoMs) : config.providerTimeoutMs;
 
   const estimated = estimateMessagesTokens(body.messages) + (body.max_tokens || 0);
   const startAll = Date.now();
@@ -246,6 +249,8 @@ anthropicRoute.post("/", zValidator("json", anthropicSchema), async (c) => {
   const result = await tryProviders({
     providerOrder,
     quotaTokens: estimatedForQuotaBase,
+    timeoutMs: perProviderTimeout,
+    parallel: isAuto ? config.providerParallelAuto : undefined,
     shouldSkip: (pid) => {
       const fullId = model.includes("/") ? model : `${pid}/${model}`;
       if (verifiedMap.get(fullId) === "deprecated" || verifiedMap.get(model) === "deprecated") {

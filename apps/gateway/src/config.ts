@@ -277,6 +277,10 @@ export const config = {
     const v = parseInt(process.env.PROVIDER_TIMEOUT_AUTO_MS || "8000", 10);
     return isNaN(v) || v <= 0 ? 8000 : Math.min(v, 30000);
   })(),
+  providerParallelAuto: (() => {
+    const v = parseInt(process.env.PROVIDER_PARALLEL_AUTO || "3", 10);
+    return isNaN(v) || v <= 0 ? 3 : Math.min(v, 5);
+  })(),
   // ---- Web tools (gateway-hosted web_search + web_fetch) ----
   webToolsEnabled: parseBoolEnv(process.env.WEB_TOOLS_ENABLED),
   webSearchProvider: (process.env.WEB_SEARCH_PROVIDER || "tavily").trim().toLowerCase(),

@@ -36,6 +36,18 @@ describe("Fix 1.9.2 — free-llm-gateway/auto slow 10-15s", () => {
     expect(txt).toContain("providerTimeoutMs");
     expect(txt).toContain("perProviderTimeout");
     expect(txt).toContain("timeoutMs: perProviderTimeout");
+    expect(txt).toContain("providerParallelAuto");
+  });
+
+  it("chat route races auto providers in parallel gateway-wide", () => {
+    const chat = readGate("apps/gateway/src/routes/v1/chat.ts");
+    expect(chat).toContain("parallel: isAuto ? config.providerParallelAuto");
+    const exec = readGate("apps/gateway/src/lib/provider-executor.ts");
+    expect(exec).toContain("tryProvidersParallel");
+    expect(exec).toContain("Promise.any");
+    expect(exec).toContain("parallel?: number");
+    const anth = readGate("apps/gateway/src/routes/v1/anthropic.ts");
+    expect(anth).toContain("providerParallelAuto");
   });
 
   it("chat route ranks auto via cost routing (with test guard)", () => {
@@ -52,8 +64,8 @@ describe("Fix 1.9.2 — free-llm-gateway/auto slow 10-15s", () => {
     expect(txt).toContain("providerOrder");
   });
 
-  it("health version is 1.9.2", () => {
+  it("health version is 1.9.3", () => {
     const txt = readGate("apps/gateway/src/routes/health.test.ts");
-    expect(txt).toContain("1.9.2");
+    expect(txt).toContain("1.9.3");
   });
 });

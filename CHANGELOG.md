@@ -2,6 +2,14 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.3] - 2026-09-11
+
+### Fixed
+- **`free-llm-gateway/auto` vẫn chậm — race song song gateway-wide (mọi client)** — `apps/gateway/src/config.ts:284` thêm `PROVIDER_PARALLEL_AUTO=3` (env, default 3, max 5), `apps/gateway/src/lib/provider-executor.ts:41` thêm `parallel?: number` + `tryProvidersParallel` batch `Promise.any` (8s/provider, 3/batch → first success trả ngay, các fail collect `errors`), `tryProviders` delegate khi `parallel>1`; `apps/gateway/src/routes/v1/chat.ts:196` + `apps/gateway/src/routes/v1/anthropic.ts:246` `isAuto ? config.providerParallelAuto : undefined` + `timeoutMs: perProviderTimeout` cho mọi client dùng `free-llm-gateway/auto` (không chỉ page Chat) — `auto` giờ `~3-5s` thay vì `10-15s` sequential, tương đương `Models` page
+
+### Changed
+- **Version** — `1.9.2→1.9.3` (root/gateway/web, badge, health, parallel auto)
+
 ## [1.9.2] - 2026-09-11
 
 ### Fixed
