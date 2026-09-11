@@ -2,6 +2,21 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.0] - 2026-09-11
+
+### Added
+- **Web search/browse cho Chat (gateway-hosted)** — `apps/gateway/src/lib/{ssrf-guard,web-extract,web-tools}.ts` + `apps/gateway/src/routes/v1/chat.ts:175` tool-loop: `web_search(query,count)` + `web_fetch(url)` (HTML only). Search chain `tavily -> brave -> serper -> jina` (jina free không cần key, 500 RPM), SSRF guard block `loopback/private/169.254.169.254`, DNS pinning + redirect re-validation, markdown extract + truncate 12k, cache 3600s. Toggle `Globe` ở `ChatHeader.tsx:2` (`localStorage chatWebTools`), header `x-web-tools:1` → gateway inject `tools: [web_search, web_fetch]` + loop tối đa 3 lần. Config `WEB_TOOLS_ENABLED=0`, `TAVILY_API_KEY/BRAVE_API_KEY/SERPER_API_KEY/JINA_API_KEY`, `WEB_FETCH_TIMEOUT_MS/MAX_BYTES`, `WEB_SEARCH_MAX_RESULTS`, `WEB_TOOLS_MAX_ITERATIONS`, `WEB_CACHE_TTL_S` (`config.ts:271`, `.env.example:178`)
+- **Truncated detection + Tiếp tục** — `apps/web/src/features/chat/lib/sse-parser.ts:66` trả `finishReason`, `apps/web/src/features/chat/hooks/useChatStream.ts:161,180` bắt `finish_reason==="length"` ở cả stream/non-stream → append cảnh báo `⚠️ Câu trả lời bị cắt do đạt giới hạn Max Tokens` + `truncated:true`, `apps/web/src/features/chat/components/MessageList.tsx:52` nút `▶ Tiếp tục` (chỉ hiện ở message cuối bị cắt), `apps/web/src/features/chat/types.ts:21` field `truncated`, `handleContinue` gửi `"Tiếp tục phần còn thiếu"`
+
+### Changed
+- **Max Tokens** — default `4096→8192`, input max `8192→16384` (`apps/web/src/features/chat/lib/storage.ts:11`, `apps/web/src/pages/Chat.tsx:242`) để phản hồi dài (như ảnh `kilo-code 26179ms`) không bị `length` cắt cụt; vượt quá vẫn báo rõ và cho tiếp tục
+- **UT** — `apps/gateway/src/lib/chat-allowed.test.ts:172` chấp nhận `4096|8192`, `apps/gateway/src/routes/health.test.ts:12` expect `1.8.0`
+- **Version** — `1.7.0→1.8.0` (root/gateway/web, badge `main.tsx:104`, `app.ts:72` health)
+
+### Fixed
+- **AI dừng giữa chừng** — trước `parseSseStream` bỏ qua `finish_reason`, truncation hiện như dừng đột ngột (ảnh Chat: dừng ở `Chat:`). Giờ phát hiện `length` + hướng dẫn tăng Max Tokens hoặc bấm Tiếp tục
+- **Chat web access thiếu** — trước không support truy cập trang web; nay gateway tự search/fetch an toàn (SSRF guard, prompt-injection wrap `<web_content>`) cho mọi model free
+
 ## [1.7.0] - 2026-09-11
 
 ### Added

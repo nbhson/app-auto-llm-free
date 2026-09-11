@@ -11,9 +11,10 @@ type Props = {
   bottomRef: React.RefObject<HTMLDivElement>;
   listRef: React.RefObject<HTMLDivElement>;
   onDismissDropdown: () => void;
+  onContinue?: () => void;
 };
 
-export const MessageList = React.memo(function MessageList({ messages, isStreaming, highlightedId, bottomRef, listRef, onDismissDropdown }: Props) {
+export const MessageList = React.memo(function MessageList({ messages, isStreaming, highlightedId, bottomRef, listRef, onDismissDropdown, onContinue }: Props) {
   const lastId = messages[messages.length - 1]?.id;
   return (
     <div ref={listRef} role="log" aria-live="polite" aria-label="Chat messages" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 bg-slate-50/30" onClick={onDismissDropdown}>
@@ -71,6 +72,16 @@ export const MessageList = React.memo(function MessageList({ messages, isStreami
                 </button>
               )}
             </div>
+            {m.truncated && onContinue && !isStreaming && m.id === lastId && (
+              <div className="mt-2">
+                <button
+                  onClick={onContinue}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600"
+                >
+                  ▶ Tiếp tục
+                </button>
+              </div>
+            )}
           </div>
           {m.role === "user" && (
             <div className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5">

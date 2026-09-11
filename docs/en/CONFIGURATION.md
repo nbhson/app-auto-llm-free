@@ -106,6 +106,24 @@ then **auto boot-sync** (`jobs/boot-sync.ts`) tự phát hiện provider mới (
 
 Flags are off by default (`0`) for backwards compatibility. Enable individually via `.env` and restart gateway (see kill/restart notes above).
 
+### Web Tools — Gateway-hosted web_search + web_fetch (1.8.0)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WEB_TOOLS_ENABLED` | `0` | Enable gateway web tools. `1` to enable, frontend `Globe` toggle sends `x-web-tools:1` to inject `tools: [web_search, web_fetch]` |
+| `WEB_SEARCH_PROVIDER` | `tavily` | Preferred `tavily`/`brave`/`serper`/`jina` (fallback `jina` free, no key, 500 RPM) |
+| `TAVILY_API_KEY` | _(empty)_ | Tavily search API key (ranked excerpts, `0.008$/credit`) |
+| `BRAVE_API_KEY` | _(empty)_ | Brave Search API key (`$5/1k`, 669ms) |
+| `SERPER_API_KEY` | _(empty)_ | Serper API key (`$1-0.3/1k`) |
+| `JINA_API_KEY` | _(empty)_ | Jina AI key (optional, `s.jina.ai` free 500 RPM when empty) |
+| `WEB_FETCH_TIMEOUT_MS` | `8000` | HTML fetch timeout (ms, max 30000) |
+| `WEB_FETCH_MAX_BYTES` | `500000` | HTML size limit (bytes, max 2M, HTML only) |
+| `WEB_SEARCH_MAX_RESULTS` | `5` | Search results count (1-10) |
+| `WEB_TOOLS_MAX_ITERATIONS` | `3` | Max tool-loop iterations (max 5) |
+| `WEB_CACHE_TTL_S` | `3600` | Cache TTL for web_search/web_fetch (s) |
+
+Flow `apps/gateway/src/routes/v1/chat.ts:175` + `lib/web-tools.ts:1` + `lib/ssrf-guard.ts:1` (block `loopback/private/169.254.169.254`, DNS pinning, redirect re-validation, `<web_content>` wrap against prompt injection) + `lib/web-extract.ts:1` (strip script, markdown). Chat default `max_tokens 8192` (max 16384) + `finish_reason:length` detection with **Continue** button.
+
 ### Rate Limit
 
 `middleware/rate-limit.ts` — sliding-window-counter over Redis Lua when available (atomic check+commit, shared across instances, no boundary spike), in-memory fixed window otherwise. List endpoints (`/v1/models`, `/api/providers`, `/api/models/health`) get 4x (`Math.max(rpmLimit*4, 200)`), frontend debounces search `q` by 400ms (Models/Providers) to reduce 429.

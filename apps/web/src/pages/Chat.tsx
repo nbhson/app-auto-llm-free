@@ -43,6 +43,7 @@ export default function Chat() {
   const [maxTokens, setMaxTokens] = useState(() => prefs.getMaxTokens());
   const [streamEnabled, setStreamEnabled] = useState(() => prefs.getStream());
   const [systemPrompt, setSystemPrompt] = useState(() => prefs.getSystem());
+  const [webToolsEnabled, setWebToolsEnabled] = useState(() => prefs.getWebTools());
   const [showSettings, setShowSettings] = useState(false);
   const [lastMeta, setLastMeta] = useState<{ provider?: string; model?: string; latencyMs?: number; usage?: unknown } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -73,6 +74,7 @@ export default function Chat() {
   useEffect(() => prefs.setMaxTokens(maxTokens), [maxTokens]);
   useEffect(() => prefs.setStream(streamEnabled), [streamEnabled]);
   useEffect(() => prefs.setSystem(systemPrompt), [systemPrompt]);
+  useEffect(() => prefs.setWebTools(webToolsEnabled), [webToolsEnabled]);
 
   // Fetch models — restrict to ALLOWED_CHAT_MODELS only, timeout-guarded
   useEffect(() => {
@@ -132,12 +134,13 @@ export default function Chat() {
 
   const { handleFiles, removeAttachment, clearAttachments } = useChatAttachments(setPendingAttachments, setError, t);
 
-  const { handleSend: sendStream, handleStop } = useChatStream({
+  const { handleSend: sendStream, handleStop, handleContinue } = useChatStream({
     selectedModel,
     systemPrompt,
     temperature,
     maxTokens,
     streamEnabled,
+    webToolsEnabled,
     messages,
     setMessages,
     setLastMeta,
@@ -224,6 +227,8 @@ export default function Chat() {
           onToggleSettings={() => setShowSettings(!showSettings)}
           onRefresh={handleRefresh}
           onConfirmRefresh={confirmRefresh}
+          webToolsEnabled={webToolsEnabled}
+          onToggleWebTools={() => setWebToolsEnabled((v) => !v)}
         />
 
         {showSettings && (
@@ -235,7 +240,7 @@ export default function Chat() {
               </label>
               <label className="space-y-1">
                 <span className="text-xs font-semibold text-slate-700">{t("chat.maxTokens")}</span>
-                <input type="number" min={64} max={8192} value={maxTokens} onChange={(e) => setMaxTokens(parseInt(e.target.value) || 1024)} className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-sm" />
+                <input type="number" min={64} max={16384} value={maxTokens} onChange={(e) => setMaxTokens(Math.min(16384, parseInt(e.target.value) || 1024))} className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-sm" />
               </label>
               <label className="flex items-center gap-2 pt-5">
                 <input type="checkbox" checked={streamEnabled} onChange={(e) => setStreamEnabled(e.target.checked)} className="w-4 h-4 accent-slate-900" />
@@ -257,6 +262,7 @@ export default function Chat() {
           listRef={listRef}
           bottomRef={bottomRef}
           onDismissDropdown={() => {}}
+          onContinue={handleContinue}
         />
 
         {error && (

@@ -73,13 +73,14 @@ export async function parseSseStream(
   stream: ReadableStream<Uint8Array>,
   callbacks: SseCallbacks,
   signal?: AbortSignal,
-): Promise<{ full: string; reasoningFull: string; error: string | null }> {
+): Promise<{ full: string; reasoningFull: string; error: string | null; finishReason: string | null }> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let full = "";
   let reasoningFull = "";
   let streamError: string | null = null;
+  let finishReason: string | null = null;
 
   try {
     while (true) {
@@ -110,6 +111,11 @@ export async function parseSseStream(
             continue;
           }
           if ((json as Record<string, unknown>).usage) callbacks.onUsage?.((json as Record<string, unknown>).usage);
+          // capture finish_reason for truncation detection (stop/length/tool_calls)
+          const ch = (json as Record<string, unknown>).choices as Array<Record<string, unknown>> | undefined;
+          const fr = ch?.[0]?.finish_reason as string | null | undefined;
+          if (fr) finishReason = fr;
+          else if ((json as Record<string, unknown>).finish_reason) finishReason = (json as Record<string, unknown>).finish_reason as string;
           const { content: deltaContent, reasoning } = extractDelta(json);
           if (reasoning && reasoning.startsWith("__ERROR__:")) {
             streamError = reasoning.slice("__ERROR__:".length);
@@ -134,6 +140,9 @@ export async function parseSseStream(
       if (dataStr && dataStr !== "[DONE]") {
         try {
           const json = JSON.parse(dataStr);
+          const ch2 = (json as Record<string, unknown>).choices as Array<Record<string, unknown>> | undefined;
+          const fr2 = ch2?.[0]?.finish_reason as string | null | undefined;
+          if (fr2) finishReason = fr2;
           const { content: deltaContent, reasoning } = extractDelta(json);
           if (reasoning) reasoningFull += reasoning;
           if (deltaContent) {
@@ -147,5 +156,5 @@ export async function parseSseStream(
   } finally {
     try { reader.releaseLock(); } catch {}
   }
-  return { full, reasoningFull, error: streamError };
+  return { full, reasoningFull, error: streamError, finishReason };
 }

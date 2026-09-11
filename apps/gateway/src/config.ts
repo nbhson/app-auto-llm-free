@@ -269,6 +269,33 @@ export const config = {
     if (isNaN(v) || v <= 0) return 30;
     return Math.min(v, 365);
   })(),
+  // ---- Web tools (gateway-hosted web_search + web_fetch) ----
+  webToolsEnabled: parseBoolEnv(process.env.WEB_TOOLS_ENABLED),
+  webSearchProvider: (process.env.WEB_SEARCH_PROVIDER || "tavily").trim().toLowerCase(),
+  tavilyApiKey: (process.env.TAVILY_API_KEY || "").trim(),
+  braveApiKey: (process.env.BRAVE_API_KEY || "").trim(),
+  serperApiKey: (process.env.SERPER_API_KEY || "").trim(),
+  jinaApiKey: (process.env.JINA_API_KEY || "").trim(),
+  webFetchTimeoutMs: (() => {
+    const v = parseInt(process.env.WEB_FETCH_TIMEOUT_MS || "8000", 10);
+    return isNaN(v) || v <= 0 ? 8000 : Math.min(v, 30000);
+  })(),
+  webFetchMaxBytes: (() => {
+    const v = parseInt(process.env.WEB_FETCH_MAX_BYTES || "500000", 10);
+    return isNaN(v) || v <= 0 ? 500000 : Math.min(v, 2_000_000);
+  })(),
+  webSearchMaxResults: (() => {
+    const v = parseInt(process.env.WEB_SEARCH_MAX_RESULTS || "5", 10);
+    return isNaN(v) || v <= 0 ? 5 : Math.min(v, 10);
+  })(),
+  webToolsMaxIterations: (() => {
+    const v = parseInt(process.env.WEB_TOOLS_MAX_ITERATIONS || "3", 10);
+    return isNaN(v) || v <= 0 ? 3 : Math.min(v, 5);
+  })(),
+  webCacheTtlSec: (() => {
+    const v = parseInt(process.env.WEB_CACHE_TTL_S || "3600", 10);
+    return isNaN(v) || v <= 0 ? 3600 : Math.min(v, 86400);
+  })(),
   providerKeys: {
     // freellms ids use hyphen, config keys use same slug
     "nvidia-nim": parseKeys(process.env.NVIDIA_API_KEYS),

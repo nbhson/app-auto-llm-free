@@ -19,6 +19,7 @@ export type ChatMessage = {
   latencyMs?: number;
   tokens?: { prompt?: number; completion?: number; total?: number };
   error?: string;
+  truncated?: boolean;
 };
 
 export type ModelEntry = {

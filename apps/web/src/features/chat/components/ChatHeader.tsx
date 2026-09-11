@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Cpu, ChevronDown, BarChart3, Settings2, RotateCcw, MessageSquare } from "lucide-react";
+import { Cpu, ChevronDown, BarChart3, Settings2, RotateCcw, MessageSquare, Globe } from "lucide-react";
 import { useLang } from "../../../lib/i18n.tsx";
 import type { ModelEntry } from "../types";
 
@@ -14,6 +14,8 @@ type Props = {
   onToggleSettings: () => void;
   onRefresh: () => void;
   onConfirmRefresh: () => void;
+  webToolsEnabled: boolean;
+  onToggleWebTools: () => void;
 };
 
 export const ChatHeader = React.memo(function ChatHeader({
@@ -27,6 +29,8 @@ export const ChatHeader = React.memo(function ChatHeader({
   onToggleSettings,
   onRefresh,
   onConfirmRefresh,
+  webToolsEnabled,
+  onToggleWebTools,
 }: Props) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
@@ -106,6 +110,15 @@ export const ChatHeader = React.memo(function ChatHeader({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <button
+          aria-label="Toggle web search"
+          aria-pressed={webToolsEnabled}
+          onClick={onToggleWebTools}
+          className={`p-2 rounded-lg border ${webToolsEnabled ? "bg-emerald-600 text-white border-emerald-600" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"}`}
+          title={webToolsEnabled ? "Web search: ON — LLM can search/browse" : "Web search: OFF"}
+        >
+          <Globe className="w-4 h-4" />
+        </button>
         <button
           aria-label="Toggle context panel"
           aria-expanded={drawerOpen}

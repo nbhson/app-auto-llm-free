@@ -17,6 +17,7 @@ import { loadVerifiedMap, loadHealthMap } from "../../lib/model-store.js";
 import { tryProviders } from "../../lib/provider-executor.js";
 import { getRequestVk, type UpstreamChatCompletion, type CompressibleMessage } from "../../lib/types.js";
 import type { ChatMessage } from "../../providers/base.js";
+import { getWebTools, executeWebSearch, executeWebFetch, shouldEnableWebTools } from "../../lib/web-tools.js";
 
 const contentPartSchema = z.object({
   type: z.string(),
@@ -126,10 +127,13 @@ chatRoute.post(
     const estimated = estimateChatTokens({ messages: body.messages, max_tokens: body.max_tokens });
     const startAll = Date.now();
 
-    // Vector 2: semantic cache check first (cheapest) - only for non-stream
+    // Web tools toggle per-request (must be early to skip cache when searching)
+    const _webToolsForCacheCheck = shouldEnableWebTools(c);
+
+    // Vector 2: semantic cache check first (cheapest) - only for non-stream, skip when web tools active (fresh data)
     // harness 01 Retrieve: tenant-aware key (vkId + tools + temperature) prevents poisoning
     let cacheHitContent: string | null = null;
-    if (config.semanticCacheEnabled && !body.stream) {
+    if (config.semanticCacheEnabled && !body.stream && !_webToolsForCacheCheck) {
       try {
         const q = JSON.stringify(body.messages);
         cacheHitContent = await semanticCache.get(q, model, {
@@ -168,42 +172,180 @@ chatRoute.post(
     const sessionId = c.req.header("x-session-id") || c.req.header("X-Session-ID") || undefined;
     const parentSessionId = c.req.header("x-parent-session-id") || c.req.header("X-Parent-Session-ID") || undefined;
 
-    const result = await tryProviders({
-      providerOrder,
-      quotaTokens: estimatedForQuota.total,
-      // Skip deprecated model for this provider if verified AND provider is NOT the original requesting provider
-      // If user explicitly requests kilo-code/..., allow kilo-code to serve it even if marked deprecated
-      shouldSkip: (pid) => {
-        const fullId = model.includes("/") ? model : `${pid}/${model}`;
-        const requestedPrefix = model.split("/")[0];
-        if (verifiedMap.get(fullId) === "deprecated" && pid !== requestedPrefix) {
-          return "model deprecated per verified-models.json";
+    // ---- Web tools: inject gateway-hosted web_search + web_fetch ----
+    const webToolsForRequest = shouldEnableWebTools(c);
+    let effectiveTools: unknown[] | undefined = body.tools as unknown[] | undefined;
+    let effectiveToolChoice: unknown = body.tool_choice;
+    if (webToolsForRequest) {
+      const injected = getWebTools() as unknown[];
+      const existing = (body.tools as unknown[] | undefined) || [];
+      // avoid duplicate if client already sent same name
+      const existingNames = new Set(existing.map((t: unknown) => (t as { function?: { name?: string } })?.function?.name));
+      const toAdd = injected.filter((t: unknown) => !existingNames.has((t as { function: { name: string } }).function.name));
+      effectiveTools = [...existing, ...toAdd];
+      if (!effectiveToolChoice) effectiveToolChoice = "auto";
+      logger.info({ tools: effectiveTools.length }, "web tools injected");
+    }
+
+    // Helper to call provider (single attempt, respects shouldSkip)
+    const callProvider = (msgs: unknown[], useStream: boolean | undefined, tools: unknown[] | undefined, toolChoice: unknown) =>
+      tryProviders({
+        providerOrder,
+        quotaTokens: estimatedForQuota.total,
+        shouldSkip: (pid) => {
+          const fullId = model.includes("/") ? model : `${pid}/${model}`;
+          const requestedPrefix = model.split("/")[0];
+          if (verifiedMap.get(fullId) === "deprecated" && pid !== requestedPrefix) {
+            return "model deprecated per verified-models.json";
+          }
+          return null;
+        },
+        call: ({ provider, key }) =>
+          provider.chat(
+            {
+              model,
+              messages: msgs as unknown as ChatMessage[],
+              temperature: body.temperature,
+              max_tokens: body.max_tokens,
+              stream: useStream,
+              tools: tools as unknown as ChatMessage[] | undefined,
+              tool_choice: toolChoice,
+              top_p: body.top_p,
+              top_k: body.top_k,
+              n: body.n,
+              stop: body.stop,
+              presence_penalty: body.presence_penalty,
+              frequency_penalty: body.frequency_penalty,
+              user: body.user,
+              sessionId,
+              parentSessionId,
+            },
+            key
+          ),
+      });
+
+    // Web tools loop: if enabled, we do non-stream tool iterations first
+    let result: Awaited<ReturnType<typeof tryProviders>> | null = null;
+    let loopMessages: unknown[] = [...messagesToSend] as unknown[];
+    let webIterations = 0;
+    let finalStreamRequested = !!body.stream;
+
+    if (webToolsForRequest) {
+      // Loop up to webToolsMaxIterations tool calls
+      while (webIterations <= config.webToolsMaxIterations) {
+        const useStream = false; // intermediate always non-stream to reliably parse tool_calls
+        const r = await callProvider(loopMessages, useStream, effectiveTools, effectiveToolChoice);
+        if (!r.ok) {
+          result = r;
+          break;
         }
-        return null;
-      },
-      call: ({ provider, key }) =>
-        provider.chat(
-          {
-            model,
-            messages: messagesToSend as unknown as ChatMessage[],
-            temperature: body.temperature,
-            max_tokens: body.max_tokens,
-            stream: body.stream,
-            tools: body.tools,
-            tool_choice: body.tool_choice,
-            top_p: body.top_p,
-            top_k: body.top_k,
-            n: body.n,
-            stop: body.stop,
-            presence_penalty: body.presence_penalty,
-            frequency_penalty: body.frequency_penalty,
-            user: body.user,
-            sessionId,
-            parentSessionId,
-          },
-          key
-        ),
-    });
+        // Parse response to detect tool_calls
+        let data: UpstreamChatCompletion | null = null;
+        try {
+          const text = await r.res.clone().text();
+          data = JSON.parse(text) as UpstreamChatCompletion;
+        } catch {
+          // If not JSON, treat as final
+          result = r;
+          break;
+        }
+        const msg = data?.choices?.[0]?.message as { tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>; content?: unknown } | undefined;
+        const toolCalls = msg?.tool_calls || [];
+        const webCalls = toolCalls.filter((tc) => tc.function?.name === "web_search" || tc.function?.name === "web_fetch");
+        if (webCalls.length === 0) {
+          // No web tool needed -> final result is this response (re-create response from data)
+          // We keep r as result; but we need to allow streaming for final if requested
+          if (finalStreamRequested) {
+            // Do one more streaming call with the enriched loopMessages (which may have grown)
+            const streamResult = await callProvider(loopMessages, true, effectiveTools, effectiveToolChoice);
+            if (streamResult.ok) {
+              result = streamResult;
+            } else {
+              // fallback to non-stream data
+              result = r;
+              // store data for non-stream path below: we will reconstruct
+              // To avoid double-read, create a new Response with JSON
+              const bodyText = JSON.stringify(data);
+              result = { ok: true, providerId: r.providerId, key: r.key, res: new Response(bodyText, { headers: { "content-type": "application/json" } }) } as typeof r;
+            }
+          } else {
+            // Ensure result res is fresh (we cloned, so need to recreate)
+            const bodyText = JSON.stringify(data);
+            result = { ok: true, providerId: r.providerId, key: r.key, res: new Response(bodyText, { headers: { "content-type": "application/json" } }) } as typeof r;
+          }
+          break;
+        }
+
+        // Execute web tools
+        logger.info({ webCalls: webCalls.map((c) => c.function?.name), iter: webIterations }, "executing web tools");
+        // Need to push assistant tool_calls message + tool results
+        const assistantMsg: Record<string, unknown> = {
+          role: "assistant",
+          content: msg?.content ?? null,
+          tool_calls: toolCalls,
+        };
+        loopMessages.push(assistantMsg);
+
+        for (const tc of webCalls) {
+          const name = tc.function?.name || "";
+          const argsRaw = tc.function?.arguments || "{}";
+          let args: Record<string, unknown> = {};
+          try {
+            args = JSON.parse(argsRaw) as Record<string, unknown>;
+          } catch {
+            args = {};
+          }
+          let toolResult = "";
+          try {
+            if (name === "web_search") {
+              const q = String(args.query || args.q || "").trim();
+              const count = typeof args.count === "number" ? args.count : undefined;
+              if (!q) throw new Error("Missing query for web_search");
+              toolResult = await executeWebSearch(q, count);
+            } else if (name === "web_fetch") {
+              const url = String(args.url || "").trim();
+              if (!url) throw new Error("Missing url for web_fetch");
+              toolResult = await executeWebFetch(url);
+            }
+          } catch (e) {
+            toolResult = `Error executing ${name}: ${(e as Error).message}`;
+          }
+          loopMessages.push({
+            role: "tool",
+            tool_call_id: tc.id || `call_${Date.now()}`,
+            name,
+            content: toolResult,
+          });
+        }
+
+        // Also need to push other non-web tool_calls as error (not supported)
+        const nonWebCalls = toolCalls.filter((tc) => tc.function?.name !== "web_search" && tc.function?.name !== "web_fetch");
+        for (const tc of nonWebCalls) {
+          loopMessages.push({
+            role: "tool",
+            tool_call_id: tc.id || `call_${Date.now()}`,
+            name: tc.function?.name || "unknown",
+            content: `Tool ${tc.function?.name} not supported by gateway. Only web_search and web_fetch are available.`,
+          });
+        }
+
+        webIterations++;
+        if (webIterations > config.webToolsMaxIterations) {
+          logger.warn("web tools max iterations reached");
+          // Make final call with current loopMessages
+          const finalR = await callProvider(loopMessages, finalStreamRequested ? true : false, effectiveTools, effectiveToolChoice);
+          result = finalR;
+          break;
+        }
+        // continue loop to let LLM see tool results
+      }
+    } else {
+      result = await callProvider(messagesToSend as unknown[], body.stream, effectiveTools, effectiveToolChoice);
+    }
+
+    if (!result) {
+      return c.json({ error: { message: "No provider result", type: "provider_error" } }, 502);
+    }
 
     if (result.ok) {
       const { providerId: pid, key, res } = result;

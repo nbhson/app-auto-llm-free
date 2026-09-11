@@ -171,7 +171,7 @@ describe("i18n VI/EN coverage for 8 pages (incl. Chat)", () => {
 
 describe("Chat empty fix — refactor code returns content (reasoning + fallback)", () => {
   it("Chat.tsx handles reasoning_content/reasoning/thinking and fallback non-stream", () => {
-    // 1.6.0: parser extracted to sse-parser.ts + useChatStream hook + storage (4096)
+    // 1.6.0: parser extracted to sse-parser.ts + useChatStream hook + storage (8192)
     const chatTxt = readWeb("apps/web/src/pages/Chat.tsx");
     const parserTxt = readWeb("apps/web/src/features/chat/lib/sse-parser.ts");
     const hookTxt = readWeb("apps/web/src/features/chat/hooks/useChatStream.ts");
@@ -180,7 +180,7 @@ describe("Chat empty fix — refactor code returns content (reasoning + fallback
     expect(combined).toContain("reasoning_content");
     expect(combined).toContain("reasoningFull");
     expect(combined).toContain("fallbackRes");
-    expect(combined).toContain("4096");
+    expect(combined).toMatch(/4096|8192/);
     expect(combined).toContain("extractDelta");
   });
   it("Chat.tsx streams robustly (ping/event, array content, error handling)", () => {

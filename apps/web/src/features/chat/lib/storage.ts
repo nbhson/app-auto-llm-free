@@ -7,6 +7,7 @@ const TEMP_KEY = "chatTemp";
 const MAX_TOK_KEY = "chatMaxTokens";
 const STREAM_KEY = "chatStream";
 const SYSTEM_KEY = "chatSystemPrompt";
+const WEB_TOOLS_KEY = "chatWebTools";
 
 export function getMasterKey(): string {
   // No hard-coded fallback in JS bundle. Bootstrap via /api/bootstrap in Layout.
@@ -55,10 +56,12 @@ export const prefs = {
   setModel: (v: string) => { try { localStorage.setItem(MODEL_KEY, v); } catch {} },
   getTemp: () => parseFloat(localStorage.getItem(TEMP_KEY) || "0.7"),
   setTemp: (v: number) => { try { localStorage.setItem(TEMP_KEY, String(v)); } catch {} },
-  getMaxTokens: () => parseInt(localStorage.getItem(MAX_TOK_KEY) || "4096", 10),
+  getMaxTokens: () => parseInt(localStorage.getItem(MAX_TOK_KEY) || "8192", 10),
   setMaxTokens: (v: number) => { try { localStorage.setItem(MAX_TOK_KEY, String(v)); } catch {} },
   getStream: () => localStorage.getItem(STREAM_KEY) !== "0",
   setStream: (v: boolean) => { try { localStorage.setItem(STREAM_KEY, v ? "1" : "0"); } catch {} },
   getSystem: () => localStorage.getItem(SYSTEM_KEY) || "",
   setSystem: (v: string) => { try { localStorage.setItem(SYSTEM_KEY, v); } catch {} },
+  getWebTools: () => localStorage.getItem(WEB_TOOLS_KEY) === "1",
+  setWebTools: (v: boolean) => { try { localStorage.setItem(WEB_TOOLS_KEY, v ? "1" : "0"); } catch {} },
 };

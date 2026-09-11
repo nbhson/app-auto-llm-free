@@ -9,6 +9,7 @@ type UseChatStreamOpts = {
   temperature: number;
   maxTokens: number;
   streamEnabled: boolean;
+  webToolsEnabled: boolean;
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setLastMeta: React.Dispatch<React.SetStateAction<{ provider?: string; model?: string; latencyMs?: number; usage?: unknown } | null>>;
@@ -17,7 +18,7 @@ type UseChatStreamOpts = {
 };
 
 export function useChatStream(opts: UseChatStreamOpts) {
-  const { selectedModel, systemPrompt, temperature, maxTokens, streamEnabled, messages, setMessages, setLastMeta, setError, setIsStreaming } = opts;
+  const { selectedModel, systemPrompt, temperature, maxTokens, streamEnabled, webToolsEnabled, messages, setMessages, setLastMeta, setError, setIsStreaming } = opts;
   const abortRef = useRef<AbortController | null>(null);
   const throttleRef = useRef<{ pending: string; raf: number | null; targetId: string | null; provider?: string; modelHeader?: string }>({ pending: "", raf: null, targetId: null });
 
@@ -135,7 +136,11 @@ export function useChatStream(opts: UseChatStreamOpts) {
     try {
       const res = await fetch(`/v1/chat/completions`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${mk}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${mk}`,
+          "Content-Type": "application/json",
+          "x-web-tools": webToolsEnabled ? "1" : "0",
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -169,11 +174,17 @@ export function useChatStream(opts: UseChatStreamOpts) {
         if (!content) content = (data.content as string) || (data.text as string) || (data.output_text as string) || "";
         if (!content) content = JSON.stringify(data, null, 2);
         const usage = data.usage as Record<string, unknown> | undefined;
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: String(content), provider: (data.provider as string) || provider, model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens as number, completion: usage.completion_tokens as number, total: usage.total_tokens as number } : undefined } : m)));
+        const finishReason = (rawChoice as Record<string, unknown> | undefined)?.finish_reason as string | undefined || (data.finish_reason as string | undefined) || null;
+        const isTruncated = finishReason === "length";
+        let finalContent = String(content);
+        if (isTruncated) {
+          finalContent += `\n\n---\n⚠️ *Câu trả lời bị cắt do đạt giới hạn Max Tokens (${maxTokens}). Tăng Max Tokens trong Settings (tối đa 16384) hoặc bấm **Tiếp tục** để sinh tiếp.*`;
+        }
+        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: finalContent, truncated: isTruncated || undefined, provider: (data.provider as string) || provider, model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, tokens: usage ? { prompt: usage.prompt_tokens as number, completion: usage.completion_tokens as number, total: usage.total_tokens as number } : undefined } : m)));
         setLastMeta({ provider: provider || (data.provider as string), model: (data.model as string) || modelHeader, latencyMs: Date.now() - start, usage });
       } else {
         // Reuse shared SSE parser — DRY, throttle via RAF
-        const { full, reasoningFull, error: streamError } = await parseSseStream(
+        const { full, reasoningFull, error: streamError, finishReason } = await parseSseStream(
           res.body,
           {
             onDelta: (delta) => scheduleFlush(delta, assistantId, provider, modelHeader),
@@ -210,7 +221,11 @@ export function useChatStream(opts: UseChatStreamOpts) {
           try {
             const fallbackRes = await fetch(`/v1/chat/completions`, {
               method: "POST",
-              headers: { Authorization: `Bearer ${mk}`, "Content-Type": "application/json" },
+              headers: {
+                Authorization: `Bearer ${mk}`,
+                "Content-Type": "application/json",
+                "x-web-tools": webToolsEnabled ? "1" : "0",
+              },
               body: JSON.stringify({ ...body, stream: false }),
               signal: fallbackController.signal,
             });
@@ -248,7 +263,13 @@ export function useChatStream(opts: UseChatStreamOpts) {
           }
         } else {
           const latency = Date.now() - start;
-          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, latencyMs: latency } : m)));
+          const isTruncated = finishReason === "length";
+          if (isTruncated) {
+            const notice = `\n\n---\n⚠️ *Câu trả lời bị cắt do đạt giới hạn Max Tokens (${maxTokens}). Tăng Max Tokens trong Settings (tối đa 16384) hoặc bấm **Tiếp tục** để sinh tiếp.*`;
+            setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: (m.content || "") + notice, truncated: true, latencyMs: latency } : m)));
+          } else {
+            setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, latencyMs: latency } : m)));
+          }
           setLastMeta((p) => ({ ...(p || {}), provider, model: modelHeader, latencyMs: latency }));
         }
       }
@@ -267,7 +288,12 @@ export function useChatStream(opts: UseChatStreamOpts) {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [messages, selectedModel, systemPrompt, temperature, maxTokens, streamEnabled, setMessages, setLastMeta, setError, setIsStreaming, scheduleFlush]);
+  }, [messages, selectedModel, systemPrompt, temperature, maxTokens, streamEnabled, webToolsEnabled, setMessages, setLastMeta, setError, setIsStreaming, scheduleFlush]);
 
-  return { handleSend, handleStop, abortRef };
+  const handleContinue = useCallback(() => {
+    // Trigger continuation with a short prompt that preserves context
+    handleSend("Tiếp tục phần còn thiếu, giữ nguyên format và không lặp lại phần đã trả lời.", [], () => {});
+  }, [handleSend]);
+
+  return { handleSend, handleStop, handleContinue, abortRef };
 }
