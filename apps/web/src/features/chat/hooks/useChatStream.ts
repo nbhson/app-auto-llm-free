@@ -148,10 +148,29 @@ export function useChatStream(opts: UseChatStreamOpts) {
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         let msg = txt;
+        let hint = "";
+        let providerErrors: unknown[] | undefined;
         try {
           const j = JSON.parse(txt);
           msg = j.error?.message || j.error || txt;
+          hint = j.error?.hint || "";
+          providerErrors = j.error?.provider_errors || j.error?.providerErrors;
+          // Append concise provider summary for UX (avoid huge blob)
+          if (providerErrors && Array.isArray(providerErrors) && providerErrors.length) {
+            const summary = (providerErrors as Array<{ provider?: string; error?: string; status?: number }>)
+              .slice(0, 2)
+              .map((e) => `${e.provider || "?"}: ${String(e.error || "").slice(0, 160)}${e.status ? ` (${e.status})` : ""}`)
+              .join(" | ");
+            if (summary && !msg.includes(summary.slice(0, 20))) {
+              msg = msg + (msg.endsWith(".") ? " " : " — ") + summary;
+            }
+          }
+          if (hint && !msg.includes(hint.slice(0, 15))) msg = msg + `\n\nGợi ý: ${hint}`;
         } catch {}
+        // Map generic 502 into user-friendly Vietnamese hint if backend didn't provide
+        if (!hint && msg.includes("All providers failed") && !msg.includes("Gợi ý")) {
+          msg = msg + "\n\nGợi ý: Thử tắt Web Tools (Globe 🌐) nếu đang bật, chọn model khác (ví dụ kiraai/kira-auto, kilo-code/kilo-auto), hoặc đợi 15s rồi gửi lại. Kiểm tra /providers để xem provider nào đang online.";
+        }
         throw new Error(msg || `HTTP ${res.status}`);
       }
 
@@ -250,7 +269,19 @@ export function useChatStream(opts: UseChatStreamOpts) {
               }
             } else {
               const txt = await fallbackRes.text().catch(() => "");
-              throw new Error(txt.slice(0, 300) || "Empty stream — fallback failed");
+              let fbMsg = txt.slice(0, 800);
+              try {
+                const j = JSON.parse(txt);
+                const base = j.error?.message || j.error || txt;
+                const h = j.error?.hint || "";
+                fbMsg = base + (h ? `\nGợi ý: ${h}` : "");
+                const pe = j.error?.provider_errors;
+                if (pe && Array.isArray(pe) && pe.length) {
+                  const sum = (pe as Array<{ provider?: string; error?: string; status?: number }>).slice(0, 1).map((e) => `${e.provider}: ${String(e.error || "").slice(0, 120)}`).join("");
+                  if (sum) fbMsg += ` — ${sum}`;
+                }
+              } catch {}
+              throw new Error(fbMsg || "Empty stream — fallback failed");
             }
           } catch (fbErr: unknown) {
             if ((fbErr as { name?: string })?.name === "AbortError") throw fbErr;

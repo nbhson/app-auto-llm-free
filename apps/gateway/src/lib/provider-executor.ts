@@ -6,6 +6,7 @@ import { isOpen, recordSuccess, recordFailureIfRetryable } from "./circuit-break
 import { logger } from "../middleware/logger.js";
 import { isPublicProvider } from "./provider-keys.js";
 import { errMessage, type ProviderError } from "./types.js";
+import { config } from "../config.js";
 
 /**
  * Shared provider fallback executor — single implementation of the
@@ -76,11 +77,12 @@ export async function tryProviders(opts: TryProvidersOpts): Promise<TryProviders
     try {
       // Per-provider fetch timeout — fail fast so next fallback is tried quickly.
       // For streaming, this only times out the initial fetch (headers), not the SSE body.
+      // Use config.providerTimeoutMs (default 25s) — long queries with web_fetch need >12s.
       const callWithTimeout = async () => {
-        const timeoutMs = 12000;
+        const timeoutMs = config.providerTimeoutMs;
         let timer: NodeJS.Timeout | undefined;
         const timeout = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error(`provider timeout after ${timeoutMs}ms`)), timeoutMs);
+          timer = setTimeout(() => reject(new Error(`provider timeout after ${timeoutMs}ms — thử model khác hoặc tắt Web Tools (Globe) nếu bật`)), timeoutMs);
           timer.unref?.();
         });
         try {

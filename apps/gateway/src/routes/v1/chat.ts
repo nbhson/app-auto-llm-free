@@ -343,6 +343,23 @@ chatRoute.post(
       result = await callProvider(messagesToSend as unknown[], body.stream, effectiveTools, effectiveToolChoice);
     }
 
+    // Fallback: if web tools were injected and all providers failed with tool/invalid-model errors, retry once without tools
+    if (result && !result.ok && webToolsForRequest) {
+      const errs = result.errors as Array<{ provider?: string; error?: string; status?: number }>;
+      const seemsToolRelated = errs.some((e) => /tool|function|web_search|web_fetch|invalid model|not a valid model|does not support tools/i.test(e.error || "")) || errs.every((e) => e.status === 400);
+      if (seemsToolRelated) {
+        logger.warn({ errors: errs.slice(0, 2), model }, "web-tools request failed for all providers — retrying without web tools as fallback");
+        const retry = await callProvider(messagesToSend as unknown[], body.stream, undefined, undefined);
+        if (retry.ok) {
+          logger.info({ provider: retry.providerId, model }, "fallback without web tools succeeded");
+          result = retry;
+        } else {
+          // keep original errors but append retry errors for visibility
+          (errs as unknown[]).push(...retry.errors.map((e) => ({ ...e, note: "retry without web-tools" })));
+        }
+      }
+    }
+
     if (!result) {
       return c.json({ error: { message: "No provider result", type: "provider_error" } }, 502);
     }
@@ -457,7 +474,8 @@ chatRoute.post(
 
     const errors = result.errors;
 
-    // Log failure
+    // Log failure with full provider summary (not just first)
+    logger.warn({ model, providerOrder, errors: errors.slice(0, 5), latency: Date.now() - startAll }, "all providers failed for chat");
     addLog({
       id: `req-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -469,7 +487,7 @@ chatRoute.post(
       totalTokens: estimated.total,
       latencyMs: Date.now() - startAll,
       status: 502,
-      error: JSON.stringify(errors).slice(0, 500),
+      error: JSON.stringify(errors).slice(0, 800),
     });
 
     if (process.env.ALLOW_MOCK === "1" && config.nodeEnv === "development" && errors.length > 0) {
@@ -497,6 +515,16 @@ chatRoute.post(
       );
     }
 
-    return c.json({ error: { message: "All providers failed", type: "provider_error", provider_errors: errors } }, 502);
+    // User-friendly detail: top 3 errors + actionable suggestion
+    const topErrors = errors.slice(0, 3).map((e) => `${e.provider}: ${String(e.error || "").slice(0, 180)}${e.status ? ` (${e.status})` : ""}`).join(" | ");
+    const suggestion = webToolsForRequest
+      ? "Thử tắt Web Tools (Globe) rồi gửi lại, hoặc chọn model khác (kilo-code/kilo-auto, kiraai/kira-auto, openrouter/auto)."
+      : errors.some((e) => /timeout/i.test(e.error || ""))
+        ? `Provider timeout sau ${config.providerTimeoutMs}ms — thử lại sau 10-30s hoặc chọn model khác (pollinations/openai, groq/llama-3.3-70b).`
+        : errors.some((e) => e.status === 400 && /invalid model/i.test(e.error || ""))
+          ? "Model không tồn tại trên provider này — thử chọn model trong danh sách Chat (6 default + Favorites) hoặc dùng free-llm-gateway/auto."
+          : "Thử chọn model khác hoặc tắt/bật Web Tools và gửi lại.";
+    const detailedMessage = `All providers failed (${errors.length} tried). ${topErrors}. Gợi ý: ${suggestion}`;
+    return c.json({ error: { message: detailedMessage, type: "provider_error", provider_errors: errors, hint: suggestion } }, 502);
   }
 );

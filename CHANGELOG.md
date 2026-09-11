@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.1] - 2026-09-11
+
+### Fixed
+- **Thường gặp `Error: All providers failed` (ảnh Chat: web_fetch github repo)** — `apps/gateway/src/config.ts:274` thêm `PROVIDER_TIMEOUT_MS` (default `25000` thay vì `12000`, env `PROVIDER_TIMEOUT_MS`, max 120k), `apps/gateway/src/lib/provider-executor.ts:79` dùng `config.providerTimeoutMs` + message hint `tắt Web Tools/đổi model`; `apps/gateway/src/routes/v1/chat.ts:345` fallback retry **không web-tools** khi `webToolsForRequest` fail toàn bộ với lỗi tool/invalid-model (400) — tránh chết vì provider không hỗ trợ `tools`; `apps/gateway/src/routes/v1/chat.ts:461` log chi tiết `providerOrder` + top 5 errors, trả `detailedMessage + hint` (`hint` gợi ý tắt Globe/chọn model khác/timeout/invalid-model) thay vì `"All providers failed"` chung chung, `provider_errors` vẫn giữ đủ; `apps/web/src/features/chat/hooks/useChatStream.ts:148` parse `hint/provider_errors` + append summary + `Gợi ý` mặc định khi 502, `useChatStream.ts:270` fallback error cũng parse hint; `apps/web/src/pages/Chat.tsx:273` banner lỗi `whitespace-pre-wrap` + nút nhanh `Tắt Web Tools & thử lại` / `Bật Web Tools` theo trạng thái `webToolsEnabled`
+- **UT docs** — `apps/gateway/src/lib/chat-error.test.ts` 8 tests mới cho fix 1.9.1 (providerTimeout config, tool-fallback, hint, frontend error parsing), `favorites.test.ts` giữ 9 tests
+
+### Changed
+- **Version** — `1.9.0→1.9.1` (root/gateway/web, badge, health, provider timeout env)
+
 ## [1.9.0] - 2026-09-11
 
 ### Added

@@ -271,12 +271,25 @@ export default function Chat() {
         />
 
         {error && (
-          <div role="alert" className="mx-3 mb-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
-            <span className="font-bold shrink-0">Error:</span>
-            <span className="flex-1 break-all">{error}</span>
-            <button aria-label="Dismiss error" onClick={() => setError(null)} className="p-1 hover:bg-rose-100 rounded">
-              <X className="w-3.5 h-3.5" />
-            </button>
+          <div role="alert" className="mx-3 mb-2 px-3 py-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="font-bold shrink-0">Error:</span>
+              <span className="flex-1 break-words whitespace-pre-wrap">{error}</span>
+              <button aria-label="Dismiss error" onClick={() => setError(null)} className="p-1 hover:bg-rose-100 rounded shrink-0">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {error.includes("timeout") || error.includes("All providers failed") ? (
+                <button onClick={() => setError(null)} className="px-2.5 py-1 rounded-full bg-white border border-rose-200 hover:bg-rose-100 font-semibold text-[11px]">Đã hiểu</button>
+              ) : null}
+              {webToolsEnabled && (
+                <button onClick={() => setWebToolsEnabled(false)} className="px-2.5 py-1 rounded-full bg-amber-500 text-white hover:bg-amber-600 font-semibold text-[11px]">Tắt Web Tools & thử lại</button>
+              )}
+              {!webToolsEnabled && error.includes("Web Tools") && (
+                <button onClick={() => setWebToolsEnabled(true)} className="px-2.5 py-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 font-semibold text-[11px]">Bật Web Tools</button>
+              )}
+            </div>
           </div>
         )}
 
