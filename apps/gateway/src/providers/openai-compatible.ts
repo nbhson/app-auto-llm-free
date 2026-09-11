@@ -35,7 +35,7 @@ export function createOpenAICompatibleProvider(opts: {
       const url = `${base}/chat/completions`;
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "User-Agent": "opencode-gateway/1.0",
+        "User-Agent": opts.id === "cline" ? "Cline/3.24.1" : "opencode-gateway/1.0",
       };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       // Extract model after provider prefix (e.g. nvidia-nim/z-ai/glm-5.2 -> z-ai/glm-5.2)
@@ -99,7 +99,14 @@ export function createOpenAICompatibleProvider(opts: {
       };
       const lower = rawModel.toLowerCase();
       const aliasMap: Record<string, string> = { auto: autoMap[opts.id] || "openai", "gpt-4": autoMap[opts.id] || "openai", "gpt-3.5": autoMap[opts.id] || "openai", llama: autoMap[opts.id] || rawModel, "claude-3": "claude-3-haiku" };
-      const model = aliasMap[lower] || rawModel;
+      let model = aliasMap[lower] || rawModel;
+      // cline short aliases: dashboard shows cline/glm-5.3-flash (raw glm-5.3-flash) but upstream expects z-ai/glm-5.3-flash
+      if (opts.id === "cline") {
+        const lm = model.toLowerCase();
+        if (lm === "glm-5.3-flash") model = "z-ai/glm-5.3-flash";
+        else if (lm === "glm-5.3") model = "z-ai/glm-5.3";
+        else if (lm === "deepseek-v4-flash") model = "deepseek/deepseek-v4-flash";
+      }
       // Auto session for opencode free tier (and similar session-gated providers)
       // Priority: req.sessionId > env > auto-generated for free models
       {
@@ -202,7 +209,7 @@ export function createOpenAICompatibleProvider(opts: {
     async models(apiKey?: string): Promise<ModelInfo[]> {
       const base = resolveBase();
       const url = `${base}${modelsPath}`;
-      const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
+      const headers: Record<string, string> = { "User-Agent": opts.id === "cline" ? "Cline/3.24.1" : "opencode-gateway/1.0" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       const res = await fetch(url, { headers });
       if (!res.ok) return [];
@@ -219,7 +226,7 @@ export function createOpenAICompatibleProvider(opts: {
     async transcriptions(req: AudioTranscriptionRequest, apiKey: string): Promise<Response> {
       const base = resolveBase();
       const url = `${base}/audio/transcriptions`;
-      const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
+      const headers: Record<string, string> = { "User-Agent": opts.id === "cline" ? "Cline/3.24.1" : "opencode-gateway/1.0" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       const form = new FormData();
       const blob = req.file instanceof Blob ? req.file : new Blob([Uint8Array.from(req.file)]);
@@ -234,7 +241,7 @@ export function createOpenAICompatibleProvider(opts: {
     async speech(req: AudioSpeechRequest, apiKey: string): Promise<Response> {
       const base = resolveBase();
       const url = `${base}/audio/speech`;
-      const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": "opencode-gateway/1.0" };
+      const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": opts.id === "cline" ? "Cline/3.24.1" : "opencode-gateway/1.0" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       let model = req.model;
       if (model.includes("/")) model = model.split("/").slice(1).join("/");
@@ -244,7 +251,7 @@ export function createOpenAICompatibleProvider(opts: {
       // Prefer native /responses if provider supports, else fallback to /chat/completions via translation
       const base = resolveBase();
       const url = `${base}/responses`;
-      const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": "opencode-gateway/1.0" };
+      const headers: Record<string, string> = { "Content-Type": "application/json", "User-Agent": opts.id === "cline" ? "Cline/3.24.1" : "opencode-gateway/1.0" };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       const chat = translateResponsesToChat(req);
       // try native responses endpoint first
@@ -262,7 +269,7 @@ export function createOpenAICompatibleProvider(opts: {
       try {
         const base = resolveBase();
         const url = `${base}${modelsPath}`;
-        const headers: Record<string, string> = { "User-Agent": "opencode-gateway/1.0" };
+        const headers: Record<string, string> = { "User-Agent": opts.id === "cline" ? "Cline/3.24.1" : "opencode-gateway/1.0" };
         if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
         const res = await fetch(url, { headers });
         return res.ok;

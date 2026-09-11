@@ -123,9 +123,11 @@ const opencodeSupplement: ModelListEntry[] = [
   { id: "opencode/ling-3.0-flash-fin-free", owned_by: "opencode", provider: "opencode", display_name: "ling-3.0-flash-fin-free", context_length: 262144, score: 68, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
   { id: "nemotron-3.5-lightning-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3.5-lightning-free", context_length: 262144, score: 70, tier: "permanent", live_status: "alias", capabilities: ["text"], limit: "free" },
   { id: "nemotron-3-ultra-free", owned_by: "opencode", provider: "opencode", display_name: "nemotron-3-ultra-free", context_length: 1000000, score: 74, tier: "permanent", live_status: "alias", capabilities: ["reasoning"], limit: "free" },
-  // cline-custom -> cline
+  // cline-custom -> cline (upstream expects z-ai/glm-5.3-flash and deepseek/deepseek-v4-flash)
   { id: "cline/deepseek-v4-flash", owned_by: "cline", provider: "cline", display_name: "deepseek-v4-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
   { id: "cline/glm-5.3-flash", owned_by: "cline", provider: "cline", display_name: "glm-5.3-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "cline/z-ai/glm-5.3-flash", owned_by: "cline", provider: "cline", display_name: "z-ai/glm-5.3-flash (cline)", context_length: 262144, score: 71, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
+  { id: "cline/z-ai/glm-5.3", owned_by: "cline", provider: "cline", display_name: "z-ai/glm-5.3 (cline)", context_length: 262144, score: 71, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
   { id: "deepseek-v4-flash", owned_by: "cline", provider: "cline", display_name: "deepseek-v4-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
   { id: "glm-5.3-flash", owned_by: "cline", provider: "cline", display_name: "glm-5.3-flash", context_length: 262144, score: 70, tier: "custom", live_status: "alias", capabilities: ["text","reasoning"], limit: "free" },
   // google-custom -> google-gemini
