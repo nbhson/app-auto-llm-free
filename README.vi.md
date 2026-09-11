@@ -23,7 +23,7 @@
 
 > #### ⚙️ **Cài đặt & Đa-Client**
 >
-> **Dashboard Settings** — Trang `/settings` load mặc định từ `.env` qua `GET /api/config`, lưu vào `localStorage`. Kiểm tra sống `EMBEDDING_MODEL`/`EMBEDDING_FALLBACKS` (xanh/đỏ), bật/tắt `SEMANTIC_CACHE`/`COMPRESSION`/`COST_ROUTING`.
+> **Dashboard Settings** — Trang `/settings` control plane (best-practice: nhóm theo mental model, search, progressive disclosure, Save rõ ràng + hot-reload). Load mặc định qua `GET /api/config` (29 keys), lưu `localStorage` + **hot-reload qua `PUT /api/config` (atomic, cần admin, không cần restart)**. Tính năng: slider `SEMANTIC_THRESHOLD 0.7-0.99 + TTL chips`, diff `amber` + badge `modified`, `Reset` từng section, thanh `Unsaved` sticky + `beforeunload`, `Export/Import JSON`, `Copy diff/Download patch`, `Preset Balanced/Cheapest/Fastest/Performance`, **Cache Live `GET /api/cache/stats` pretty `hits/misses/hitRate/size` + `Clear`**, **Cost Router 4 weights live `score=cost*W+latency*W-headroom*W-success*W`**, **Compression `MAX_TOKENS` slider + `POST /api/compression/preview`**, **Advanced `MAX_MEM/SCAN_CAP`**, **Web Tools `WEB_SEARCH_PROVIDER`**, **Reliability `PROVIDER_TIMEOUT/CIRCUIT_BREAKER`**, **Fallback Tiers JSON editor**, **Danger Zone**. Tất cả toggle `role=switch` a11y, `HelpTip` chú thích inline, `Search` lọc 6 sections.
 >
 > **Claude Code** — Set `ANTHROPIC_BASE_URL=http://localhost:7373` và `ANTHROPIC_AUTH_TOKEN=fgk-...`, dùng `POST /v1/messages` với model `free-llm-gateway/auto` (strict 8 fallback: pollinations, llm7-io, kilo-code, nvidia-nim, agnes-ai, orcarouter, openrouter).
 >

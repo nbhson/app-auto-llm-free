@@ -127,8 +127,8 @@ export function createApp() {
     const key = extractBearer(c);
     const vk = key ? isValidVirtualKeyLive(key) : null;
     if (!vk) return c.json({ error: { message: "Unauthorized", type: "invalid_api_key" } }, 401);
-    // For /api/keys POST/DELETE require admin
-    if ((c.req.path.startsWith("/api/keys") && c.req.method !== "GET") && vk.role !== "admin") {
+    // For /api/keys POST/DELETE and PUT /api/config require admin
+    if (((c.req.path.startsWith("/api/keys") && c.req.method !== "GET") || (c.req.path === "/api/config" && c.req.method === "PUT")) && vk.role !== "admin") {
       return c.json({ error: { message: "Admin required", type: "forbidden" } }, 403);
     }
     setRequestVk(c, vk);

@@ -90,21 +90,34 @@ then **auto boot-sync** (`jobs/boot-sync.ts`) tự phát hiện provider mới (
 | `CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before opening the circuit |
 | `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | Cooldown duration |
 
-### Vector 1+2 — Audio / Responses / Anthropic / Semantic Cache / Compression / Cost Routing / Analytics (2026-09-08)
+### Vector 1+2 — Audio / Responses / Anthropic / Semantic Cache / Compression / Cost Routing / Analytics (2026-09-08) — now tunable via `/settings` + `PUT /api/config` hot-reload (no restart)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ANTHROPIC_API_KEYS` | _(empty)_ | Comma-separated Anthropic keys for `/v1/messages` upstream (round-robin, same pool semantics as other providers) |
-| `SEMANTIC_CACHE_ENABLED` | `0` | Enable semantic vector cache for `/v1/chat/completions` + `/v1/messages`. `1` to enable, `0` to disable |
-| `SEMANTIC_THRESHOLD` | `0.92` | Cosine similarity threshold for cache hit (0.0–1.0, higher = stricter). Tuned for `cohere/embed-english-v3.0` |
-| `CACHE_TTL_S` | `3600` | TTL in seconds for cached completions (1 hour). Evicted via Redis TTL or in-memory sweep |
-| `EMBEDDING_MODEL` | `cohere/embed-english-v3.0` | Embedding model for semantic cache. Uses Cohere embeddings; swap to any compatible endpoint |
-| `COMPRESSION_ENABLED` | `0` | Enable token compression: query-aware `relevanceKeep` (BM25-lite vs last user message, keeps system + 3 recent + top-5 relevant) + tools minify + normalized code dedup |
-| `COST_ROUTING_ENABLED` | `0` | Enable cost-aware routing — score `cost*COST_WEIGHT + latency*LATENCY_WEIGHT - headroom*HEADROOM_WEIGHT - successRate*SUCCESS_WEIGHT` (success from request-log last100, default 1 when no data) |
-| `ANALYTICS_RETENTION_DAYS` | `30` | Days to retain admin analytics rollups (cost tracking, savings, per-key billing, `costByProvider`, `cacheHitRate`, `p95` latency) |
-| `SUCCESS_WEIGHT` | `2` | Cost-router weight for rolling success rate — demotes flaky providers before the breaker opens (`0` disables) |
+| Variable | Default | Description | UI Control (Settings) |
+|----------|---------|-------------|-------------|
+| `ANTHROPIC_API_KEYS` | _(empty)_ | Comma-separated Anthropic keys for `/v1/messages` upstream (round-robin) | — (env only, secret) |
+| `SEMANTIC_CACHE_ENABLED` | `0` | Enable semantic vector cache for `/v1/chat/completions` + `/v1/messages`. `1` to enable | Toggle + `role=switch` a11y, shows `HIT` vs `Upstream` |
+| `SEMANTIC_THRESHOLD` | `0.92` | Cosine similarity threshold for cache hit (0.0–1.0, higher = stricter). Tuned for `cohere/embed-english-v3.0` | Slider `0.7-0.99` + number sync, `recommended 0.92` dot, validation `0..1` |
+| `CACHE_TTL_S` | `3600` | TTL in seconds for cached completions (1 hour). Evicted via Redis TTL or in-memory sweep | Number + chips `1h/6h/24h/7d`, cap `604800` (7d) |
+| `EMBEDDING_MODEL` | `cohere/embed-english-v3.0` | Embedding model for semantic cache. Uses Cohere embeddings; swap to any compatible endpoint | Text + `Check` live `POST /v1/embeddings` 8s `green-500/red-500` |
+| `EMBEDDING_FALLBACKS` | `nvidia-nim/... ,cloudflare/...` | Comma-separated fallback chain → final `hash exact` | Text + per-model `Check` chips `✓/✗/…` |
+| `SEMANTIC_CACHE_MAX_MEM` | `1000` | Max in-memory entries before LRU evict (100..10000) | Number `100..10000` |
+| `SEMANTIC_CACHE_SCAN_CAP` | `200` | Max entries scanned for cosine hit (10..1000) | Number `10..1000` |
+| `COMPRESSION_ENABLED` | `0` | Enable token compression: query-aware `relevanceKeep` (BM25-lite vs last user message, keeps system + 3 recent + top-5 relevant) + tools minify + normalized code dedup | Toggle, dependency: only on cache miss `chat.ts:165` |
+| `COMPRESSION_MAX_TOKENS` | `4096` | Token budget before compression kicks in (512..32000) — `>80% context` triggers | Slider `512..32000` |
+| `COST_ROUTING_ENABLED` | `0` | Enable cost-aware routing — score `cost*COST_WEIGHT + latency*LATENCY_WEIGHT - headroom*HEADROOM_WEIGHT - successRate*SUCCESS_WEIGHT` (success from request-log last100, default 1 when no data) | Toggle, live formula preview |
+| `COST_WEIGHT` | `5` | Cost weight ($/1M) — higher = prefer cheapest | Slider `0..10` |
+| `LATENCY_WEIGHT` | `0.0005` | Latency weight (ms) — higher = prefer fastest | Slider `0..0.005` |
+| `HEADROOM_WEIGHT` | `0.3` | Headroom weight — higher = avoid near-limit providers | Slider `0..1` |
+| `SUCCESS_WEIGHT` | `2` | Success rate weight — demotes flaky providers before breaker opens (`0` disables) | Slider `0..5` |
+| `ANALYTICS_RETENTION_DAYS` | `30` | Days to retain admin analytics rollups (`costByProvider`, `cacheHitRate`, `p95` latency) | Slider `1..365` |
+| `PROVIDER_TIMEOUT_MS` | `25000` | Timeout for regular providers (1000..120000 ms) | Number `1k..120k` |
+| `PROVIDER_TIMEOUT_AUTO_MS` | `8000` | Timeout when `model=auto` (1000..30000) — faster failover | Number `1k..30k` |
+| `PROVIDER_PARALLEL_AUTO` | `3` | Parallel providers when `auto` (1..5) | Slider `1..5` |
+| `CIRCUIT_BREAKER_THRESHOLD` | `5` | Consecutive failures before opening breaker (1..100) | Number `1..100` |
+| `CIRCUIT_BREAKER_COOLDOWN_MS` | `30000` | Cooldown before half-open (1000..300000 ms) | Number `1k..300k` |
+| `FALLBACK_TIERS` | `[[...default 41 providers...]]` | Provider priority order — JSON array of arrays (max 8 tiers, 200 providers, 60/tier, deduped) | JSON editor + preview chips + `Add to tier 1` + `Validate & Stage` |
 
-Flags are off by default (`0`) for backwards compatibility. Enable individually via `.env` and restart gateway (see kill/restart notes above).
+Flags are off by default (`0`) for backwards compatibility. **New:** all tunable live via `/settings` → `Apply to server` `PUT /api/config` (atomic, admin, caps, audit `logger.info`) without restart; also available via `.env` + restart (see kill/restart notes above). `GET /api/config` returns all 29 keys, `PUT` validates ranges and returns `{applied, errors}` 400 on invalid.
 
 ### Web Tools — Gateway-hosted web_search + web_fetch (1.8.0)
 

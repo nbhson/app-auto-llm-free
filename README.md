@@ -23,7 +23,7 @@
 
 > #### ⚙️ **Settings & Multi-Client Ready**
 >
-> **Dashboard Settings** — `/settings` page loads defaults from `.env` via `GET /api/config`, saves to `localStorage`. Live health checks for `EMBEDDING_MODEL`/`EMBEDDING_FALLBACKS` (green/red), toggles for `SEMANTIC_CACHE`/`COMPRESSION`/`COST_ROUTING`.
+> **Dashboard Settings** — `/settings` control plane (best-practice: grouped by mental model, search, progressive disclosure, explicit Save + hot-reload). Loads defaults via `GET /api/config` (29 keys), saves to `localStorage` + **hot-reload via `PUT /api/config` (atomic, admin, no restart)**. Features: slider `SEMANTIC_THRESHOLD 0.7-0.99 + TTL chips`, diff `amber` + `modified` badge, per-section `Reset`, sticky `Unsaved bar` + `beforeunload`, `Export/Import JSON`, `Copy diff/Download patch`, `Preset Balanced/Cheapest/Fastest/Performance`, **Cache Live `GET /api/cache/stats` pretty `hits/misses/hitRate/size` + `Clear`**, **Cost Router 4 weights live `score=cost*W+latency*W-headroom*W-success*W`**, **Compression `MAX_TOKENS` slider + `POST /api/compression/preview` (7 msgs)**, **Advanced `MAX_MEM/SCAN_CAP`**, **Web Tools `WEB_SEARCH_PROVIDER`**, **Reliability `PROVIDER_TIMEOUT/CIRCUIT_BREAKER`**, **Fallback Tiers JSON editor + preview**, **Danger Zone `DELETE /api/cache|/api/models/health/persisted`**, `FALLBACK_TIERS` visual. All toggles `role=switch` a11y, `HelpTip` inline docs per field, `validation` 60..604800 caps, `Search` filters 6 sections.
 >
 > **Claude Code** — Set `ANTHROPIC_BASE_URL=http://localhost:7373` and `ANTHROPIC_AUTH_TOKEN=fgk-...`, uses `POST /v1/messages` with model `free-llm-gateway/auto` (strict 8 fallback: pollinations, llm7-io, kilo-code, nvidia-nim, agnes-ai, orcarouter, openrouter).
 >

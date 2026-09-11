@@ -333,9 +333,11 @@ No auth required; returns gateway status and provider pool.
 | `GET` | `/api/logs` | Paginated logs (`promptTokens/completionTokens/totalTokens`) |
 | `GET` | `/api/logs/stream` | SSE live logs — **Live ON (SSE + 2s poll)**, duplicate Auto sync 5s removed |
 | `GET` | `/api/analytics?interval=hour\|day&groupBy=provider\|key\|model` | Aggregated analytics (tokens, requests grouped by provider/key/model, interval `hour`/`day`, plus `costBreakdown` and `savings`) |
-| `GET` | `/api/cache/stats` | Cache stats (hits, misses, size) |
-| `DELETE` | `/api/cache` | Clear gateway cache |
-| `POST` | `/api/compression/preview` | Preview compression for a prompt (estimate token savings) |
+| `GET` | `/api/config` | Get runtime config — returns 29 keys `SEMANTIC_*`/`COMPRESSION_*`/`COST_*`/`PROVIDER_TIMEOUT_*`/`CIRCUIT_BREAKER_*`/`WEB_*`/`FALLBACK_TIERS` + `_source` (`.env`). Used by `/settings` to load defaults |
+| `PUT` | `/api/config` | **New hot-reload**: Update runtime config in-memory (admin only, atomic). Body is partial `SettingsState` JSON. Validates ranges (`threshold 0..1`, `TTL 60..604800`, `tiers 8*60 deduped 200`), strict bool `0/1/true/false`, caps, returns `{applied, updated, message}` or `400 {errors, applied:{}}` without mutating on error. Audit `logger.info`. Persists only in-memory — copy `.env snippet` + restart to persist |
+| `GET` | `/api/cache/stats` | Cache stats — `{enabled, hits, misses, hitRate, size}` pretty in Settings Cache Live banner (poll 30s) |
+| `DELETE` | `/api/cache` | Clear gateway cache — `DELETE /api/cache` (admin, confirm in Settings Danger Zone) |
+| `POST` | `/api/compression/preview` | Preview compression for a prompt — body `{messages:[], maxTokens}` → `{original, compressed, ratio, savedTokens, preview}` (needs 7+ msgs to trigger `ratio<1`, sample in Settings) |
 
 **Create a key**:
 

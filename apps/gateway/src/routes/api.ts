@@ -460,8 +460,264 @@ apiRoute.get("/config", (c) => {
     HEADROOM_WEIGHT: config.headroomWeight,
     SUCCESS_WEIGHT: config.successWeight,
     ANALYTICS_RETENTION_DAYS: config.analyticsRetentionDays,
+    PROVIDER_TIMEOUT_MS: config.providerTimeoutMs,
+    PROVIDER_TIMEOUT_AUTO_MS: config.providerTimeoutAutoMs,
+    PROVIDER_PARALLEL_AUTO: config.providerParallelAuto,
+    CIRCUIT_BREAKER_THRESHOLD: config.circuitBreakerThreshold,
+    CIRCUIT_BREAKER_COOLDOWN_MS: config.circuitBreakerCooldownMs,
+    WEB_TOOLS_ENABLED: config.webToolsEnabled ? 1 : 0,
+    WEB_SEARCH_PROVIDER: config.webSearchProvider,
+    WEB_FETCH_TIMEOUT_MS: config.webFetchTimeoutMs,
+    WEB_FETCH_MAX_BYTES: config.webFetchMaxBytes,
+    WEB_SEARCH_MAX_RESULTS: config.webSearchMaxResults,
+    WEB_TOOLS_MAX_ITERATIONS: config.webToolsMaxIterations,
+    WEB_CACHE_TTL_S: config.webCacheTtlSec,
+    FALLBACK_TIERS: JSON.stringify(config.fallbackTiers),
     _source: ".env",
   });
+});
+
+apiRoute.put("/config", async (c) => {
+  const rawBody = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return c.json({ errors: ["Invalid JSON body: expected object"], applied: {} }, 400);
+  }
+  const body = rawBody;
+  const errors: string[] = [];
+  const pending: Record<string, unknown> = {}; // validate first, apply atomically
+  const applied: Record<string, unknown> = {};
+
+  function parseBoolStrict(v: unknown): boolean | null {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") {
+      if (v === 1) return true;
+      if (v === 0) return false;
+      return null;
+    }
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      if (["1", "true", "yes", "on"].includes(s)) return true;
+      if (["0", "false", "no", "off"].includes(s)) return false;
+    }
+    return null;
+  }
+
+  // Collect validations into pending, never mutate config yet
+  if (body.SEMANTIC_CACHE_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.SEMANTIC_CACHE_ENABLED);
+    if (b === null) errors.push("SEMANTIC_CACHE_ENABLED must be 0/1/true/false");
+    else pending.semanticCacheEnabled = b;
+  }
+  if (body.SEMANTIC_THRESHOLD !== undefined) {
+    const v = Number(body.SEMANTIC_THRESHOLD);
+    if (!Number.isFinite(v) || v < 0 || v > 1) errors.push("SEMANTIC_THRESHOLD must be 0..1");
+    else pending.semanticCacheThreshold = v;
+  }
+  if (body.CACHE_TTL_S !== undefined) {
+    const v = parseInt(String(body.CACHE_TTL_S), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("CACHE_TTL_S must be >0");
+    else pending.semanticCacheTtlSec = Math.min(v, 86400 * 7);
+  }
+  if (body.EMBEDDING_MODEL !== undefined) {
+    const s = String(body.EMBEDDING_MODEL).trim();
+    if (!s) errors.push("EMBEDDING_MODEL empty");
+    else if (s.length > 200) errors.push("EMBEDDING_MODEL too long");
+    else {
+      const list = s.split(",").map((x) => x.trim()).filter(Boolean);
+      if (list.length === 0) errors.push("EMBEDDING_MODEL empty after parse");
+      else { pending.embeddingModel = list[0]; pending.embeddingModels = list; }
+    }
+  }
+  if (body.EMBEDDING_FALLBACKS !== undefined) {
+    const s = String(body.EMBEDDING_FALLBACKS);
+    if (s.length > 2000) errors.push("EMBEDDING_FALLBACKS too long");
+    else {
+      const list = s ? s.split(",").map((x) => x.trim()).filter(Boolean) : [];
+      pending.embeddingFallbacks = list;
+    }
+  }
+  if (body.SEMANTIC_CACHE_MAX_MEM !== undefined) {
+    const v = parseInt(String(body.SEMANTIC_CACHE_MAX_MEM), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("SEMANTIC_CACHE_MAX_MEM must be >0");
+    else pending.semanticCacheMaxMemEntries = Math.min(v, 10000);
+  }
+  if (body.SEMANTIC_CACHE_SCAN_CAP !== undefined) {
+    const v = parseInt(String(body.SEMANTIC_CACHE_SCAN_CAP), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("SEMANTIC_CACHE_SCAN_CAP must be >0");
+    else pending.semanticCacheScanCap = Math.min(v, 1000);
+  }
+  if (body.COMPRESSION_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.COMPRESSION_ENABLED);
+    if (b === null) errors.push("COMPRESSION_ENABLED must be 0/1/true/false");
+    else pending.compressionEnabled = b;
+  }
+  if (body.COMPRESSION_MAX_TOKENS !== undefined) {
+    const v = parseInt(String(body.COMPRESSION_MAX_TOKENS), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("COMPRESSION_MAX_TOKENS must be >0");
+    else pending.compressionMaxTokens = Math.min(v, 32000);
+  }
+  if (body.COST_ROUTING_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.COST_ROUTING_ENABLED);
+    if (b === null) errors.push("COST_ROUTING_ENABLED must be 0/1/true/false");
+    else pending.costRoutingEnabled = b;
+  }
+  for (const k of ["COST_WEIGHT", "LATENCY_WEIGHT", "HEADROOM_WEIGHT", "SUCCESS_WEIGHT"] as const) {
+    if (body[k] !== undefined) {
+      const v = parseFloat(String(body[k]));
+      if (!Number.isFinite(v) || v < 0) errors.push(`${k} must be >=0`);
+      else if (v > 1000) errors.push(`${k} too large (max 1000)`);
+      else {
+        const map: Record<string, string> = { COST_WEIGHT: "costWeight", LATENCY_WEIGHT: "latencyWeight", HEADROOM_WEIGHT: "headroomWeight", SUCCESS_WEIGHT: "successWeight" };
+        pending[map[k]] = v;
+      }
+    }
+  }
+  if (body.ANALYTICS_RETENTION_DAYS !== undefined) {
+    const v = parseInt(String(body.ANALYTICS_RETENTION_DAYS), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("ANALYTICS_RETENTION_DAYS must be >0");
+    else pending.analyticsRetentionDays = Math.min(v, 365);
+  }
+  if (body.PROVIDER_TIMEOUT_MS !== undefined) {
+    const v = parseInt(String(body.PROVIDER_TIMEOUT_MS), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("PROVIDER_TIMEOUT_MS must be >0");
+    else pending.providerTimeoutMs = Math.min(v, 120000);
+  }
+  if (body.PROVIDER_TIMEOUT_AUTO_MS !== undefined) {
+    const v = parseInt(String(body.PROVIDER_TIMEOUT_AUTO_MS), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("PROVIDER_TIMEOUT_AUTO_MS must be >0");
+    else pending.providerTimeoutAutoMs = Math.min(v, 30000);
+  }
+  if (body.PROVIDER_PARALLEL_AUTO !== undefined) {
+    const v = parseInt(String(body.PROVIDER_PARALLEL_AUTO), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("PROVIDER_PARALLEL_AUTO must be >0");
+    else pending.providerParallelAuto = Math.min(v, 5);
+  }
+  if (body.CIRCUIT_BREAKER_THRESHOLD !== undefined) {
+    const v = parseInt(String(body.CIRCUIT_BREAKER_THRESHOLD), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("CIRCUIT_BREAKER_THRESHOLD must be >0");
+    else if (v > 100) errors.push("CIRCUIT_BREAKER_THRESHOLD max 100");
+    else pending.circuitBreakerThreshold = v;
+  }
+  if (body.CIRCUIT_BREAKER_COOLDOWN_MS !== undefined) {
+    const v = parseInt(String(body.CIRCUIT_BREAKER_COOLDOWN_MS), 10);
+    if (!Number.isFinite(v) || v <= 0) errors.push("CIRCUIT_BREAKER_COOLDOWN_MS must be >0");
+    else pending.circuitBreakerCooldownMs = Math.min(v, 300000);
+  }
+  if (body.WEB_TOOLS_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.WEB_TOOLS_ENABLED);
+    if (b === null) errors.push("WEB_TOOLS_ENABLED must be 0/1/true/false");
+    else pending.webToolsEnabled = b;
+  }
+  if (body.WEB_SEARCH_PROVIDER !== undefined) {
+    const s = String(body.WEB_SEARCH_PROVIDER).trim().toLowerCase();
+    const allowed = ["tavily", "brave", "serper", "jina"];
+    if (!allowed.includes(s)) errors.push("WEB_SEARCH_PROVIDER must be tavily|brave|serper|jina");
+    else pending.webSearchProvider = s;
+  }
+  for (const k of ["WEB_FETCH_TIMEOUT_MS", "WEB_FETCH_MAX_BYTES", "WEB_SEARCH_MAX_RESULTS", "WEB_TOOLS_MAX_ITERATIONS", "WEB_CACHE_TTL_S"] as const) {
+    if (body[k] !== undefined) {
+      const v = parseInt(String(body[k]), 10);
+      if (!Number.isFinite(v) || v <= 0) errors.push(`${k} must be >0`);
+      else {
+        const map: Record<string, string> = { WEB_FETCH_TIMEOUT_MS: "webFetchTimeoutMs", WEB_FETCH_MAX_BYTES: "webFetchMaxBytes", WEB_SEARCH_MAX_RESULTS: "webSearchMaxResults", WEB_TOOLS_MAX_ITERATIONS: "webToolsMaxIterations", WEB_CACHE_TTL_S: "webCacheTtlSec" };
+        const caps: Record<string, number> = { WEB_FETCH_TIMEOUT_MS: 30000, WEB_FETCH_MAX_BYTES: 2000000, WEB_SEARCH_MAX_RESULTS: 10, WEB_TOOLS_MAX_ITERATIONS: 5, WEB_CACHE_TTL_S: 86400 };
+        pending[map[k]] = Math.min(v, caps[k]);
+      }
+    }
+  }
+  if (body.FALLBACK_TIERS !== undefined) {
+    try {
+      const raw = typeof body.FALLBACK_TIERS === "string" ? JSON.parse(body.FALLBACK_TIERS) : body.FALLBACK_TIERS;
+      if (!Array.isArray(raw) || raw.length === 0) throw new Error("must be non-empty array");
+      if (raw.length > 8) throw new Error("max 8 tiers");
+      const tiers: string[][] = [];
+      let totalProviders = 0;
+      for (const tier of raw) {
+        if (!Array.isArray(tier)) throw new Error("each tier must be array");
+        const clean = tier.filter((p: unknown) => typeof p === "string" && (p as string).trim().length > 0).map((p: string) => p.trim()).slice(0, 60);
+        if (clean.length === 0) throw new Error("each tier must have at least one provider");
+        // dedupe within tier
+        const deduped = [...new Set(clean)];
+        totalProviders += deduped.length;
+        tiers.push(deduped);
+      }
+      if (totalProviders > 200) throw new Error("total providers exceed 200");
+      pending.fallbackTiers = tiers;
+    } catch (e) {
+      errors.push(`FALLBACK_TIERS invalid: ${errMessage(e)}`);
+    }
+  }
+
+  // Unknown keys warning (ignore but report)
+  const known = new Set(["SEMANTIC_CACHE_ENABLED","SEMANTIC_THRESHOLD","CACHE_TTL_S","EMBEDDING_MODEL","EMBEDDING_FALLBACKS","SEMANTIC_CACHE_MAX_MEM","SEMANTIC_CACHE_SCAN_CAP","COMPRESSION_ENABLED","COMPRESSION_MAX_TOKENS","COST_ROUTING_ENABLED","COST_WEIGHT","LATENCY_WEIGHT","HEADROOM_WEIGHT","SUCCESS_WEIGHT","ANALYTICS_RETENTION_DAYS","PROVIDER_TIMEOUT_MS","PROVIDER_TIMEOUT_AUTO_MS","PROVIDER_PARALLEL_AUTO","CIRCUIT_BREAKER_THRESHOLD","CIRCUIT_BREAKER_COOLDOWN_MS","WEB_TOOLS_ENABLED","WEB_SEARCH_PROVIDER","WEB_FETCH_TIMEOUT_MS","WEB_FETCH_MAX_BYTES","WEB_SEARCH_MAX_RESULTS","WEB_TOOLS_MAX_ITERATIONS","WEB_CACHE_TTL_S","FALLBACK_TIERS","_source"]);
+  for (const k of Object.keys(body)) {
+    if (!known.has(k) && !k.startsWith("_")) errors.push(`Unknown key: ${k}`);
+  }
+
+  if (errors.length > 0) {
+    return c.json({ errors, applied: {} }, 400);
+  }
+
+  // Atomic apply: only now mutate config
+  const reverseMap: Record<string, string> = {
+    semanticCacheEnabled: "SEMANTIC_CACHE_ENABLED",
+    semanticCacheThreshold: "SEMANTIC_THRESHOLD",
+    semanticCacheTtlSec: "CACHE_TTL_S",
+    embeddingModel: "EMBEDDING_MODEL",
+    embeddingFallbacks: "EMBEDDING_FALLBACKS",
+    semanticCacheMaxMemEntries: "SEMANTIC_CACHE_MAX_MEM",
+    semanticCacheScanCap: "SEMANTIC_CACHE_SCAN_CAP",
+    compressionEnabled: "COMPRESSION_ENABLED",
+    compressionMaxTokens: "COMPRESSION_MAX_TOKENS",
+    costRoutingEnabled: "COST_ROUTING_ENABLED",
+    costWeight: "COST_WEIGHT",
+    latencyWeight: "LATENCY_WEIGHT",
+    headroomWeight: "HEADROOM_WEIGHT",
+    successWeight: "SUCCESS_WEIGHT",
+    analyticsRetentionDays: "ANALYTICS_RETENTION_DAYS",
+    providerTimeoutMs: "PROVIDER_TIMEOUT_MS",
+    providerTimeoutAutoMs: "PROVIDER_TIMEOUT_AUTO_MS",
+    providerParallelAuto: "PROVIDER_PARALLEL_AUTO",
+    circuitBreakerThreshold: "CIRCUIT_BREAKER_THRESHOLD",
+    circuitBreakerCooldownMs: "CIRCUIT_BREAKER_COOLDOWN_MS",
+    webToolsEnabled: "WEB_TOOLS_ENABLED",
+    webSearchProvider: "WEB_SEARCH_PROVIDER",
+    webFetchTimeoutMs: "WEB_FETCH_TIMEOUT_MS",
+    webFetchMaxBytes: "WEB_FETCH_MAX_BYTES",
+    webSearchMaxResults: "WEB_SEARCH_MAX_RESULTS",
+    webToolsMaxIterations: "WEB_TOOLS_MAX_ITERATIONS",
+    webCacheTtlSec: "WEB_CACHE_TTL_S",
+    fallbackTiers: "FALLBACK_TIERS",
+  };
+  for (const [internal, value] of Object.entries(pending)) {
+    (config as unknown as Record<string, unknown>)[internal] = value;
+    const external = reverseMap[internal] || internal;
+    if (external === "EMBEDDING_MODEL") {
+      // already set embeddingModels too
+      (config as unknown as Record<string, unknown>).embeddingModels = value === (pending.embeddingModel as string).split(",")[0] ? pending.embeddingModels : [value];
+      applied[external] = pending.embeddingModels ? (pending.embeddingModels as string[]).join(",") : value;
+    } else if (external === "FALLBACK_TIERS") {
+      applied[external] = JSON.stringify(value);
+    } else if (external === "EMBEDDING_FALLBACKS") {
+      applied[external] = (value as string[]).join(",");
+    } else if (typeof value === "boolean") {
+      applied[external] = value ? 1 : 0;
+    } else {
+      applied[external] = value;
+    }
+    // also handle embeddingModels side effect
+    if (internal === "embeddingModel" && pending.embeddingModels) {
+      (config as unknown as Record<string, unknown>).embeddingModels = pending.embeddingModels;
+    }
+  }
+  // audit
+  try {
+    const vk = (c as unknown as { get?: (k: string) => unknown }).get?.("vk") || null;
+    const { logger } = await import("../middleware/logger.js");
+    logger.info({ applied: Object.keys(applied), vk: (vk as { id?: string })?.id || "master" }, "[config] PUT /api/config applied");
+  } catch { /* ignore */ }
+
+  return c.json({ applied, updated: Object.keys(applied).length, message: "Config updated in-memory (restart still needed to persist to .env)" });
 });
 
 apiRoute.get("/stats", (c) => {
