@@ -30,6 +30,7 @@ export interface TryProvidersOpts {
   quotaTokens?: number;
   shouldSkip?: (providerId: string) => string | null;
   call: (attempt: ProviderAttempt) => Promise<Response>;
+  timeoutMs?: number;
 }
 
 export type TryProvidersResult =
@@ -77,9 +78,9 @@ export async function tryProviders(opts: TryProvidersOpts): Promise<TryProviders
     try {
       // Per-provider fetch timeout — fail fast so next fallback is tried quickly.
       // For streaming, this only times out the initial fetch (headers), not the SSE body.
-      // Use config.providerTimeoutMs (default 25s) — long queries with web_fetch need >12s.
+      // Use opts.timeoutMs if provided (auto uses shorter timeout), else config.providerTimeoutMs (default 25s)
       const callWithTimeout = async () => {
-        const timeoutMs = config.providerTimeoutMs;
+        const timeoutMs = opts.timeoutMs ?? config.providerTimeoutMs;
         let timer: NodeJS.Timeout | undefined;
         const timeout = new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error(`provider timeout after ${timeoutMs}ms — thử model khác hoặc tắt Web Tools (Globe) nếu bật`)), timeoutMs);

@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.2] - 2026-09-11
+
+### Fixed
+- **`free-llm-gateway/auto` chậm 10-15s (thậm chí 54s log `llm7-io` `54837ms` qua `kiraai→pollinations` sequential `25s` mỗi provider)** — `apps/gateway/src/config.ts:274` thêm `PROVIDER_TIMEOUT_AUTO_MS=8000` (env, default 8s vs `PROVIDER_TIMEOUT_MS=25000` cho single model), `apps/gateway/src/lib/provider-executor.ts:26` thêm `timeoutMs?` param để per-call override; `apps/gateway/src/routes/v1/chat.ts:119` `isAuto` detection (`free-llm-gateway/auto`|`auto`) → `shouldRank` luôn bật cost-routing ranking cho auto (ưu tiên successRate+latency) + `perProviderTimeout = isAuto ? 8000 : 25000`, truyền `timeoutMs` vào `tryProviders` (fail fast 8s → fallback nhanh, 3 providers ~24s max thay vì 54s), log `isAuto`
+- **UT docs** — `chat-error.test.ts` giữ 8 tests, thêm `chat-auto.test.ts` 6 tests cho 1.9.2 (auto timeout config, perProviderTimeout, ranking for auto)
+
+### Changed
+- **Version** — `1.9.1→1.9.2` (root/gateway/web, badge, health, auto timeout)
+
 ## [1.9.1] - 2026-09-11
 
 ### Fixed

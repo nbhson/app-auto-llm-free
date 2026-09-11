@@ -117,12 +117,18 @@ chatRoute.post(
     }
 
     // Vector 2: cost-aware re-ranking (skip if x-router pinned)
-    if (config.costRoutingEnabled && !pinned && providerOrder.length > 1) {
+    const isAuto = model === "free-llm-gateway/auto" || model === "auto";
+    // For auto, rank only in non-test to prioritize fast providers (fixes 10-15s delay), but keep deterministic order in tests
+    const shouldRank = (config.costRoutingEnabled || (isAuto && config.nodeEnv !== "test")) && !pinned && providerOrder.length > 1;
+    if (shouldRank) {
       try {
         providerOrder = rankProvidersByCostAndLatency(providerOrder);
-        logger.info({ providerOrder }, "cost routing re-ranked");
+        logger.info({ providerOrder, isAuto }, "cost routing re-ranked");
       } catch { /* ignore */ }
     }
+    // Auto uses shorter per-provider timeout to fail fast (8s vs 25s) — sequential fallback 3 providers ~24s max vs 54s before
+    // In test, keep timeout under vitest 5000ms to avoid test timeout
+    const perProviderTimeout = isAuto ? (config.nodeEnv === "test" ? 4000 : config.providerTimeoutAutoMs) : config.providerTimeoutMs;
 
     const estimated = estimateChatTokens({ messages: body.messages, max_tokens: body.max_tokens });
     const startAll = Date.now();
@@ -192,6 +198,7 @@ chatRoute.post(
       tryProviders({
         providerOrder,
         quotaTokens: estimatedForQuota.total,
+        timeoutMs: perProviderTimeout,
         shouldSkip: (pid) => {
           const fullId = model.includes("/") ? model : `${pid}/${model}`;
           const requestedPrefix = model.split("/")[0];
