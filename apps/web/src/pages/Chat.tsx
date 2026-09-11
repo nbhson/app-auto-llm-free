@@ -11,10 +11,12 @@ import { estimateTotalPromptTokens, CHAT_CONSTANTS } from "../features/chat/lib/
 import { loadMessages, persistMessages, clearPersistedMessages, prefs, getMasterKey } from "../features/chat/lib/storage";
 import { useChatStream } from "../features/chat/hooks/useChatStream";
 import { useChatAttachments } from "../features/chat/hooks/useChatAttachments";
+import { useFavoriteModels } from "../features/chat/hooks/useFavoriteModels.ts";
 import { ChatHeader } from "../features/chat/components/ChatHeader";
 import { MessageList } from "../features/chat/components/MessageList";
 import { Composer } from "../features/chat/components/Composer";
 import { ContextPanel, TipsCard } from "../features/chat/components/ContextPanel";
+import { getFavoriteIds } from "../lib/favorites.ts";
 
 // Re-export for backwards compat + tests that grep this file
 export const ALLOWED_CHAT_MODELS = _ALLOWED;
@@ -38,7 +40,16 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<ModelEntry[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>(() => prefs.getModel(_ALLOWED[1], ALLOWED_SET));
+  const { favoriteSet, combinedIds, combinedSet } = useFavoriteModels();
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    try {
+      const favs = getFavoriteIds();
+      const extended = new Set<string>([...(_ALLOWED as unknown as string[]), ...favs]);
+      return prefs.getModel(_ALLOWED[1], extended);
+    } catch {
+      return prefs.getModel(_ALLOWED[1], ALLOWED_SET);
+    }
+  });
   const [temperature, setTemperature] = useState(() => prefs.getTemp());
   const [maxTokens, setMaxTokens] = useState(() => prefs.getMaxTokens());
   const [streamEnabled, setStreamEnabled] = useState(() => prefs.getStream());
@@ -76,31 +87,24 @@ export default function Chat() {
   useEffect(() => prefs.setSystem(systemPrompt), [systemPrompt]);
   useEffect(() => prefs.setWebTools(webToolsEnabled), [webToolsEnabled]);
 
-  // Fetch models — restrict to ALLOWED_CHAT_MODELS only, timeout-guarded
+  // Fetch models — ALLOWED + favorites, timeout-guarded
   useEffect(() => {
+    const ids = combinedIds;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), CHAT_CONSTANTS.MODELS_FETCH_TIMEOUT_MS);
     fetch(`/v1/models?limit=1000`, { headers: { Authorization: `Bearer ${getMasterKey()}` }, signal: ac.signal })
       .then((r) => r.json())
       .then((d) => {
         const list = (d.data || []) as ModelEntry[];
-        setModels(
-          _ALLOWED.map((id) => {
-            const found = list.find((m) => m.id === id);
-            if (found) return found;
-            return { id, owned_by: id.split("/")[0], context_length: FALLBACK_CONTEXT[id] || 128000, score: 70, live_status: "alias" };
-          }),
-        );
+        setModels(ids.map((id) => {
+          const found = list.find((m) => m.id === id);
+          return found || { id, owned_by: id.split("/")[0] || "unknown", context_length: FALLBACK_CONTEXT[id] || 128000, score: 70, live_status: favoriteSet.has(id) ? "favorite" : "alias" };
+        }));
       })
-      .catch(() => {
-        setModels(_ALLOWED.map((id) => ({ id, owned_by: id.split("/")[0], context_length: FALLBACK_CONTEXT[id] || 128000, live_status: "alias" })));
-      })
+      .catch(() => setModels(ids.map((id) => ({ id, owned_by: id.split("/")[0] || "unknown", context_length: FALLBACK_CONTEXT[id] || 128000, live_status: favoriteSet.has(id) ? "favorite" : "alias" }))))
       .finally(() => clearTimeout(timer));
-    return () => {
-      clearTimeout(timer);
-      ac.abort();
-    };
-  }, []);
+    return () => { clearTimeout(timer); ac.abort(); };
+  }, [combinedIds, favoriteSet]);
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant", block: "end" });
@@ -229,6 +233,7 @@ export default function Chat() {
           onConfirmRefresh={confirmRefresh}
           webToolsEnabled={webToolsEnabled}
           onToggleWebTools={() => setWebToolsEnabled((v) => !v)}
+          favoriteSet={favoriteSet}
         />
 
         {showSettings && (

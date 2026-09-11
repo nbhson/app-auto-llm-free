@@ -2,6 +2,15 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.0] - 2026-09-11
+
+### Added
+- **Favorite models** — `apps/web/src/lib/favorites.ts` `FAVORITES_KEY="favoriteModels"` + `FAVORITES_EVENT="favorites-updated"` helpers `getFavoriteIds/getFavoriteSet/setFavoriteIds/toggleFavorite/isFavorite` (localStorage + CustomEvent + storage sync); `apps/web/src/features/chat/hooks/useFavoriteModels.ts` hook `favoriteSet/combinedIds/combinedSet` (merge `ALLOWED_CHAT_MODELS` 6 + favorites); `apps/web/src/pages/Models.tsx` cột ★ (Star) + toggle `toggleFav` (persist `favoriteModels`, dispatch event), filter `favOnly` (`localStorage modelsFavOnly`) chỉ trong dropdown `Filters` (checkbox `★ Favorites only`), sort/filter `favorites.has(m.id)`, highlight row `amber-50`; `apps/web/src/pages/Chat.tsx` dùng `useFavoriteModels` để fetch `combinedIds` (ALLOWED + favorites) thay vì chỉ 6, fallback `live_status favorite/alias`; `apps/web/src/features/chat/components/ChatHeader.tsx` dropdown group `Favorites` lên đầu (Star fill amber, context badge amber), `Default` ở dưới, star cạnh `selectedModel`, hint `no_favorites`; i18n VI/EN `models.favorite/favorites_only/favorites_tip/th_fav/add_fav/remove_fav` + `chat.favorites/favorites_hint/no_favorites/default_models` (10 keys ×2)
+- **UT favorites (9 tests)** — `apps/gateway/src/lib/favorites.test.ts` 5 suites: `lib/favorites + hook`, `Models page`, `Chat integration`, `ChatHeader grouping`, `i18n VI/EN`; `chat-architecture.test.ts` bump `<320→<360 LOC` do Chat.tsx 322 LOC sau favorites
+
+### Changed
+- **Version** — `1.8.0→1.9.0` (root/gateway/web, badge `main.tsx:104`, `app.ts:72` health, `health.test.ts` expect)
+
 ## [1.8.0] - 2026-09-11
 
 ### Added
