@@ -37,15 +37,19 @@
 
 ---
 
-## 📸 Screenshots — Live Dashboard (30 freellms + 2 • 338 free verified 24h)
+## 📸 Screenshots — Live Dashboard (51 providers • 316 free • verified 24h)
 
-| Providers — 51 IDs, tier, live health, `Get Key ↗` | Models — 338 (316 freellms + 14 KiraAI + 8 B.AI/TokenHarbor), live probe `Check Live`, `Hide 404` |
+| Providers — 51 IDs, tier, hasKey, `Get Key ↗` + Live Health 5s | Models — 316 models, `kiraai` filter, `Check Live`, Hide 404 (`usable`/`timeout`/`404`) |
 |:---:|:---:|
-| ![Providers — 51 live, health 5s](docs/images/providers.png) | ![Models — 338 live verify](docs/images/models.png) |
+| ![Providers — 51 live, health 5s](docs/images/providers.png) | ![Models — 316 live verify](docs/images/models.png) |
 
-| Dashboard — 4 cards + tokens overview | Logs — request log + SSE stream (charts moved to Usage) |
+| Chat — `ollama-cloud/gpt-oss:120b`, Context Window + vision | Usage — Provider Topology + Requests/Tokens by Provider |
 |:---:|:---:|
-| ![Dashboard — 4 cards + 3 charts + tokens](docs/images/dashboard.png) | ![Logs — charts + SSE](docs/images/logs.png) |
+| ![Chat — vision + Context Window](docs/images/chat.png) | ![Usage — Provider Topology](docs/images/usage.png) |
+
+| Benchmark — Leaderboard 3 runs × 3 models (avg latency / TPS / radar / cost) — winner `agnes-ai/agnes-2.5-flash` |
+|:---:|
+| ![Benchmark — latency, TPS, radar, cost](docs/images/benchmark.png) |
 
 ---
 
