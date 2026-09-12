@@ -50,6 +50,10 @@ export const baseUrls: Record<string, string> = {
   orcarouter: "https://api.orcarouter.ai/v1",
   freeai: "https://api.free.ai/v1",
   cline: "https://api.cline.bot/api/v1",
+  unorouter: "https://api.unorouter.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  "claude-code": "https://api.anthropic.com/v1",
+  codex: "https://api.openai.com/v1",
 };
 
 export function getBaseUrl(slug: string): string {

@@ -1,0 +1,212 @@
+# Provider: unorouter — UnoRouter unified gateway (https://unorouter.com/en/models, 219 free :free suffix, baseUrl https://api.unorouter.com/v1, key: https://unorouter.com/en/token)
+models:
+  - id: "unorouter/gpt-oss-120b:free"
+    display_name: "gpt-oss-120b:free"
+    provider: unorouter
+    context_length: 131072
+    score: 78
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/gpt-oss-20b:free"
+    display_name: "gpt-oss-20b:free"
+    provider: unorouter
+    context_length: 131072
+    score: 76
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/deepseek-v4-flash:free"
+    display_name: "deepseek-v4-flash:free"
+    provider: unorouter
+    context_length: 1048576
+    score: 75
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/deepseek-v4-pro:free"
+    display_name: "deepseek-v4-pro:free"
+    provider: unorouter
+    context_length: 1048576
+    score: 74
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/deepseek-v4-flash-0731:free"
+    display_name: "deepseek-v4-flash-0731:free"
+    provider: unorouter
+    context_length: 1048576
+    score: 74
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/deepseek-reasoner:free"
+    display_name: "deepseek-reasoner:free"
+    provider: unorouter
+    context_length: 131072
+    score: 73
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/qwen3.8-27b:free"
+    display_name: "qwen3.8-27b:free"
+    provider: unorouter
+    context_length: 131072
+    score: 72
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/glm-5.3-flash:free"
+    display_name: "glm-5.3-flash:free"
+    provider: unorouter
+    context_length: 131072
+    score: 71
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/glm-5.3:free"
+    display_name: "glm-5.3:free"
+    provider: unorouter
+    context_length: 131072
+    score: 71
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/glm-5.3-flash-search:free"
+    display_name: "glm-5.3-flash-search:free"
+    provider: unorouter
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/glm-5.3-flash-think-search:free"
+    display_name: "glm-5.3-flash-think-search:free"
+    provider: unorouter
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/glm-5.3-flash-thinking:free"
+    display_name: "glm-5.3-flash-thinking:free"
+    provider: unorouter
+    context_length: 131072
+    score: 70
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/hy3:free"
+    display_name: "hy3:free"
+    provider: unorouter
+    context_length: 262144
+    score: 73
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/ling-3.0-flash-fin:free"
+    display_name: "ling-3.0-flash-fin:free"
+    provider: unorouter
+    context_length: 131072
+    score: 68
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/nemotron-3.5-lightning:free"
+    display_name: "nemotron-3.5-lightning:free"
+    provider: unorouter
+    context_length: 131072
+    score: 69
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/laguna-xs-2.1:free"
+    display_name: "laguna-xs-2.1:free"
+    provider: unorouter
+    context_length: 32768
+    score: 66
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/dots-3-note-preview:free"
+    display_name: "dots-3-note-preview:free"
+    provider: unorouter
+    context_length: 131072
+    score: 65
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/lfm-2.5-2.6b:free"
+    display_name: "lfm-2.5-2.6b:free"
+    provider: unorouter
+    context_length: 32768
+    score: 64
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/sensenova-6.8-flash-lite:free"
+    display_name: "sensenova-6.8-flash-lite:free"
+    provider: unorouter
+    context_length: 32768
+    score: 63
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/muse-glimmer-30b:free"
+    display_name: "muse-glimmer-30b:free"
+    provider: unorouter
+    context_length: 131072
+    score: 64
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, vision]
+    limit: "1 RPM (free :free tier)"
+  - id: "unorouter/hy4-preview"
+    display_name: "hy4-preview"
+    provider: unorouter
+    context_length: 262144
+    score: 72
+    tier: permanent
+    verified: false
+    no_card: true
+    capabilities: [text, reasoning]
+    limit: "1 RPM (free :free tier)"

@@ -86,6 +86,7 @@ export function createOpenAICompatibleProvider(opts: {
         nebius: "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "ai21-labs": "jamba-1.5-large",
         orcarouter: "orcarouter/free",
+        unorouter: "gpt-oss-120b:free",
         freeai: "freeai/qwen3-8b",
         cline: "cline/deepseek-v4-flash",
         "b-ai": "qwen3.8-flash",

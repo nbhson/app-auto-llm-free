@@ -38,7 +38,7 @@ describe("registry resolveProvidersForModel", () => {
     expect(resolveProvidersForModel("hy3")).toEqual(["b-ai"]);
     expect(resolveProvidersForModel("QWEN3.8-FLASH")).toEqual(["b-ai"]);
     expect(resolveProvidersForModel("tokenharbor/deepseek-v4.1-flash:free")).toEqual(["tokenharbor"]);
-    expect(resolveProvidersForModel("deepseek-v4.1-flash:free")).toEqual(["tokenharbor"]);
+    expect(resolveProvidersForModel("deepseek-v4.1-flash:free")).toEqual(["tokenharbor", "unorouter"]);
     expect(resolveProvidersForModel("mimo-v2.5:free")).toContain("tokenharbor");
     expect(resolveProvidersForModel("glm-5.3-flash")).toContain("b-ai");
     expect(providerIds).toContain("b-ai");

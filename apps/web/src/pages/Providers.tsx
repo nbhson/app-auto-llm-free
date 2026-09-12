@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, RefreshCw, ExternalLink, Copy, Check, Layers, ArrowUpDown } from "lucide-react";
-import { getKeyUrl } from "../lib/getKeyUrls";
+import { getKeyUrl, getProviderInfoUrl } from "../lib/getKeyUrls";
 import { getBaseUrl } from "../lib/getBaseUrls";
 import { useLang } from "../lib/i18n.tsx";
 import { errMsg, type ApiHealth, type ApiProvider } from "../lib/api-types.ts";
@@ -313,7 +313,11 @@ export default function Providers() {
                     {/* get key */}
                     <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2">
                       <a href={getKeyUrl(p.id)} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md text-white shadow-xs ${hasKey ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"}`}>{hasKey ? "✓ Key" : "Get Key"} <ExternalLink className="w-3 h-3" /></a>
-                      <a href={`https://freellms.org/providers/${p.id}`} target="_blank" rel="noopener" className="text-[11px] font-medium text-slate-500 hover:text-slate-700 border border-slate-200 bg-white px-2.5 py-1.5 rounded-md">freellms ↗</a>
+                      {getProviderInfoUrl(p.id) !== "#" ? (
+                        <a href={getProviderInfoUrl(p.id)} target="_blank" rel="noopener" className="text-[11px] font-medium text-slate-500 hover:text-slate-700 border border-slate-200 bg-white px-2.5 py-1.5 rounded-md">info ↗</a>
+                      ) : (
+                        <span className="text-[11px] font-medium text-slate-400 border border-slate-200 bg-slate-50 px-2.5 py-1.5 rounded-md">—</span>
+                      )}
                     </div>
                   </div>
                 </div>

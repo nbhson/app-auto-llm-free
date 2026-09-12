@@ -12,7 +12,7 @@ describe("health route", () => {
     expect(data.version).toBe("1.11.0");
     expect(data.providers).toBe(providerIds.length);
     expect(data.providers).toBeGreaterThan(40);
-    expect(data.providers).toBe(51);
+    expect(data.providers).toBe(52);
     expect(typeof data.uptime).toBe("number");
     expect(Array.isArray(data.tiers)).toBe(true);
     expect(typeof data.timestamp).toBe("string");

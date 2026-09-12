@@ -1,6 +1,7 @@
-// Direct console URLs for obtaining API keys (from freellms.org Get API Key buttons + opencode config)
+// Direct console URLs for obtaining API keys (direct provider consoles, no freellms fallback)
 export const getKeyUrls: Record<string, string> = {
   "nvidia-nim": "https://build.nvidia.com/settings/api-keys",
+  nvidia: "https://build.nvidia.com/settings/api-keys",
   groq: "https://console.groq.com/keys",
   cerebras: "https://cloud.cerebras.ai/",
   openrouter: "https://openrouter.ai/keys",
@@ -47,6 +48,7 @@ export const getKeyUrls: Record<string, string> = {
   bai: "https://chat.b.ai/key",
   "chat-b-ai": "https://chat.b.ai/key",
   tokenharbor: "https://tokenharbor.ai",
+  unorouter: "https://unorouter.com/en/token",
   orcarouter: "https://api.orcarouter.ai",
   freeai: "https://api.free.ai",
   cline: "https://api.cline.bot",
@@ -56,5 +58,68 @@ export const getKeyUrls: Record<string, string> = {
 };
 
 export function getKeyUrl(slug: string): string {
-  return getKeyUrls[slug] || `https://freellms.org/providers/${slug}`;
+  return getKeyUrls[slug] || "#";
+}
+
+// Provider homepage / models listing (no freellms fallback)
+export const providerInfoUrls: Record<string, string> = {
+  "nvidia-nim": "https://build.nvidia.com",
+  nvidia: "https://build.nvidia.com",
+  groq: "https://groq.com",
+  cerebras: "https://cerebras.ai",
+  openrouter: "https://openrouter.ai/models",
+  unorouter: "https://unorouter.com/en/models",
+  "google-gemini": "https://ai.google.dev",
+  gemini: "https://ai.google.dev",
+  "github-models": "https://github.com/marketplace/models",
+  "ovhcloud-ai-endpoints": "https://www.ovhcloud.com/en/public-cloud/ai-endpoints/",
+  cohere: "https://cohere.com",
+  "mistral-ai": "https://mistral.ai",
+  mistral: "https://mistral.ai",
+  modelscope: "https://modelscope.cn",
+  "cloudflare-workers-ai": "https://developers.cloudflare.com/workers-ai/",
+  "llm7-io": "https://llm7.io",
+  "chutes-ai": "https://chutes.ai",
+  chutes: "https://chutes.ai",
+  sambanova: "https://sambanova.ai",
+  siliconflow: "https://www.siliconflow.cn",
+  "glhf-chat": "https://glhf.chat",
+  glhf: "https://glhf.chat",
+  "kilo-code": "https://kilo.ai",
+  opencode: "https://opencode.ai",
+  "agnes-ai": "https://agnes-ai.com",
+  "aion-labs": "https://aionlabs.ai",
+  "z-ai-zhipu-ai": "https://www.zhipuai.cn",
+  experientiallabs: "https://experientiallabs.ai",
+  experiential: "https://experientiallabs.ai",
+  "experiential-cloud": "https://experientiallabs.ai",
+  experiential_cloud: "https://experientiallabs.ai",
+  kiraai: "https://kiraai.vn",
+  kira: "https://kiraai.vn",
+  tokenharbor: "https://tokenharbor.ai",
+  "grok-xai": "https://x.ai",
+  xai: "https://x.ai",
+  deepseek: "https://www.deepseek.com",
+  "alibaba-cloud-model-studio": "https://www.alibabacloud.com/product/dashscope",
+  nscale: "https://www.nscale.com",
+  nebius: "https://nebius.com",
+  "ai21-labs": "https://www.ai21.com",
+  together: "https://www.together.ai",
+  fireworks: "https://fireworks.ai",
+  novita: "https://novita.ai",
+  pollinations: "https://pollinations.ai",
+  "ollama-cloud": "https://ollama.com",
+  "b-ai": "https://b.ai",
+  bai: "https://b.ai",
+  "chat-b-ai": "https://b.ai",
+  orcarouter: "https://orcarouter.ai",
+  freeai: "https://free.ai",
+  cline: "https://cline.bot",
+  anthropic: "https://www.anthropic.com",
+  "claude-code": "https://www.anthropic.com",
+  codex: "https://openai.com/codex",
+};
+
+export function getProviderInfoUrl(slug: string): string {
+  return providerInfoUrls[slug] || "#";
 }
