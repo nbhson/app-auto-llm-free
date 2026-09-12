@@ -308,6 +308,43 @@ export const config = {
     const v = parseInt(process.env.WEB_CACHE_TTL_S || "3600", 10);
     return isNaN(v) || v <= 0 ? 3600 : Math.min(v, 86400);
   })(),
+  // ---- P8 Adaptive Routing ----
+  adaptiveRoutingEnabled: parseBoolEnv(process.env.ADAPTIVE_ROUTING_ENABLED),
+  adaptiveEmaAlpha: (() => {
+    const v = parseFloat(process.env.ADAPTIVE_EMA_ALPHA || "0.3");
+    if (isNaN(v) || v <= 0 || v > 1) return 0.3;
+    return v;
+  })(),
+  // ---- P8 Per-model quota ----
+  perModelQuotaEnabled: parseBoolEnv(process.env.PER_MODEL_QUOTA_ENABLED),
+  // ---- P8 Observability ----
+  prometheusEnabled: (() => {
+    const v = process.env.PROMETHEUS_ENABLED;
+    if (v === undefined) return true; // enabled by default, no auth
+    return parseBoolEnv(v);
+  })(),
+  // ---- P8 BYOK ----
+  byokEnabled: (() => {
+    const v = process.env.BYOK_ENABLED;
+    if (v === undefined) return true;
+    return parseBoolEnv(v);
+  })(),
+  // ---- P8 Local embedding ----
+  localEmbeddingEnabled: parseBoolEnv(process.env.LOCAL_EMBEDDING_ENABLED),
+  localEmbeddingModel: (process.env.LOCAL_EMBEDDING_MODEL || "Xenova/bge-small-en-v1.5").trim(),
+  // ---- P8 MCP ----
+  mcpEnabled: parseBoolEnv(process.env.MCP_ENABLED),
+  // ---- P8 Compare ----
+  compareMaxConcurrency: (() => {
+    const v = parseInt(process.env.COMPARE_MAX_CONCURRENCY || "3", 10);
+    return isNaN(v) || v <= 0 ? 3 : Math.min(v, 5);
+  })(),
+  // ---- P8 Alerts ----
+  alertWebhookUrl: (process.env.ALERT_WEBHOOK_URL || "").trim(),
+  alertThresholdErrorRate: (() => {
+    const v = parseFloat(process.env.ALERT_THRESHOLD_ERROR_RATE || "0.5");
+    return isNaN(v) || v < 0 || v > 1 ? 0.5 : v;
+  })(),
   providerKeys: {
     // freellms ids use hyphen, config keys use same slug
     "nvidia-nim": parseKeys(process.env.NVIDIA_API_KEYS),

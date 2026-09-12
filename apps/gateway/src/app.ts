@@ -13,6 +13,7 @@ import { imagesRoute } from "./routes/v1/images.js";
 import { audioRoute } from "./routes/v1/audio.js";
 import { responsesRoute } from "./routes/v1/responses.js";
 import { anthropicRoute } from "./routes/v1/anthropic.js";
+import { compareRoute } from "./routes/v1/compare.js";
 import { apiRoute } from "./routes/api.js";
 import { extractBearer } from "./lib/auth.js";
 import { setRequestVk } from "./lib/types.js";
@@ -68,8 +69,36 @@ export function createApp() {
     return res;
   });
 
+  // Metrics (Prometheus via prom-client) — public if enabled, no auth
+  app.get("/metrics", async (c) => {
+    if (!config.prometheusEnabled) return c.text("prometheus disabled", 404);
+    const { renderMetrics } = await import("./lib/metrics.js");
+    const { getAllStates } = await import("./lib/circuit-breaker.js");
+    const { metrics } = await import("./lib/metrics.js");
+    // update gauges
+    const breakers = getAllStates() as Record<string, { state: string }>;
+    for (const [id, st] of Object.entries(breakers)) metrics.circuitOpen(id, st.state === "open" ? 1 : 0);
+    return c.text(await renderMetrics(), 200, { "Content-Type": "text/plain; version=0.0.4" });
+  });
+
+  // MCP manifest
+  app.get("/mcp.json", (c) => {
+    if (!config.mcpEnabled) return c.json({ error: "MCP disabled" }, 404);
+    return c.json({
+      name: "app-auto-llm-free",
+      version: "1.11.0",
+      tools: [
+        { name: "gateway_chat", endpoint: "/v1/chat/completions", method: "POST", description: "Chat completions via gateway" },
+        { name: "gateway_compare", endpoint: "/v1/chat/compare", method: "POST", description: "Compare 2-5 models side-by-side" },
+        { name: "gateway_list_models", endpoint: "/v1/models", method: "GET" },
+        { name: "gateway_provider_health", endpoint: "/api/providers/health", method: "GET" },
+      ],
+      auth: "Bearer fgk-...",
+    });
+  });
+
   // Public
-  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "1.9.3", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
+  app.get("/", (c) => c.json({ name: "app-auto-llm-free", version: "1.11.0", docs: "/docs", health: "/v1/health", models: "/v1/models" }));
   app.route("/v1/health", healthRoute);
   // LB-friendly liveness/readiness probes — no auth, no version payload
   app.get("/health", (c) => c.json({ status: "ok" }));
@@ -107,6 +136,7 @@ export function createApp() {
 
   app.route("/v1/models", modelsRoute);
   app.route("/v1/chat", chatRoute);
+  app.route("/v1/chat", compareRoute);
   app.route("/v1/embeddings", embeddingsRoute);
   app.route("/v1/images", imagesRoute);
   app.route("/v1/audio", audioRoute);

@@ -20,6 +20,7 @@ export default defineConfig({
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-markdown": ["react-markdown", "remark-gfm", "rehype-highlight", "highlight.js"],
           "vendor-charts": ["recharts"],
+          "vendor-tiktoken": ["js-tiktoken"],
         },
       },
     },

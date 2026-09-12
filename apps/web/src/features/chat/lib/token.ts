@@ -12,10 +12,34 @@ export const CHAT_CONSTANTS = {
   MODELS_FETCH_TIMEOUT_MS: 8000,
 } as const;
 
+// Keep sync heuristic for immediate UI (bundle < 1KB); accurate tiktoken loaded lazily via dynamic import
+let tiktokenEnc: { encode: (s: string) => number[] } | null = null;
+let tiktokenReady = false;
+async function getTiktoken() {
+  if (tiktokenReady) return tiktokenEnc;
+  tiktokenReady = true;
+  try {
+    const mod = await import("js-tiktoken");
+    tiktokenEnc = mod.getEncoding("cl100k_base");
+  } catch { tiktokenEnc = null; }
+  return tiktokenEnc;
+}
+// Warm up in idle
+if (typeof window !== "undefined") {
+  if ("requestIdleCallback" in window) (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(() => { void getTiktoken(); });
+  else setTimeout(() => { void getTiktoken(); }, 1500);
+}
+
 export function estimateTokens(text: string): number {
   if (!text) return 0;
-  // Heuristic: ~4 chars per token for English, ~2.5 for mixed/CJK.
-  // Keep lightweight in browser; backend uses js-tiktoken when available.
+  if (tiktokenEnc) {
+    try { return tiktokenEnc.encode(text).length; } catch { /* fallback */ }
+  }
+  return Math.ceil(text.length / CHAT_CONSTANTS.CHARS_PER_TOKEN);
+}
+export async function estimateTokensAccurate(text: string): Promise<number> {
+  const enc = await getTiktoken();
+  if (enc) { try { return enc.encode(text).length; } catch { /* fallback */ } }
   return Math.ceil(text.length / CHAT_CONSTANTS.CHARS_PER_TOKEN);
 }
 

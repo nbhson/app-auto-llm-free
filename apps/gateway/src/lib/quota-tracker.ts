@@ -1,3 +1,4 @@
+import { config } from "../config.js";
 import { logger } from "../middleware/logger.js";
 import { slidingCheck } from "./sliding-window.js";
 
@@ -79,7 +80,7 @@ export function checkQuota(provider: string, key: string, estimatedTokens: numbe
   return { allowed: true };
 }
 
-export function recordUsage(provider: string, key: string, tokens: number) {
+export function recordUsage(provider: string, key: string, tokens: number, model?: string) {
   const now = Date.now();
   const k = windowKey(provider, key.slice(0, 8));
   const limits = FREELLMS_LIMITS[provider];
@@ -107,8 +108,17 @@ export function recordUsage(provider: string, key: string, tokens: number) {
     w.count += tokens;
     tpdWindows.set(k, w);
   }
-  // Redis commit (best-effort): mirrors the increments above into sliding windows
-  void commitUsageAsync(provider, key, tokens).catch(() => {});
+  // also track per-model prefix if enabled (light in-memory)
+  if (model && config.perModelQuotaEnabled) {
+    const km = `${provider}:${model.slice(0,40)}:${key.slice(0,8)}`;
+    if (limits?.rpm) {
+      let w = rpmWindows.get(km);
+      if (!w || w.resetAt <= now) w = { count: 0, resetAt: now + 60000 };
+      w.count++; rpmWindows.set(km, w);
+    }
+  }
+  // Redis commit (best-effort): mirrors the increments into sliding windows (once)
+  void commitUsageAsync(provider, key, tokens, model).catch(() => {});
   logger.debug({ provider, tokens, k }, "quota usage recorded");
 }
 
@@ -124,10 +134,11 @@ interface QuotaDim {
   incr: number;
 }
 
-function quotaDims(provider: string, keyPrefix: string, estimatedTokens: number, commit: boolean): QuotaDim[] {
+function quotaDims(provider: string, keyPrefix: string, estimatedTokens: number, commit: boolean, model?: string): QuotaDim[] {
   const limits = FREELLMS_LIMITS[provider];
   if (!limits) return [];
-  const base = `quota:${provider}:${keyPrefix}`;
+  const modelSuffix = model && config.perModelQuotaEnabled ? `:${model.replace(/[^a-z0-9-]/gi, "_").slice(0, 40)}` : "";
+  const base = `quota:${provider}${modelSuffix}:${keyPrefix}`;
   const dims: QuotaDim[] = [];
   if (limits.rpm) dims.push({ kind: "RPM", ns: `${base}:rpm`, limit: limits.rpm, windowMs: MIN_MS, tokens: 1, incr: commit ? 1 : 0 });
   if (limits.tpm) dims.push({ kind: "TPM", ns: `${base}:tpm`, limit: limits.tpm, windowMs: MIN_MS, tokens: estimatedTokens, incr: commit ? estimatedTokens : 0 });
@@ -136,8 +147,8 @@ function quotaDims(provider: string, keyPrefix: string, estimatedTokens: number,
   return dims;
 }
 
-async function commitUsageAsync(provider: string, key: string, tokens: number): Promise<void> {
-  const dims = quotaDims(provider, key.slice(0, 8), tokens, true);
+async function commitUsageAsync(provider: string, key: string, tokens: number, model?: string): Promise<void> {
+  const dims = quotaDims(provider, key.slice(0, 8), tokens, true, model);
   if (dims.length === 0) return;
   // parallel fire — best-effort background, don't block
   await Promise.all(dims.map((d) => slidingCheck({ namespace: d.ns, limit: d.limit, tokens: d.tokens, incr: d.incr, windowMs: d.windowMs }).catch(() => null)));
@@ -162,9 +173,10 @@ function slidingCheckWithFallback(
 export async function checkQuotaAsync(
   provider: string,
   key: string,
-  estimatedTokens: number
+  estimatedTokens: number,
+  model?: string
 ): Promise<{ allowed: boolean; reason?: string; retryAfterMs?: number }> {
-  const dims = quotaDims(provider, key.slice(0, 8), estimatedTokens, false);
+  const dims = quotaDims(provider, key.slice(0, 8), estimatedTokens, false, model);
   if (dims.length === 0) return { allowed: true };
   // Parallel probe — single round-trip batch, fallback to in-memory if Redis unavailable/slow
   const results = await Promise.all(dims.map((d) => slidingCheckWithFallback({ namespace: d.ns, limit: d.limit, tokens: d.tokens, incr: 0, windowMs: d.windowMs })));

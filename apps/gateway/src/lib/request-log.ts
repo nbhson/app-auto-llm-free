@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { mean, quantileSorted } from "simple-statistics";
 import { resolveDataPath } from "./paths.js";
 
 export interface RequestLog {
@@ -150,12 +151,12 @@ export function getStats() {
   // All-time tokens
   let allTimeTokens = 0;
   for (const l of logs) allTimeTokens += l.totalTokens || 0;
-  const avgLatency = last100.length ? Math.round(last100.reduce((a, b) => a + b.latencyMs, 0) / last100.length) : 0;
-  const avgTokens = last100.length ? Math.round(totalTokens / last100.length) : 0;
+  const avgLatency = last100.length ? Math.round(mean(last100.map((l) => l.latencyMs))) : 0;
+  const avgTokens = last100.length ? Math.round(mean(last100.map((l) => l.totalTokens || 0))) : 0;
   const errors = last100.filter((l) => l.status >= 400).length;
-  // p95
-  const sorted = [...last100].sort((a, b) => a.latencyMs - b.latencyMs);
-  const p95 = sorted.length ? sorted[Math.floor(sorted.length * 0.95)]?.latencyMs || 0 : 0;
+  // p95 via simple-statistics (linear interpolation, accurate for small n)
+  const sortedLat = [...last100].map((l) => l.latencyMs).sort((a, b) => a - b);
+  const p95 = sortedLat.length ? Math.round(quantileSorted(sortedLat, 0.95)) : 0;
   return {
     total: logs.length,
     last100,

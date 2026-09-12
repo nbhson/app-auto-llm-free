@@ -86,6 +86,15 @@ export async function embedWithFallback(text: string, timeoutMs = 2000): Promise
       return { embedding: emb, model: models[i] };
     }
   }
+  // P8: local embedding fallback (hash or transformers) before giving up
+  try {
+    const { localEmbed } = await import("./local-embedding.js");
+    const local = await localEmbed(text);
+    if (local) {
+      logger.info({ dim: local.length }, "[embeddings] local fallback success");
+      return { embedding: local, model: `local/${config.localEmbeddingModel}` };
+    }
+  } catch {}
   logger.warn({ models }, "[embeddings] all fallbacks failed, will use hash fallback");
   return null;
 }

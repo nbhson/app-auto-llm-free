@@ -8,6 +8,9 @@ import { readDataJson, resolveDataPath } from "../lib/paths.js";
 import { semanticCache } from "../lib/semantic-cache.js";
 import { hasRealKey, isPublicProvider } from "../lib/provider-keys.js";
 import { errMessage, type FreellmsModelEntry, type FreellmsProviderEntry } from "../lib/types.js";
+import { getAdaptiveScores, getAdaptiveState } from "../lib/adaptive-router.js";
+import { getByokForVk, setByokKeys } from "../lib/byok-store.js";
+import { getStats as getRequestStats } from "../lib/request-log.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -473,6 +476,17 @@ apiRoute.get("/config", (c) => {
     WEB_TOOLS_MAX_ITERATIONS: config.webToolsMaxIterations,
     WEB_CACHE_TTL_S: config.webCacheTtlSec,
     FALLBACK_TIERS: JSON.stringify(config.fallbackTiers),
+    ADAPTIVE_ROUTING_ENABLED: config.adaptiveRoutingEnabled ? 1 : 0,
+    ADAPTIVE_EMA_ALPHA: config.adaptiveEmaAlpha,
+    PER_MODEL_QUOTA_ENABLED: config.perModelQuotaEnabled ? 1 : 0,
+    PROMETHEUS_ENABLED: config.prometheusEnabled ? 1 : 0,
+    BYOK_ENABLED: config.byokEnabled ? 1 : 0,
+    LOCAL_EMBEDDING_ENABLED: config.localEmbeddingEnabled ? 1 : 0,
+    LOCAL_EMBEDDING_MODEL: config.localEmbeddingModel,
+    MCP_ENABLED: config.mcpEnabled ? 1 : 0,
+    COMPARE_MAX_CONCURRENCY: config.compareMaxConcurrency,
+    ALERT_WEBHOOK_URL: config.alertWebhookUrl ? "***" : "",
+    ALERT_THRESHOLD_ERROR_RATE: config.alertThresholdErrorRate,
     _source: ".env",
   });
 });
@@ -647,9 +661,54 @@ apiRoute.put("/config", async (c) => {
       errors.push(`FALLBACK_TIERS invalid: ${errMessage(e)}`);
     }
   }
+  // P8 flags
+  if (body.ADAPTIVE_ROUTING_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.ADAPTIVE_ROUTING_ENABLED);
+    if (b===null) errors.push("ADAPTIVE_ROUTING_ENABLED must be 0/1/true/false"); else pending.adaptiveRoutingEnabled = b;
+  }
+  if (body.ADAPTIVE_EMA_ALPHA !== undefined) {
+    const v = parseFloat(String(body.ADAPTIVE_EMA_ALPHA));
+    if (!Number.isFinite(v) || v<=0 || v>1) errors.push("ADAPTIVE_EMA_ALPHA must be 0..1"); else pending.adaptiveEmaAlpha = v;
+  }
+  if (body.PER_MODEL_QUOTA_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.PER_MODEL_QUOTA_ENABLED);
+    if (b===null) errors.push("PER_MODEL_QUOTA_ENABLED must be 0/1/true/false"); else pending.perModelQuotaEnabled = b;
+  }
+  if (body.PROMETHEUS_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.PROMETHEUS_ENABLED);
+    if (b===null) errors.push("PROMETHEUS_ENABLED must be 0/1/true/false"); else pending.prometheusEnabled = b;
+  }
+  if (body.BYOK_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.BYOK_ENABLED);
+    if (b===null) errors.push("BYOK_ENABLED must be 0/1/true/false"); else pending.byokEnabled = b;
+  }
+  if (body.LOCAL_EMBEDDING_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.LOCAL_EMBEDDING_ENABLED);
+    if (b===null) errors.push("LOCAL_EMBEDDING_ENABLED must be 0/1/true/false"); else pending.localEmbeddingEnabled = b;
+  }
+  if (body.LOCAL_EMBEDDING_MODEL !== undefined) {
+    const s = String(body.LOCAL_EMBEDDING_MODEL).trim();
+    if (!s) errors.push("LOCAL_EMBEDDING_MODEL empty"); else if (s.length>200) errors.push("LOCAL_EMBEDDING_MODEL too long"); else pending.localEmbeddingModel = s;
+  }
+  if (body.MCP_ENABLED !== undefined) {
+    const b = parseBoolStrict(body.MCP_ENABLED);
+    if (b===null) errors.push("MCP_ENABLED must be 0/1/true/false"); else pending.mcpEnabled = b;
+  }
+  if (body.COMPARE_MAX_CONCURRENCY !== undefined) {
+    const v = parseInt(String(body.COMPARE_MAX_CONCURRENCY),10);
+    if (!Number.isFinite(v)||v<=0) errors.push("COMPARE_MAX_CONCURRENCY must be >0"); else pending.compareMaxConcurrency = Math.min(v,5);
+  }
+  if (body.ALERT_WEBHOOK_URL !== undefined) {
+    const s = String(body.ALERT_WEBHOOK_URL).trim();
+    if (s.length>500) errors.push("ALERT_WEBHOOK_URL too long"); else pending.alertWebhookUrl = s;
+  }
+  if (body.ALERT_THRESHOLD_ERROR_RATE !== undefined) {
+    const v = parseFloat(String(body.ALERT_THRESHOLD_ERROR_RATE));
+    if (!Number.isFinite(v)||v<0||v>1) errors.push("ALERT_THRESHOLD_ERROR_RATE must be 0..1"); else pending.alertThresholdErrorRate = v;
+  }
 
   // Unknown keys warning (ignore but report)
-  const known = new Set(["SEMANTIC_CACHE_ENABLED","SEMANTIC_THRESHOLD","CACHE_TTL_S","EMBEDDING_MODEL","EMBEDDING_FALLBACKS","SEMANTIC_CACHE_MAX_MEM","SEMANTIC_CACHE_SCAN_CAP","COMPRESSION_ENABLED","COMPRESSION_MAX_TOKENS","COST_ROUTING_ENABLED","COST_WEIGHT","LATENCY_WEIGHT","HEADROOM_WEIGHT","SUCCESS_WEIGHT","ANALYTICS_RETENTION_DAYS","PROVIDER_TIMEOUT_MS","PROVIDER_TIMEOUT_AUTO_MS","PROVIDER_PARALLEL_AUTO","CIRCUIT_BREAKER_THRESHOLD","CIRCUIT_BREAKER_COOLDOWN_MS","WEB_TOOLS_ENABLED","WEB_SEARCH_PROVIDER","WEB_FETCH_TIMEOUT_MS","WEB_FETCH_MAX_BYTES","WEB_SEARCH_MAX_RESULTS","WEB_TOOLS_MAX_ITERATIONS","WEB_CACHE_TTL_S","FALLBACK_TIERS","_source"]);
+  const known = new Set(["SEMANTIC_CACHE_ENABLED","SEMANTIC_THRESHOLD","CACHE_TTL_S","EMBEDDING_MODEL","EMBEDDING_FALLBACKS","SEMANTIC_CACHE_MAX_MEM","SEMANTIC_CACHE_SCAN_CAP","COMPRESSION_ENABLED","COMPRESSION_MAX_TOKENS","COST_ROUTING_ENABLED","COST_WEIGHT","LATENCY_WEIGHT","HEADROOM_WEIGHT","SUCCESS_WEIGHT","ANALYTICS_RETENTION_DAYS","PROVIDER_TIMEOUT_MS","PROVIDER_TIMEOUT_AUTO_MS","PROVIDER_PARALLEL_AUTO","CIRCUIT_BREAKER_THRESHOLD","CIRCUIT_BREAKER_COOLDOWN_MS","WEB_TOOLS_ENABLED","WEB_SEARCH_PROVIDER","WEB_FETCH_TIMEOUT_MS","WEB_FETCH_MAX_BYTES","WEB_SEARCH_MAX_RESULTS","WEB_TOOLS_MAX_ITERATIONS","WEB_CACHE_TTL_S","FALLBACK_TIERS","ADAPTIVE_ROUTING_ENABLED","ADAPTIVE_EMA_ALPHA","PER_MODEL_QUOTA_ENABLED","PROMETHEUS_ENABLED","BYOK_ENABLED","LOCAL_EMBEDDING_ENABLED","LOCAL_EMBEDDING_MODEL","MCP_ENABLED","COMPARE_MAX_CONCURRENCY","ALERT_WEBHOOK_URL","ALERT_THRESHOLD_ERROR_RATE","_source"]);
   for (const k of Object.keys(body)) {
     if (!known.has(k) && !k.startsWith("_")) errors.push(`Unknown key: ${k}`);
   }
@@ -688,6 +747,17 @@ apiRoute.put("/config", async (c) => {
     webToolsMaxIterations: "WEB_TOOLS_MAX_ITERATIONS",
     webCacheTtlSec: "WEB_CACHE_TTL_S",
     fallbackTiers: "FALLBACK_TIERS",
+    adaptiveRoutingEnabled: "ADAPTIVE_ROUTING_ENABLED",
+    adaptiveEmaAlpha: "ADAPTIVE_EMA_ALPHA",
+    perModelQuotaEnabled: "PER_MODEL_QUOTA_ENABLED",
+    prometheusEnabled: "PROMETHEUS_ENABLED",
+    byokEnabled: "BYOK_ENABLED",
+    localEmbeddingEnabled: "LOCAL_EMBEDDING_ENABLED",
+    localEmbeddingModel: "LOCAL_EMBEDDING_MODEL",
+    mcpEnabled: "MCP_ENABLED",
+    compareMaxConcurrency: "COMPARE_MAX_CONCURRENCY",
+    alertWebhookUrl: "ALERT_WEBHOOK_URL",
+    alertThresholdErrorRate: "ALERT_THRESHOLD_ERROR_RATE",
   };
   for (const [internal, value] of Object.entries(pending)) {
     (config as unknown as Record<string, unknown>)[internal] = value;
@@ -786,4 +856,91 @@ apiRoute.post("/compression/preview", async (c) => {
   } catch (e) {
     return c.json({ error: errMessage(e) }, 500);
   }
+});
+
+// ---- P8: Adaptive routing scores ----
+apiRoute.get("/routing/scores", async (c) => {
+  const model = c.req.query("model") || "auto";
+  const { getProvidersForRequest } = await import("../lib/router.js");
+  const providers = getProvidersForRequest(model);
+  const scores = getAdaptiveScores(providers, model);
+  return c.json({ model, adaptiveEnabled: config.adaptiveRoutingEnabled, scores, state: getAdaptiveState() });
+});
+
+apiRoute.get("/routing/state", (c) => {
+  return c.json({ enabled: config.adaptiveRoutingEnabled, emaAlpha: config.adaptiveEmaAlpha, state: getAdaptiveState() });
+});
+
+// ---- P8: BYOK self-serve ----
+apiRoute.get("/byok", (c) => {
+  if (!config.byokEnabled) return c.json({ error: "BYOK disabled" }, 403);
+  const vk = (c as unknown as { get: (k:string)=>unknown }).get?.("vk") as { id: string; role: string } | null;
+  const vkId = c.req.query("vkId") || vk?.id || "";
+  if (!vkId) return c.json({ error: "vkId required" }, 400);
+  // user can only view own unless admin
+  if (vk && vk.role !== "admin" && vk.id !== vkId) return c.json({ error: "forbidden" }, 403);
+  const data = getByokForVk(vkId);
+  // mask keys
+  const masked = Object.fromEntries(Object.entries(data).map(([p, keys])=> [p, keys.map((k)=> k.slice(0,8)+"***")]));
+  return c.json({ vkId, providers: masked, count: Object.keys(data).length });
+});
+
+apiRoute.post("/byok", async (c) => {
+  if (!config.byokEnabled) return c.json({ error: "BYOK disabled" }, 403);
+  const vk = (c as unknown as { get: (k:string)=>unknown }).get?.("vk") as { id: string; role: string } | null;
+  const body = await c.req.json().catch(()=> ({} as Record<string,unknown>));
+  const vkId = String(body.vkId || vk?.id || "").trim();
+  const provider = String(body.provider || "").trim();
+  const keys = Array.isArray(body.keys) ? (body.keys as unknown[]).filter((x): x is string=> typeof x==="string" && x.trim().length>0).map(s=> s.trim()).slice(0,10) : [];
+  if (!vkId || !provider) return c.json({ error: "vkId and provider required" }, 400);
+  if (vk && vk.role !== "admin" && vk.id !== vkId) return c.json({ error: "forbidden: can only set own BYOK" }, 403);
+  if (keys.length===0) return c.json({ error: "keys empty" }, 400);
+  // validate provider exists
+  const { providerIds } = await import("../providers/registry.js");
+  if (!providerIds.includes(provider)) return c.json({ error: `unknown provider ${provider}` }, 400);
+  setByokKeys(vkId, provider, keys);
+  const { metrics } = await import("../lib/metrics.js");
+  metrics.byokKeys(provider, keys.length);
+  return c.json({ saved: true, vkId, provider, count: keys.length });
+});
+
+apiRoute.delete("/byok", async (c) => {
+  if (!config.byokEnabled) return c.json({ error: "BYOK disabled" }, 403);
+  const vk = (c as unknown as { get: (k:string)=>unknown }).get?.("vk") as { id: string; role: string } | null;
+  const vkId = c.req.query("vkId") || vk?.id || "";
+  const provider = c.req.query("provider") || "";
+  if (!vkId || !provider) return c.json({ error: "vkId and provider required" }, 400);
+  if (vk && vk.role !== "admin" && vk.id !== vkId) return c.json({ error: "forbidden" }, 403);
+  setByokKeys(vkId, provider, []);
+  return c.json({ deleted: true, vkId, provider });
+});
+
+// ---- P8: Alerts webhook ----
+apiRoute.get("/alerts", (c) => {
+  const stats = getRequestStats();
+  const errorRate = stats.errorRate;
+  const threshold = config.alertThresholdErrorRate;
+  const firing = errorRate >= threshold && stats.last100.length >= 10;
+  return c.json({ errorRate, threshold, firing, webhookConfigured: !!config.alertWebhookUrl, stats: { total: stats.total, avgLatencyMs: stats.avgLatencyMs, p95LatencyMs: stats.p95LatencyMs } });
+});
+
+apiRoute.post("/alerts/test", async (c) => {
+  if (!config.alertWebhookUrl) return c.json({ error: "ALERT_WEBHOOK_URL not configured" }, 400);
+  try {
+    const stats = getRequestStats();
+    const res = await fetch(config.alertWebhookUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: `Gateway alert test: errorRate ${(stats.errorRate*100).toFixed(1)}%`, stats, at: new Date().toISOString() }) });
+    return c.json({ sent: res.ok, status: res.status });
+  } catch (e) { return c.json({ error: errMessage(e) }, 500); }
+});
+
+// ---- P8: Quota per-model ----
+apiRoute.get("/quota", async (c) => {
+  const provider = c.req.query("provider") || "";
+  const model = c.req.query("model") || "";
+  if (!provider) return c.json({ error: "provider required" }, 400);
+  const { getQuotaState, getQuotaHeadroom } = await import("../lib/quota-tracker.js");
+  // headroom aggregated
+  const headroom = getQuotaHeadroom(provider, "");
+  const st = getQuotaState(provider, "");
+  return c.json({ provider, model: model||null, perModelEnabled: config.perModelQuotaEnabled, headroom, state: st, limits: st.limits || null });
 });

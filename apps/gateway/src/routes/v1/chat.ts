@@ -12,12 +12,14 @@ import { hasScope } from "../../lib/virtual-keys.js";
 import { compressWithMetrics } from "../../lib/compression.js";
 import { logGenAI } from "../../lib/otel.js";
 import { FREELLMS_COST, rankProvidersByCostAndLatency } from "../../lib/cost-router.js";
+import { adaptiveRank, getAdaptiveScores } from "../../lib/adaptive-router.js";
 import { semanticCache } from "../../lib/semantic-cache.js";
 import { loadVerifiedMap, loadHealthMap } from "../../lib/model-store.js";
 import { tryProviders } from "../../lib/provider-executor.js";
 import { getRequestVk, type UpstreamChatCompletion, type CompressibleMessage } from "../../lib/types.js";
 import type { ChatMessage } from "../../providers/base.js";
 import { getWebTools, executeWebSearch, executeWebFetch, shouldEnableWebTools } from "../../lib/web-tools.js";
+import { metrics } from "../../lib/metrics.js";
 
 const contentPartSchema = z.object({
   type: z.string(),
@@ -118,12 +120,17 @@ chatRoute.post(
 
     // Vector 2: cost-aware re-ranking (skip if x-router pinned)
     const isAuto = model === "free-llm-gateway/auto" || model === "auto";
-    // For auto, rank only in non-test to prioritize fast providers (fixes 10-15s delay), but keep deterministic order in tests
-    const shouldRank = (config.costRoutingEnabled || (isAuto && config.nodeEnv !== "test")) && !pinned && providerOrder.length > 1;
+    // P8 adaptive: prefer adaptiveRank when ADAPTIVE_ROUTING_ENABLED=1, otherwise cost router
+    const shouldRank = (config.costRoutingEnabled || config.adaptiveRoutingEnabled || (isAuto && config.nodeEnv !== "test")) && !pinned && providerOrder.length > 1;
     if (shouldRank) {
       try {
-        providerOrder = rankProvidersByCostAndLatency(providerOrder);
-        logger.info({ providerOrder, isAuto }, "cost routing re-ranked");
+        if (config.adaptiveRoutingEnabled) {
+          providerOrder = await adaptiveRank(providerOrder, model);
+          logger.info({ providerOrder, isAuto, adaptive: true }, "adaptive routing re-ranked");
+        } else {
+          providerOrder = rankProvidersByCostAndLatency(providerOrder);
+          logger.info({ providerOrder, isAuto }, "cost routing re-ranked");
+        }
       } catch { /* ignore */ }
     }
     // Auto uses shorter per-provider timeout to fail fast (8s vs 25s) — sequential fallback 3 providers ~24s max vs 54s before
@@ -194,12 +201,18 @@ chatRoute.post(
     }
 
     // Helper to call provider — for auto, race 3 providers in parallel gateway-wide (not only Chat page)
+    // When x-router pinned, disable parallel to preserve pin order (test pins pollinations first)
+    // In test env, keep sequential for determinism
+    const parallelForCall = isAuto && !pinned && config.nodeEnv !== "test" ? config.providerParallelAuto : undefined;
     const callProvider = (msgs: unknown[], useStream: boolean | undefined, tools: unknown[] | undefined, toolChoice: unknown) =>
       tryProviders({
         providerOrder,
         quotaTokens: estimatedForQuota.total,
+        quotaModel: model,
+        vkId: vk?.id,
         timeoutMs: perProviderTimeout,
-        parallel: isAuto ? config.providerParallelAuto : undefined,
+        parallel: parallelForCall,
+        jitterMs: isAuto && !pinned && config.nodeEnv !== "test" ? 80 : 30,
         shouldSkip: (pid) => {
           const fullId = model.includes("/") ? model : `${pid}/${model}`;
           const requestedPrefix = model.split("/")[0];
@@ -234,9 +247,9 @@ chatRoute.post(
 
     // Web tools loop: if enabled, we do non-stream tool iterations first
     let result: Awaited<ReturnType<typeof tryProviders>> | null = null;
-    let loopMessages: unknown[] = [...messagesToSend] as unknown[];
+    const loopMessages: unknown[] = [...messagesToSend] as unknown[];
     let webIterations = 0;
-    let finalStreamRequested = !!body.stream;
+    const finalStreamRequested = !!body.stream;
 
     if (webToolsForRequest) {
       // Loop up to webToolsMaxIterations tool calls

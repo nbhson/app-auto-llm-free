@@ -1,35 +1,20 @@
-// Simple char-based token estimator (1 token ~4 chars, like tiktoken heuristic)
-// If js-tiktoken is installed, it will be used lazily via dynamic import (optional dep)
-import { createRequire } from "node:module";
+// Token estimator via js-tiktoken (cl100k_base) — single source of truth for quota/compression
+// Falls back to heuristic only if encoding fails (never on normal text)
+import { getEncoding } from "js-tiktoken";
 import type { TokenCountMessage } from "./types.js";
 
-const _require = createRequire(import.meta.url);
-
-interface TiktokenEncoding {
-  encode: (text: string) => number[];
-}
-
-let tiktokenEnc: TiktokenEncoding | null = null;
-let tiktokenTried = false;
-function getTiktoken(): TiktokenEncoding | null {
-  if (tiktokenTried) return tiktokenEnc;
-  tiktokenTried = true;
-  try {
-    const mod = _require("js-tiktoken") as unknown as { getEncoding?: (name: string) => TiktokenEncoding };
-    if (mod?.getEncoding) tiktokenEnc = mod.getEncoding("cl100k_base");
-  } catch { /* ignore */ }
-  return tiktokenEnc;
-}
+const enc = getEncoding("cl100k_base");
 
 export function estimateTokens(text: string): number {
   if (!text) return 0;
-  const enc = getTiktoken();
-  if (enc) {
-    try { return enc.encode(text).length; } catch { /* ignore */ }
+  try {
+    return enc.encode(text).length;
+  } catch {
+    return Math.ceil(text.length / 4);
   }
-  return Math.ceil(text.length / 4);
 }
 export function estimateTokensWithModel(text: string, _model?: string): number {
+  // Future: switch encoding per model (e.g. o200k_base for gpt-4o). Keep cl100k_base as default for gateway.
   return estimateTokens(text);
 }
 

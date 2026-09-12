@@ -1,4 +1,9 @@
 import crypto from "node:crypto";
+import type { LRUCache as LRUCacheType } from "lru-cache";
+import * as LRUCacheMod from "lru-cache";
+// Compat: lru-cache@10 ESM named export, CJS default via tsx interop
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const LRUCacheImpl: any = (LRUCacheMod as any).LRUCache ?? (LRUCacheMod as any).default ?? LRUCacheMod;
 import { getRedis } from "./redis.js";
 import { logger } from "../middleware/logger.js";
 import { config } from "../config.js";
@@ -14,17 +19,22 @@ export interface SemanticCacheKeyOpts {
 }
 
 export class SemanticCache {
-  private mem = new Map<string, CacheEntry>();
+  private mem: LRUCacheType<string, CacheEntry>;
   private hits = 0;
   private misses = 0;
   private defaultTtl: number;
-  private maxMemEntries: number;
   private scanCap: number;
 
   constructor(defaultTtlSec?: number) {
     this.defaultTtl = defaultTtlSec ?? (typeof config.semanticCacheTtlSec === "number" && config.semanticCacheTtlSec > 0 ? config.semanticCacheTtlSec : 3600);
-    this.maxMemEntries = config.semanticCacheMaxMemEntries ?? 1000;
+    const maxMemEntries = config.semanticCacheMaxMemEntries ?? 1000;
     this.scanCap = config.semanticCacheScanCap ?? 200;
+    this.mem = new (LRUCacheImpl as typeof LRUCacheType)<string, CacheEntry>({
+      max: maxMemEntries,
+      ttl: this.defaultTtl * 1000,
+      ttlAutopurge: true,
+      updateAgeOnGet: true,
+    });
   }
 
   private hash(query: string): string {
@@ -54,6 +64,7 @@ export class SemanticCache {
   private isExpired(entry: CacheEntry): boolean {
     return Date.now() > entry.expiresAt;
   }
+  // lru-cache handles TTL automatically; isExpired kept for Redis fallback compat
 
   // Public helpers for callers (chat.ts / anthropic.ts)
   buildKey(opts: SemanticCacheKeyOpts): string {
@@ -93,6 +104,7 @@ export class SemanticCache {
           this.mem.delete(k);
         } else {
           this.hits++;
+          // lru-cache updateAgeOnGet already promotes recency
           return entry.value;
         }
       }
@@ -113,7 +125,7 @@ export class SemanticCache {
           let scanned = 0;
           const maxScan = this.scanCap;
           // LRU scan: most-recent-first (Map is insertion-order oldest-first, so reverse)
-          const entries = Array.from(this.mem.entries()).reverse();
+          const entries = Array.from(this.mem.entries()).reverse() as Array<[string, CacheEntry]>;
           for (const [memKey, memEntry] of entries) {
             if (this.isExpired(memEntry) || !memEntry.embedding) continue;
             // tenant/model isolation: composite keys contain vk, legacy keys contain model prefix
@@ -172,16 +184,9 @@ export class SemanticCache {
     }
 
     // background embedding: don't block caller (harness 01 RAG pipeline async store)
-    // fire-and-forget with timeout
     let embedding: number[] | undefined;
     if (config.semanticCacheEnabled) {
-      // set immediately without embedding, then enrich async
-      this.mem.set(k, { value: response, expiresAt, embedding: undefined, createdAt: Date.now() });
-      if (this.mem.size > this.maxMemEntries) {
-        const oldestKey = this.mem.keys().next().value;
-        if (oldestKey) this.mem.delete(oldestKey);
-      }
-      if (this.mem.size % 100 === 0) this.sweep();
+      this.mem.set(k, { value: response, expiresAt, embedding: undefined, createdAt: Date.now() }, { ttl: ttlSec * 1000 });
       // enrich embedding in background
       void (async () => {
         try {
@@ -201,12 +206,7 @@ export class SemanticCache {
       return;
     }
 
-    this.mem.set(k, { value: response, expiresAt, embedding, createdAt: Date.now() });
-    if (this.mem.size > this.maxMemEntries) {
-      const oldestKey = this.mem.keys().next().value;
-      if (oldestKey) this.mem.delete(oldestKey);
-    }
-    if (this.mem.size % 100 === 0) this.sweep();
+    this.mem.set(k, { value: response, expiresAt, embedding, createdAt: Date.now() }, { ttl: ttlSec * 1000 });
   }
 
   // fire-and-forget helper for callers that should not await (harness 10 Automation)
@@ -240,13 +240,6 @@ export class SemanticCache {
       }
     } catch (err) {
       logger.warn({ err: (err as Error).message }, "[semantic-cache] clear redis failed");
-    }
-  }
-
-  private sweep(): void {
-    const now = Date.now();
-    for (const [k, v] of this.mem.entries()) {
-      if (now > v.expiresAt) this.mem.delete(k);
     }
   }
 }

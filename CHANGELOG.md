@@ -2,6 +2,41 @@
 
 Tất cả thay đổi đáng chú ý sẽ được ghi ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.11.0] - 2026-09-12
+
+### Added
+- **P9 — Thay lib ngoài chuẩn (5 nhóm)** — `v1.11.0`:
+  - **Benchmark chuyên nghiệp** — `apps/web/src/pages/Compare.tsx:1` `simple-statistics` (`mean/medianSorted/quantileSorted/standardDeviation`) thay hand-rolled `percentile`, `estimateCost` minh bạch `free=0`, TPS `mean(completion/latency)` per-run, p95 linear interpolation, thêm `median/p50/stdDev/min/max`, chart dual Y, abort `AbortController`, `max_tokens` slider, `csvEscape` RFC4180
+  - **Token chính xác** — `apps/gateway/src/lib/token-estimator.ts:1` `js-tiktoken cl100k_base` trực tiếp (bỏ `createRequire` lazy), `apps/web/src/features/chat/lib/token.ts:1` heuristic sync + `js-tiktoken` lazy dynamic `getTiktoken()` warmup `requestIdleCallback`, `vite.config.ts:22` split `vendor-tiktoken` 5.6MB chunk
+  - **Prometheus chuẩn** — `apps/gateway/src/lib/metrics.ts:1` `prom-client Registry/Counter/Histogram/Gauge + collectDefaultMetrics`, giữ API `incCounter/observeHistogram/metrics.*`, `app.ts:73` `await renderMetrics()`
+  - **Circuit breaker chuẩn** — `apps/gateway/src/lib/circuit-breaker.ts:1` `cockatiel circuitBreaker(handleAll, {halfOpenAfter, ConsecutiveBreaker(threshold)})` + sync `failures/openedAt` để test đồng bộ, `isOpen` check cooldown `30000ms`/`threshold 5`
+  - **Cache chuẩn** — `apps/gateway/src/lib/semantic-cache.ts:2` `lru-cache@10 LRUCache {max, ttl, ttlAutopurge, updateAgeOnGet}` thay `Map + sweep()`, compat `LRUCacheMod.LRUCache ?? default`, `apps/gateway/src/lib/request-log.ts:1` `simple-statistics quantileSorted` thay `floor(n*0.95)` cho p95
+  - **Observability** — `GET /metrics` public, `POST /v1/chat/compare` isolated latency server-side, `GET /health` version `1.11.0`
+- **UT docs** — `318 tests pass (49 files)` sau fix `circuit-breaker.test.ts` + `router-fallback.test.ts` cho `cockatiel` sync state (backdate `openedAt` via live `getState` ref), `health.test.ts:12` `1.11.0`, `chat-auto.test.ts:68` `1.11.0`, typecheck/build pass, `vite` split `vendor-tiktoken`
+
+### Changed
+- **Version** — `1.10.0→1.11.0` (root/gateway/web, badge `main.tsx:106`, `app.ts:89`, `health.test.ts`, `chat-auto.test.ts`, `docker-compose.yml` envs)
+- **Deps** — `js-tiktoken@1.0.21`, `prom-client`, `cockatiel@4.0.0`, `lru-cache@10.4.3`, `simple-statistics@7`, `rate-limiter-flexible` (gateway); `js-tiktoken` + `simple-statistics` (web)
+
+## [1.10.0] - 2026-09-12
+
+### Added
+- **P8 — Toàn bộ nâng cấp (6 nhóm)** — `v1.10.0`:
+  - **Adaptive routing EWMA** — `apps/gateway/src/lib/adaptive-router.ts:1` mới `EMA α=0.3` (`ADAPTIVE_ROUTING_ENABLED=0`, `ADAPTIVE_EMA_ALPHA=0.3`), `updateLatencyEMA` sau mỗi `tryProviders` success (`provider-executor.ts:1`), `GET /api/routing/scores?model=& /routing/state` debug, `config.ts:284` + `.env.example:193` + `docker-compose.yml` + `PUT /api/config` hot-reload, `Settings` expose; score=`cost*5+ema*0.0005-headroom*0.3-success*2+breakerPenalty`, ưu tiên provider nhanh + healthy khi bật
+  - **Per-model quota** — `apps/gateway/src/lib/quota-tracker.ts:127` `quotaDims` support `model` suffix khi `PER_MODEL_QUOTA_ENABLED=1` (`config.ts:289`), `checkQuotaAsync(provider,key,tokens,model)` + `recordUsage(provider,key,tokens,model)` per-model in-memory + Redis `quota:${provider}:${model}:${prefix}:rpm`, `GET /api/quota?provider=&model=` inspect, tránh 1 model spam chặn cả provider (Groq per-model)
+  - **Jitter + retry** — `provider-executor.ts:34` `jitterMs` 30/80ms + `tryProvidersSettled` fan-out isolated, `chat.ts:196` `jitterMs` + `vkId` + `quotaModel` per call
+  - **BYOK self-serve** — `apps/gateway/src/lib/byok-store.ts:1` mới AES-GCM encrypted `data/byok-store.json` (`__enc` wrapper), `POST /api/byok {vkId,provider,keys[]}` + `GET /api/byok?vkId=` (masked) + `DELETE /api/byok` (user chỉ own, admin all), `getEffectiveKeys` override `config.providerKeys` trong `provider-executor.ts:49`, `BYOK_ENABLED=1` (`config.ts:290`), `metrics.byokKeys` gauge
+  - **Prometheus /metrics** — `apps/gateway/src/lib/metrics.ts:1` mới minimal `prom-client` text exposition (`gateway_http_requests_total`, `gateway_llm_latency_ms` histogram 50..10000, `gateway_quota_headroom`, `gateway_circuit_breaker_open`, `gateway_byok_keys`), `GET /metrics` public khi `PROMETHEUS_ENABLED=1` (default 1) `app.ts:29`, `GET /api/alerts` + `POST /api/alerts/test` webhook (`ALERT_WEBHOOK_URL`, `ALERT_THRESHOLD_ERROR_RATE=0.5`), `docker-compose` env
+  - **Local embedding** — `apps/gateway/src/lib/local-embedding.ts:1` hash `384-dim L2-normalized` deterministic khi `LOCAL_EMBEDDING_ENABLED=1` (`LOCAL_EMBEDDING_MODEL=Xenova/bge-small-en-v1.5`), auto fallback `embedWithFallback` → local khi Cohere/NVIDIA fail (`embeddings.ts:78`), offline 100% không cần API key, optional `@huggingface/transformers` ONNX
+  - **Compare playground** — `apps/gateway/src/routes/v1/compare.ts:1` mới `POST /v1/chat/compare {models:2-5,messages,temperature}` fan-out isolated `Promise.all` per-model (không cross-fallback), trả `results[] {model,provider,ok,content,latencyMs,usage}`, `apps/web/src/pages/Compare.tsx:1` UI 3 cột + dropdown 120 models + `localStorage compareModels`, nav `Compare` (`main.tsx:1`, `i18n VI/EN`), mount `/v1/chat` + `/metrics` + `/mcp.json` (`app.ts:29`)
+  - **MCP gateway** — `GET /mcp.json` manifest khi `MCP_ENABLED=1` (`app.ts:48`), tools `gateway_chat/gateway_compare/gateway_list_models/gateway_provider_health`, sẵn sàng cho Claude Code/OpenCode MCP client
+  - **Observability** — `adaptive-router.getAdaptiveState()` + `metrics.llmLatency` per call, `GET /api/config` expose 10 keys P8 (`ADAPTIVE_*`, `PER_MODEL_QUOTA_ENABLED`, `PROMETHEUS_ENABLED`, `BYOK_ENABLED`, `LOCAL_*`, `MCP_ENABLED`, `COMPARE_MAX_CONCURRENCY`, `ALERT_*`), `PUT /api/config` validate atomic cho P8
+- **Dashboard** — 9 routes (thêm `/compare`), compare side-by-side isolated, alerts webhook test, quota inspect, BYOK per-provider via API
+- **UT docs** — 318 tests pass (49 files), typecheck/build pass, `chat-auto.test.ts` update parallel expectation, `health.test.ts` `1.10.0`
+
+### Changed
+- **Version** — `1.9.3→1.10.0` (root/gateway/web, badge `main.tsx:106`, `app.ts` health, `docker-compose.yml` envs)
+
 ## [1.9.3] - 2026-09-11
 
 ### Fixed

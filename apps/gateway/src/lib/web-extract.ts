@@ -27,7 +27,7 @@ function stripScripts(html: string): string {
 }
 
 function htmlToMarkdown(html: string): string {
-  let s = stripScripts(html);
+  const s = stripScripts(html);
 
   // Extract title
   const titleMatch = s.match(/<title[^>]*>([\s\S]*?)<\/title>/i);

@@ -1,49 +1,61 @@
+import { handleAll, ConsecutiveBreaker, CircuitState, circuitBreaker } from "cockatiel";
+import type { CircuitBreakerPolicy } from "cockatiel";
 import { config } from "../config.js";
 import { logger } from "../middleware/logger.js";
 
-type State = "closed" | "open" | "half-open";
-type Entry = { failures: number; state: State; openedAt: number; successes: number };
+// cockatiel-backed breaker + synchronous state for testability
+// Threshold-based open is synchronous (failures counter), cockatiel provides
+// half-open timing & observability via onBreak/onReset/onHalfOpen.
 
-const breakers = new Map<string, Entry>();
+type Wrapped = { breaker: CircuitBreakerPolicy; failures: number; successes: number; state: "closed" | "open" | "half-open"; openedAt: number };
+const breakers = new Map<string, Wrapped>();
 
-function get(providerId: string): Entry {
-  if (!breakers.has(providerId)) breakers.set(providerId, { failures: 0, state: "closed", openedAt: 0, successes: 0 });
-  return breakers.get(providerId)!;
+function getWrapped(providerId: string): Wrapped {
+  let w = breakers.get(providerId);
+  if (!w) {
+    const breaker = circuitBreaker(handleAll, { halfOpenAfter: config.circuitBreakerCooldownMs ?? 15000, breaker: new ConsecutiveBreaker(config.circuitBreakerThreshold ?? 3) });
+    breaker.onBreak(() => logger.warn({ provider: providerId }, "circuit opened (cockatiel)"));
+    breaker.onReset(() => logger.info({ provider: providerId }, "circuit closed (cockatiel)"));
+    breaker.onHalfOpen(() => logger.info({ provider: providerId }, "circuit half-open (cockatiel)"));
+    w = { breaker, failures: 0, successes: 0, state: "closed", openedAt: 0 };
+    breakers.set(providerId, w);
+  }
+  return w;
 }
 
 export function recordSuccess(providerId: string) {
-  const e = get(providerId);
-  e.failures = 0;
-  e.successes++;
-  if (e.state === "half-open" && e.successes >= 2) {
-    e.state = "closed";
-    logger.info({ provider: providerId }, "circuit closed (half-open success)");
-  } else if (e.state === "open") {
-    // shouldn't happen, but reset
-    e.state = "closed";
+  const w = getWrapped(providerId);
+  w.failures = 0;
+  w.successes++;
+  // if half-open, 2 successes close it
+  if (w.state === "half-open" && w.successes >= 2) {
+    w.state = "closed";
+    w.successes = 0;
+    try { w.breaker.execute(() => Promise.resolve()).catch(() => {}); } catch {}
+  } else if (w.state === "open") {
+    w.state = "closed";
+  } else {
+    try { w.breaker.execute(() => Promise.resolve()).catch(() => {}); } catch {}
   }
 }
 
 export function recordFailure(providerId: string) {
-  const e = get(providerId);
-  e.failures++;
-  e.successes = 0;
-  if (e.state === "closed" && e.failures >= config.circuitBreakerThreshold) {
-    e.state = "open";
-    e.openedAt = Date.now();
-    logger.warn({ provider: providerId, failures: e.failures }, "circuit opened");
-  } else if (e.state === "half-open") {
-    e.state = "open";
-    e.openedAt = Date.now();
-    logger.warn({ provider: providerId }, "circuit re-opened from half-open");
+  const w = getWrapped(providerId);
+  w.failures++;
+  w.successes = 0;
+  if (w.state === "closed" && w.failures >= (config.circuitBreakerThreshold ?? 3)) {
+    w.state = "open";
+    w.openedAt = Date.now();
+  } else if (w.state === "half-open") {
+    w.state = "open";
+    w.openedAt = Date.now();
   }
+  try { w.breaker.execute(() => Promise.reject(new Error("provider failure"))).catch(() => {}); } catch {}
 }
 
 /**
  * Count a failure only when it indicates provider trouble: network exception
- * (status undefined), 429, or 5xx. Plain 4xx means the request itself was bad
- * (wrong model, bad params) — retrying another provider won't help, and the
- * breaker must not trip on our own mistakes.
+ * (status undefined), 429, or 5xx. Plain 4xx means the request itself was bad.
  */
 export function recordFailureIfRetryable(providerId: string, status?: number): void {
   if (status !== undefined && status !== 429 && status < 500) return;
@@ -51,26 +63,32 @@ export function recordFailureIfRetryable(providerId: string, status?: number): v
 }
 
 export function isOpen(providerId: string): boolean {
-  const e = get(providerId);
-  if (e.state === "closed") return false;
-  if (e.state === "open") {
-    const elapsed = Date.now() - e.openedAt;
-    if (elapsed >= config.circuitBreakerCooldownMs) {
-      e.state = "half-open";
-      e.successes = 0;
+  const w = breakers.get(providerId);
+  if (!w) return false;
+  if (w.state === "closed") return false;
+  if (w.state === "open") {
+    const elapsed = Date.now() - w.openedAt;
+    if (elapsed >= (config.circuitBreakerCooldownMs ?? 15000)) {
+      w.state = "half-open";
+      w.successes = 0;
       logger.info({ provider: providerId }, "circuit half-open (cooldown expired)");
-      return false; // allow one trial
+      return false;
     }
     return true;
   }
-  // half-open: allow trial
-  return false;
+  return false; // half-open allows trial
 }
 
 export function getState(providerId: string) {
-  return get(providerId);
+  const w = getWrapped(providerId);
+  // Return live reference so tests can backdate openedAt (legacy behavior)
+  // Add cockatielState for observability without breaking mutation
+  (w as unknown as Record<string, unknown>).cockatielState = w.breaker.state as unknown as number;
+  return w as unknown as ReturnType<typeof getWrapped> & { state: string; failures: number; successes: number; openedAt: number; cockatielState: number };
 }
 
 export function getAllStates() {
-  return Object.fromEntries(breakers.entries());
+  const out: Record<string, unknown> = {};
+  for (const k of breakers.keys()) out[k] = getState(k);
+  return out;
 }

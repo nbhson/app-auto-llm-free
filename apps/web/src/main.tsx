@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
-import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown, Settings as SettingsIcon, BarChart3, MessageSquare } from "lucide-react";
+import { Zap, LayoutDashboard, Server, Cpu, Key, ScrollText, ShieldCheck, Copy, Eye, EyeOff, Check, ChevronDown, Settings as SettingsIcon, BarChart3, MessageSquare, GitCompare } from "lucide-react";
 import Dashboard from "./pages/Dashboard.tsx";
 import Models from "./pages/Models.tsx";
 import Providers from "./pages/Providers.tsx";
@@ -10,6 +10,7 @@ import Logs from "./pages/Logs.tsx";
 import Usage from "./pages/Usage.tsx";
 import Settings from "./pages/Settings.tsx";
 import Chat from "./pages/Chat.tsx";
+import Compare from "./pages/Compare.tsx";
 import "./index.css";
 import { LangProvider, useLang } from "./lib/i18n.tsx";
 
@@ -89,6 +90,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   ];
   const settingsNav = { to: "/settings", label: t("nav.settings"), icon: <SettingsIcon className="w-4 h-4" /> };
   const chatNav = { to: "/chat", label: t("nav.chat"), icon: <MessageSquare className="w-4 h-4" /> };
+  const compareNav = { to: "/compare", label: t("nav.compare"), icon: <GitCompare className="w-4 h-4" /> };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/60">
@@ -101,7 +103,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                   <Zap className="w-4 h-4 fill-white stroke-white" />
                 </div>
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors">Free LLM Gateway</span>
-                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v1.9.3</span>
+                <span className="font-mono text-[10px] font-semibold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 hidden sm:inline-flex">v1.11.0</span>
               </NavLink>
 
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs ${health === "ok" ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" : health === "down" ? "bg-rose-50 text-rose-700 border-rose-200/80" : "bg-slate-100 text-slate-600 border-slate-200/80"}`}>
@@ -221,6 +223,18 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                   )}
                 </NavLink>
                 <NavLink
+                  to={compareNav.to}
+                  className={({ isActive }) => `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${isActive ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"}`}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span className={isActive ? "text-amber-400" : "text-slate-500"}>{compareNav.icon}</span>
+                      <span>{compareNav.label}</span>
+                      {isActive && <div className="absolute inset-0 rounded-lg -z-10 bg-slate-900" />}
+                    </>
+                  )}
+                </NavLink>
+                <NavLink
                   to={settingsNav.to}
                   className={({ isActive }) => `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${isActive ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"}`}
                 >
@@ -259,6 +273,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/usage" element={<Usage />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/compare" element={<Compare />} />
+          <Route path="/benchmark" element={<Compare />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
